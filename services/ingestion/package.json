@@ -1,0 +1,17 @@
+{
+  "name": "@ekg/ingestion",
+  "version": "0.1.0",
+  "description": "Ingestion pipeline v0 — classify documents and queue candidates for curation (PRD P0-2)",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.mjs",
+    "ingest": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@ekg/core": "*",
+    "@ekg/store-sqlite": "*"
+  }
+}

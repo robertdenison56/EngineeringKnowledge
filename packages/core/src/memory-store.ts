@@ -1,11 +1,6 @@
-import type { Entity, Relationship, RelationshipType, ReviewStatus } from './ontology.js';
+import type { Entity, Relationship, RelationshipType } from './ontology.js';
 import type { Caller, GraphStore, NeighborHit, SearchHit, SearchOptions } from './graph-store.js';
-
-const REVIEW_WARNINGS: Partial<Record<ReviewStatus, string>> = {
-  superseded:
-    'This item has been superseded. Consult the replacement (see "supersedes" relationships) before relying on it.',
-  deprecated: 'This item is deprecated and must not be used on new work.',
-};
+import { buildQueryGroups, canRead, matchesTagFilter, scoreEntityMatch, warningFor } from './matching.js';
 
 /**
  * Development/test implementation of GraphStore. Naive term-match scoring
@@ -24,32 +19,22 @@ export class InMemoryGraphStore implements GraphStore {
     this.relationships.set(rel.id, rel);
   }
 
-  private canRead(caller: Caller, entity: Entity): boolean {
-    if (entity.tenantId !== caller.tenantId) return false;
-    const allowed = entity.acl.allowedPrincipals;
-    return allowed.includes('*') || allowed.some((p) => caller.principals.includes(p));
-  }
-
   async getEntity(caller: Caller, id: string): Promise<Entity | undefined> {
     const entity = this.entities.get(id);
-    return entity && this.canRead(caller, entity) ? entity : undefined;
+    return entity && canRead(caller, entity) ? entity : undefined;
   }
 
   async search(caller: Caller, query: string, options: SearchOptions = {}): Promise<SearchHit[]> {
-    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const groups = buildQueryGroups(query);
     const hits: SearchHit[] = [];
     for (const entity of this.entities.values()) {
-      if (!this.canRead(caller, entity)) continue;
+      if (!canRead(caller, entity)) continue;
       if (options.types && !options.types.includes(entity.type)) continue;
-      const haystack = [entity.title, entity.summary ?? '', JSON.stringify(entity.properties)]
-        .join(' ')
-        .toLowerCase();
-      // All terms must match (AND): partial matches would surface unrelated
-      // items and defeat the honest no_results state (PRD P0-8).
-      if (!terms.every((t) => haystack.includes(t))) continue;
-      const title = entity.title.toLowerCase();
-      const score = terms.length + terms.filter((t) => title.includes(t)).length;
-      hits.push({ entity, score, warning: REVIEW_WARNINGS[entity.provenance.reviewStatus] });
+      if (!matchesTagFilter(entity, options.tags)) continue;
+      const score = scoreEntityMatch(entity, groups);
+      if (score > 0) {
+        hits.push({ entity, score, warning: warningFor(entity.provenance.reviewStatus) });
+      }
     }
     hits.sort((a, b) => b.score - a.score);
     return hits.slice(0, options.limit ?? 10);
@@ -58,12 +43,34 @@ export class InMemoryGraphStore implements GraphStore {
   async list(caller: Caller, options: SearchOptions = {}): Promise<Entity[]> {
     const out: Entity[] = [];
     for (const entity of this.entities.values()) {
-      if (!this.canRead(caller, entity)) continue;
+      if (!canRead(caller, entity)) continue;
       if (options.types && !options.types.includes(entity.type)) continue;
+      if (!matchesTagFilter(entity, options.tags)) continue;
       out.push(entity);
       if (out.length >= (options.limit ?? 100)) break;
     }
     return out;
+  }
+
+  async listRelationships(caller: Caller): Promise<Relationship[]> {
+    const out: Relationship[] = [];
+    for (const rel of this.relationships.values()) {
+      if (rel.tenantId !== caller.tenantId) continue;
+      const from = this.entities.get(rel.fromId);
+      const to = this.entities.get(rel.toId);
+      if (from && to && canRead(caller, from) && canRead(caller, to)) out.push(rel);
+    }
+    return out;
+  }
+
+  async deleteEntity(caller: Caller, id: string): Promise<boolean> {
+    const entity = this.entities.get(id);
+    if (!entity || !canRead(caller, entity)) return false;
+    this.entities.delete(id);
+    for (const [relId, rel] of this.relationships) {
+      if (rel.fromId === id || rel.toId === id) this.relationships.delete(relId);
+    }
+    return true;
   }
 
   async neighbors(
@@ -78,7 +85,7 @@ export class InMemoryGraphStore implements GraphStore {
       const direction = rel.fromId === entityId ? 'out' : rel.toId === entityId ? 'in' : undefined;
       if (!direction) continue;
       const other = this.entities.get(direction === 'out' ? rel.toId : rel.fromId);
-      if (other && this.canRead(caller, other)) {
+      if (other && canRead(caller, other)) {
         hits.push({ relationship: rel, entity: other, direction });
       }
     }

@@ -24,6 +24,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@ekg/core": "*"
+    "@ekg/core": "*",
+    "@ekg/store-sqlite": "*"
   }
 }

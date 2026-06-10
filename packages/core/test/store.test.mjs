@@ -63,6 +63,32 @@ test('list browses by type with ACL trimming (P0-9 browse)', async () => {
   assert.equal(docsForLegal.length, 1);
 });
 
+test('multi-tag filtering and tag-aware search', async () => {
+  const store = await seededStore();
+  const firestop = await store.list(ENGINEER, { tags: ['firestop'] });
+  assert.ok(firestop.length >= 4, 'tag filter finds tagged entities');
+  const both = await store.list(ENGINEER, { tags: ['firestop', 'sealant'] });
+  assert.deepEqual(both.map((e) => e.id), ['material:fs-195'], 'multiple tags AND together');
+  const bySearch = await store.search(ENGINEER, 'envelope', { tags: ['firestop'] });
+  assert.ok(bySearch.length >= 2, 'search terms match tag text too');
+});
+
+test('listRelationships only returns edges between visible entities (P0-7)', async () => {
+  const store = await seededStore();
+  const rels = await store.listRelationships(ENGINEER);
+  assert.equal(rels.length, 7);
+  assert.equal((await store.listRelationships(OTHER_FIRM)).length, 0);
+});
+
+test('deleteEntity removes the entity and its relationships (curation reject)', async () => {
+  const store = await seededStore();
+  assert.equal(await store.deleteEntity(OTHER_FIRM, 'detail:cw-firestop-01'), false);
+  assert.equal(await store.deleteEntity(ENGINEER, 'detail:cw-firestop-01'), true);
+  assert.equal(await store.getEntity(ENGINEER, 'detail:cw-firestop-01'), undefined);
+  const fromCurrent = await store.neighbors(ENGINEER, 'detail:cw-firestop-02', 'supersedes');
+  assert.equal(fromCurrent.length, 0, 'dangling relationships must be removed');
+});
+
 test('neighbors traverses typed relationships in both directions', async () => {
   const store = await seededStore();
   const all = await store.neighbors(ENGINEER, 'detail:cw-firestop-02');

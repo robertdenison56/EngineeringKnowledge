@@ -6,6 +6,7 @@ import {
   ProvenanceLine,
   REVIEW_WARNINGS,
   ReviewBadge,
+  TagChips,
   TypeBadge,
   entityHref,
   typeColor,
@@ -102,7 +103,17 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
         </p>
       ) : null}
       {entity.summary ? <p className="summary">{entity.summary}</p> : null}
+      <TagChips tags={entity.tags} />
       <ProvenanceLine entity={entity} />
+      {entity.content ? (
+        <details className="doc-panel">
+          <summary>
+            Source document text ({entity.content.length.toLocaleString()} characters) — verify
+            the answer against the exact source
+          </summary>
+          <pre className="doc-text">{entity.content}</pre>
+        </details>
+      ) : null}
 
       <div className="entity-grid" style={{ marginTop: '1.2rem' }}>
         <div>

@@ -17,6 +17,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </Link>
           <nav>
             <Link href="/search">Browse &amp; search</Link>
+            <Link href="/map">Map</Link>
+            <Link href="/curation">Curate</Link>
+            <Link href="/capture">Capture</Link>
           </nav>
           <div
             className="identity"

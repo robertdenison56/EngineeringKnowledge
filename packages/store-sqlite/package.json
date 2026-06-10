@@ -1,0 +1,23 @@
+{
+  "name": "@ekg/store-sqlite",
+  "version": "0.1.0",
+  "description": "Persistent GraphStore on SQLite (node:sqlite) — dev-grade reference for the relational+graph-layer path of PRD OQ 1",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@ekg/core": "*"
+  }
+}

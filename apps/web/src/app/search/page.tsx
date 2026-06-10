@@ -5,15 +5,16 @@ import { EntityCard } from '../../components/ui';
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; type?: string }>;
+  searchParams: Promise<{ q?: string; type?: string; tag?: string }>;
 }) {
-  const { q = '', type = '' } = await searchParams;
+  const { q = '', type = '', tag = '' } = await searchParams;
   const store = await getStore();
   const types = type ? [type] : undefined;
+  const tags = tag ? [tag] : undefined;
 
   const entities = q
-    ? (await store.search(DEV_CALLER, q, { types, limit: 25 })).map((h) => h.entity)
-    : await store.list(DEV_CALLER, { types, limit: 50 });
+    ? (await store.search(DEV_CALLER, q, { types, tags, limit: 25 })).map((h) => h.entity)
+    : await store.list(DEV_CALLER, { types, tags, limit: 50 });
 
   return (
     <>
@@ -34,8 +35,14 @@ export default async function SearchPage({
             </option>
           ))}
         </select>
+        {tag ? <input type="hidden" name="tag" value={tag} /> : null}
         <button type="submit">Search</button>
       </form>
+      {tag ? (
+        <p className="meta" style={{ marginBottom: '0.8rem' }}>
+          Filtering by tag <strong>#{tag}</strong> · <a href={`/search?q=${encodeURIComponent(q)}`}>clear</a>
+        </p>
+      ) : null}
 
       {entities.length === 0 ? (
         <div className="empty">

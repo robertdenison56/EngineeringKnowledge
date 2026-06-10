@@ -36,6 +36,7 @@ const PUBLIC = { allowedPrincipals: ['*'] };
 export const DEMO_ENTITIES: Entity[] = [
   entity({
     id: 'project:riverside',
+    tags: ['healthcare', 'curtain-wall', 'steel-frame'],
     type: 'project',
     title: 'Riverside Medical Center',
     summary: 'Six-story acute-care hospital, completed 2024. Steel frame, unitized curtain wall.',
@@ -44,6 +45,8 @@ export const DEMO_ENTITIES: Entity[] = [
   }),
   entity({
     id: 'detail:cw-firestop-02',
+    aliases: ['perimeter fire barrier', 'safing', 'slab edge firestop'],
+    tags: ['firestop', 'fire-safety', 'curtain-wall', 'envelope'],
     type: 'design-detail',
     title: 'Curtain wall to slab edge firestop detail (rev. 2)',
     summary:
@@ -58,6 +61,8 @@ export const DEMO_ENTITIES: Entity[] = [
   }),
   entity({
     id: 'detail:cw-firestop-01',
+    aliases: ['perimeter fire barrier', 'safing', 'slab edge firestop'],
+    tags: ['firestop', 'fire-safety', 'curtain-wall', 'envelope'],
     type: 'design-detail',
     title: 'Curtain wall to slab edge firestop detail (rev. 1)',
     summary: 'Original perimeter fire barrier detail. Failed hose-stream test in 2023 mockup.',
@@ -72,6 +77,8 @@ export const DEMO_ENTITIES: Entity[] = [
   }),
   entity({
     id: 'spec:07-84-00',
+    aliases: ['firestopping spec', 'fire-stopping'],
+    tags: ['firestop', 'fire-safety', 'division-07'],
     type: 'spec-section',
     title: 'Section 07 84 00 — Firestopping',
     summary: 'Firm master spec for through-penetration and perimeter firestopping systems.',
@@ -84,6 +91,8 @@ export const DEMO_ENTITIES: Entity[] = [
   }),
   entity({
     id: 'standard:astm-e2307',
+    aliases: ['perimeter fire barrier test', 'E2307'],
+    tags: ['fire-safety', 'testing'],
     type: 'standard',
     title: 'ASTM E2307 — Perimeter Fire Barrier Systems',
     summary: 'Test standard for fire resistance of perimeter fire barriers using the intermediate-scale multistory apparatus.',
@@ -92,6 +101,7 @@ export const DEMO_ENTITIES: Entity[] = [
   }),
   entity({
     id: 'lesson:firestop-mockup-failure',
+    tags: ['firestop', 'fire-safety', 'qa', 'mockup'],
     type: 'lesson-learned',
     title: 'Perimeter fire barrier failed hose-stream test at mockup',
     summary:
@@ -102,6 +112,8 @@ export const DEMO_ENTITIES: Entity[] = [
   }),
   entity({
     id: 'person:james-okafor',
+    aliases: ['facade engineer', 'fire safety expert'],
+    tags: ['facade', 'fire-safety', 'expert'],
     type: 'person',
     title: 'James Okafor',
     summary: 'Senior façade engineer; firm expert on curtain wall fire/life-safety interfaces.',
@@ -109,7 +121,19 @@ export const DEMO_ENTITIES: Entity[] = [
     acl: PUBLIC,
   }),
   entity({
+    id: 'material:fs-195',
+    tags: ['firestop', 'sealant'],
+    type: 'material',
+    title: 'FS-195 intumescent firestop sealant',
+    summary:
+      'Candidate product record auto-extracted from a Riverside submittal; awaiting curator review.',
+    properties: { manufacturer: 'HoldFast Fire Protection', extractedBy: 'ingestion-pipeline' },
+    provenance: { reviewStatus: 'unverified' },
+    acl: PUBLIC,
+  }),
+  entity({
     id: 'document:claims-memo-riverside',
+    tags: ['legal'],
     type: 'document',
     title: 'Riverside firestop claim — legal memo',
     summary: 'Privileged memo on the mockup-failure schedule claim.',

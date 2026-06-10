@@ -12,10 +12,11 @@ Full product definition: [PRD](PRD-engineering-knowledge-graph.md).
 
 | Path | What it is | PRD |
 |---|---|---|
-| `packages/core` | Ontology, `GraphStore` interface, in-memory dev store, demo seed | P0-1 |
-| `apps/mcp-server` | MCP gateway — `search` / `fetch` / `traverse` tools (stdio for now; Streamable HTTP + OAuth next) | P0-3…P0-6 |
-| `apps/web` | Knowledge workspace app — dashboard, search/browse, entity pages with graph view (`npm run dev --workspace @ekg/web`) | P0-9 |
-| `services/ingestion` | Document ingestion & PDF parsing pipeline (placeholder) | P0-2, P0-2a |
+| `packages/core` | Ontology, `GraphStore` interface, shared retrieval semantics, in-memory dev store, demo seed | P0-1 |
+| `packages/store-sqlite` | Persistent `GraphStore` on SQLite (`node:sqlite`, no native deps) | OQ 1 reference |
+| `apps/mcp-server` | MCP gateway — `search` / `fetch` / `traverse` tools (stdio for now; set `EKG_DB_PATH` to serve the curated database) | P0-3…P0-6 |
+| `apps/web` | Knowledge workspace app — dashboard, search/browse, entity pages with graph view, curation workbench, capture form (`npm run dev --workspace @ekg/web`) | P0-9 |
+| `services/ingestion` | Ingestion CLI v0 — classify files, queue candidates for curation (PDF text extraction pending OQ 8) | P0-2, P0-2a |
 | `docs/decisions` | Architecture decision records | — |
 
 ## Getting started
@@ -40,9 +41,22 @@ Then ask: *"How have we detailed curtain-wall firestop conditions, and what
 went wrong at Riverside?"* — answers come from the seeded demo graph with
 citations, and the superseded rev. 1 detail comes back with a warning.
 
+## The full loop
+
+```sh
+npm run dev --workspace @ekg/web          # app on :3000, seeds .data/ekg.db
+npm run ingest --workspace @ekg/ingestion -- services/ingestion/samples \
+  --db apps/web/.data/ekg.db              # queue candidates for review
+# review at http://localhost:3000/curation → Verify / Reject
+EKG_DB_PATH=$PWD/apps/web/.data/ekg.db node apps/mcp-server/dist/index.js
+# the gateway now serves exactly what curators approved
+```
+
 ## Status
 
-Phase 1 scaffold (see PRD Timeline Considerations). The graph store is an
-in-memory implementation behind the `GraphStore` interface while the engine
-spike (PRD Open Question 1) is open; the MCP server runs on stdio with a
-fixed dev identity until the remote OAuth deployment lands in Phase 2.
+Phase 1 functionally complete (see PRD Timeline Considerations): ontology,
+persistent store, ingestion v0, curation workbench, capture form, and the
+stdio MCP gateway sharing one database with the app. Open before Phase 2
+exit: production graph engine (OQ 1), PDF parsing spike (OQ 8), SharePoint
+sync, and the remote transport (Streamable HTTP + OAuth) with real
+identity — today's dev caller is fixed.

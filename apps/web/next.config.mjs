@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@ekg/core'],
+  transpilePackages: ['@ekg/core', '@ekg/store-sqlite'],
 };
 
 export default nextConfig;

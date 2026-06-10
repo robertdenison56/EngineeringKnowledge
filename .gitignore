@@ -39,6 +39,9 @@ venv/
 release/
 *.tgz
 
+# Local databases
+.data/
+
 # Misc
 .turbo/
 .cache/

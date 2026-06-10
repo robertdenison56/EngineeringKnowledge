@@ -23,6 +23,8 @@ export interface SearchHit {
 
 export interface SearchOptions {
   types?: EntityType[];
+  /** Entities must carry every listed tag. */
+  tags?: string[];
   limit?: number;
 }
 
@@ -44,6 +46,18 @@ export interface GraphStore {
   search(caller: Caller, query: string, options?: SearchOptions): Promise<SearchHit[]>;
   /** Browse without a query (workspace-app faceted browse, PRD P0-9). */
   list(caller: Caller, options?: SearchOptions): Promise<Entity[]>;
+  /**
+   * Remove an entity and every relationship touching it (curation reject,
+   * PRD P0-9). Returns false if the entity is missing or not visible to the
+   * caller.
+   */
+  deleteEntity(caller: Caller, id: string): Promise<boolean>;
+  /**
+   * All relationships whose BOTH endpoints are visible to the caller —
+   * edges must never leak the existence of hidden entities (PRD P0-7).
+   * Powers the workspace app's full-graph knowledge map (PRD P0-9).
+   */
+  listRelationships(caller: Caller): Promise<Relationship[]>;
   /** Follow relationships from an entity (MCP `traverse` tool, PRD P0-3). */
   neighbors(caller: Caller, entityId: string, type?: RelationshipType): Promise<NeighborHit[]>;
 }

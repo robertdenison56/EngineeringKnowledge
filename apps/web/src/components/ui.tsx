@@ -54,6 +54,19 @@ export function entityHref(id: string): string {
   return `/entities/${encodeURIComponent(id)}`;
 }
 
+export function TagChips({ tags }: { tags?: string[] }) {
+  if (!tags || tags.length === 0) return null;
+  return (
+    <span className="tags">
+      {tags.map((t) => (
+        <Link key={t} href={`/search?tag=${encodeURIComponent(t)}`} className="tag-chip">
+          #{t}
+        </Link>
+      ))}
+    </span>
+  );
+}
+
 export function ProvenanceLine({ entity }: { entity: Entity }) {
   const p = entity.provenance;
   return (
@@ -90,6 +103,7 @@ export function EntityCard({ entity }: { entity: Entity }) {
       </div>
       {warning ? <p className="warning">⚠ {warning}</p> : null}
       {entity.summary ? <p className="summary">{entity.summary}</p> : null}
+      <TagChips tags={entity.tags} />
       <ProvenanceLine entity={entity} />
     </article>
   );

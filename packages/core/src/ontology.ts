@@ -77,6 +77,23 @@ export interface Entity {
   summary?: string;
   /** Type-specific attributes; schema is tenant-extensible. */
   properties: Record<string, unknown>;
+  /**
+   * Free-form, multi-valued labels for cross-cutting facets (discipline,
+   * system, hazard, market…). Assigned by curators, capture forms, and the
+   * ingestion parser; searchable and filterable everywhere.
+   */
+  tags?: string[];
+  /**
+   * Alternate names and domain synonyms ("safing", "perimeter fire
+   * barrier") so retrieval finds knowledge however the engineer words it.
+   */
+  aliases?: string[];
+  /**
+   * Extracted source-document text (P0-2a pipeline output). Searchable, and
+   * shown in the workspace app so users can verify answers against the
+   * exact document.
+   */
+  content?: string;
   provenance: Provenance;
   acl: Acl;
 }

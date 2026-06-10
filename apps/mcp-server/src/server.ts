@@ -20,9 +20,15 @@ import {
  * caller resolution, and the real graph store — the tool surface stays.
  */
 
-/** Stable deep link into the workspace app (PRD P0-9); placeholder host for now. */
+/**
+ * Stable deep link to the entity in the workspace app (PRD P0-9), where the
+ * user can verify the answer against the source document text, provenance,
+ * and graph context. EKG_APP_URL points at the deployed app.
+ */
+const APP_BASE = (process.env.EKG_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+
 function appUrl(entity: Entity): string {
-  return `https://app.ekg.example/${entity.tenantId}/entities/${encodeURIComponent(entity.id)}`;
+  return `${APP_BASE}/entities/${encodeURIComponent(entity.id)}`;
 }
 
 function citation(entity: Entity) {
@@ -42,6 +48,7 @@ function searchResult(hit: SearchHit) {
     url: appUrl(hit.entity),
     type: hit.entity.type,
     snippet: hit.entity.summary,
+    tags: hit.entity.tags,
     provenance: citation(hit.entity),
     ...(hit.warning ? { warning: hit.warning } : {}),
   };
@@ -64,6 +71,16 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
   let store: GraphStore;
   if (options.store) {
     store = options.store;
+  } else if (process.env.EKG_DB_PATH && process.env.EKG_DB_PATH !== ':memory:') {
+    // Share the same persistent database the workspace app curates, so the
+    // gateway serves curator-approved knowledge (point it at the app's
+    // .data/ekg.db). Falls back to the seeded demo graph when unset.
+    const { SqliteGraphStore, providerFromEnv } = await import('@ekg/store-sqlite');
+    const sqlite = new SqliteGraphStore(process.env.EKG_DB_PATH, {
+      embeddings: providerFromEnv(),
+    });
+    if (sqlite.countEntities(DEMO_TENANT) === 0) await seedDemo(sqlite);
+    store = sqlite;
   } else {
     const seeded = new InMemoryGraphStore();
     await seedDemo(seeded);
@@ -91,11 +108,15 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
           .array(z.string())
           .optional()
           .describe('Optional entity-type filter, e.g. ["design-detail", "lesson-learned"]'),
+        tags: z
+          .array(z.string())
+          .optional()
+          .describe('Optional tag filter — results must carry every listed tag, e.g. ["firestop"]'),
         limit: z.number().int().min(1).max(25).optional(),
       },
     },
-    async ({ query, types, limit }) => {
-      const hits = await store.search(caller, query, { types, limit });
+    async ({ query, types, tags, limit }) => {
+      const hits = await store.search(caller, query, { types, tags, limit });
       if (hits.length === 0) {
         return asContent({ results: [], no_results: true, guidance: NO_RESULTS_GUIDANCE });
       }
@@ -123,11 +144,12 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
       return asContent({
         id: entity.id,
         title: entity.title,
-        text: entity.summary ?? '',
+        text: entity.content ?? entity.summary ?? '',
         url: appUrl(entity),
         metadata: {
           type: entity.type,
           properties: entity.properties,
+          tags: entity.tags,
           provenance: citation(entity),
           related: related.map((n) => ({
             relationship: n.relationship.type,
