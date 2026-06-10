@@ -1,0 +1,189 @@
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import type { Entity, NeighborHit } from '@ekg/core';
+import { DEV_CALLER, getStore } from '../../../lib/store';
+import {
+  ProvenanceLine,
+  REVIEW_WARNINGS,
+  ReviewBadge,
+  TypeBadge,
+  entityHref,
+  typeColor,
+} from '../../../components/ui';
+
+function shortTitle(title: string, max = 20): string {
+  return title.length > max ? `${title.slice(0, max - 1)}…` : title;
+}
+
+/**
+ * Server-rendered SVG neighborhood view — the seed of the P0-9 graph
+ * explorer. Center node plus first-degree neighbors, clickable.
+ */
+function NeighborhoodGraph({ entity, neighbors }: { entity: Entity; neighbors: NeighborHit[] }) {
+  const W = 640;
+  const H = 400;
+  const cx = W / 2;
+  const cy = H / 2;
+  const R = 140;
+  const shown = neighbors.slice(0, 10);
+  const placed = shown.map((n, i) => {
+    const angle = (2 * Math.PI * i) / shown.length - Math.PI / 2;
+    return { n, x: cx + R * Math.cos(angle), y: cy + R * Math.sin(angle) };
+  });
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Graph neighborhood of ${entity.title}`}>
+      {placed.map(({ n, x, y }) => (
+        <g key={`edge-${n.relationship.id}`}>
+          <line x1={cx} y1={cy} x2={x} y2={y} stroke="#cbd5e1" strokeWidth={1.5} />
+          <text
+            x={(cx + x) / 2}
+            y={(cy + y) / 2 - 4}
+            textAnchor="middle"
+            fontSize={9}
+            fill="#94a3b8"
+          >
+            {n.direction === 'out' ? n.relationship.type : `← ${n.relationship.type}`}
+          </text>
+        </g>
+      ))}
+      {placed.map(({ n, x, y }) => (
+        <Link key={`node-${n.entity.id}`} href={entityHref(n.entity.id)}>
+          <circle cx={x} cy={y} r={24} fill={typeColor(n.entity.type)} opacity={0.9} />
+          <text x={x} y={y + 38} textAnchor="middle" fontSize={10} fill="#334155">
+            {shortTitle(n.entity.title)}
+          </text>
+        </Link>
+      ))}
+      <circle cx={cx} cy={cy} r={30} fill={typeColor(entity.type)} stroke="#0f172a" strokeWidth={2} />
+      <text x={cx} y={cy + 48} textAnchor="middle" fontSize={11} fontWeight={600} fill="#0f172a">
+        {shortTitle(entity.title, 28)}
+      </text>
+    </svg>
+  );
+}
+
+export default async function EntityPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: rawId } = await params;
+  const id = decodeURIComponent(rawId);
+  const store = await getStore();
+  const entity = await store.getEntity(DEV_CALLER, id);
+  if (!entity) notFound();
+  const neighbors = await store.neighbors(DEV_CALLER, id);
+
+  const warning = REVIEW_WARNINGS[entity.provenance.reviewStatus];
+  const supersededBy = neighbors.find(
+    (n) => n.relationship.type === 'supersedes' && n.direction === 'in',
+  );
+  const properties = Object.entries(entity.properties);
+
+  return (
+    <>
+      <p className="breadcrumb">
+        <Link href="/search">Browse</Link> / {entity.type}
+      </p>
+      <div className="card-head">
+        <h1 style={{ margin: 0, fontSize: '1.4rem' }}>{entity.title}</h1>
+        <span className="badges">
+          <TypeBadge type={entity.type} />
+          <ReviewBadge status={entity.provenance.reviewStatus} />
+        </span>
+      </div>
+      {warning ? (
+        <p className="warning">
+          ⚠ {warning}
+          {supersededBy ? (
+            <>
+              {' '}
+              Current version:{' '}
+              <Link href={entityHref(supersededBy.entity.id)}>{supersededBy.entity.title}</Link>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+      {entity.summary ? <p className="summary">{entity.summary}</p> : null}
+      <ProvenanceLine entity={entity} />
+
+      <div className="entity-grid" style={{ marginTop: '1.2rem' }}>
+        <div>
+          <h2 style={{ marginTop: 0 }}>Graph neighborhood</h2>
+          {neighbors.length > 0 ? (
+            <div className="graph-card">
+              <NeighborhoodGraph entity={entity} neighbors={neighbors} />
+            </div>
+          ) : (
+            <div className="empty">No relationships yet.</div>
+          )}
+
+          <h2>Relationships</h2>
+          {neighbors.length > 0 ? (
+            <table className="rel-table">
+              <tbody>
+                {neighbors.map((n) => (
+                  <tr key={n.relationship.id}>
+                    <td>
+                      <span className="rel-chip">
+                        {n.direction === 'out' ? `${n.relationship.type} →` : `← ${n.relationship.type}`}
+                      </span>
+                    </td>
+                    <td>
+                      <Link href={entityHref(n.entity.id)}>{n.entity.title}</Link>
+                    </td>
+                    <td>
+                      <TypeBadge type={n.entity.type} />
+                    </td>
+                    <td>
+                      <ReviewBadge status={n.entity.provenance.reviewStatus} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="empty">No relationships yet.</div>
+          )}
+        </div>
+
+        <div>
+          <h2 style={{ marginTop: 0 }}>Record</h2>
+          <div className="card">
+            <table className="kv">
+              <tbody>
+                <tr>
+                  <td>Entity id</td>
+                  <td>
+                    <code>{entity.id}</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Review status</td>
+                  <td>{entity.provenance.reviewStatus}</td>
+                </tr>
+                {entity.provenance.author ? (
+                  <tr>
+                    <td>Author</td>
+                    <td>{entity.provenance.author}</td>
+                  </tr>
+                ) : null}
+                <tr>
+                  <td>Created</td>
+                  <td>{entity.provenance.createdAt.slice(0, 10)}</td>
+                </tr>
+                <tr>
+                  <td>Modified</td>
+                  <td>{entity.provenance.modifiedAt.slice(0, 10)}</td>
+                </tr>
+                {properties.map(([key, value]) => (
+                  <tr key={key}>
+                    <td>{key}</td>
+                    <td>{typeof value === 'string' ? value : JSON.stringify(value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

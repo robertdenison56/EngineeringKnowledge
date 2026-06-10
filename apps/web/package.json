@@ -1,0 +1,23 @@
+{
+  "name": "@ekg/web",
+  "version": "0.1.0",
+  "description": "Knowledge workspace app — browse, search, and explore the AEC engineering knowledge graph (PRD P0-9)",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@ekg/core": "*",
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}

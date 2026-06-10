@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ekg-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--workspace", "@ekg/web"],
+      "port": 3000
+    },
+    {
+      "name": "ekg-mcp-server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["apps/mcp-server/dist/index.js"]
+    }
+  ]
+}
