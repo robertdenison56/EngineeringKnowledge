@@ -70,7 +70,10 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
   const store = await getStore();
   const entity = await store.getEntity(DEV_CALLER, id);
   if (!entity) notFound();
-  const neighbors = await store.neighbors(DEV_CALLER, id);
+  const [neighbors, chunks] = await Promise.all([
+    store.neighbors(DEV_CALLER, id),
+    store.getChunks(DEV_CALLER, id),
+  ]);
 
   const warning = REVIEW_WARNINGS[entity.provenance.reviewStatus];
   const supersededBy = neighbors.find(
@@ -108,10 +111,41 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
       {entity.content ? (
         <details className="doc-panel">
           <summary>
-            Source document text ({entity.content.length.toLocaleString()} characters) — verify
-            the answer against the exact source
+            Source document text
+            {chunks.length > 0
+              ? ` — preview of ${chunks.length.toLocaleString()} indexed passage${chunks.length === 1 ? '' : 's'}`
+              : ` (${entity.content.length.toLocaleString()} characters)`}{' '}
+            — verify the answer against the exact source
           </summary>
           <pre className="doc-text">{entity.content}</pre>
+        </details>
+      ) : null}
+      {chunks.length > 1 ? (
+        <details className="doc-panel">
+          <summary>
+            Document sections ({chunks.length.toLocaleString()}) — each searchable and citable by
+            page/sheet/spec section (ADR 0006)
+          </summary>
+          <ol className="section-list">
+            {chunks.map((c) => {
+              const a = c.anchor ?? {};
+              const loc = [
+                a.sheet ? `Sheet ${a.sheet}` : null,
+                a.specSection ? a.specSection : null,
+                a.page ? `p. ${a.page}` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ');
+              return (
+                <li key={c.id}>
+                  <span className="section-loc">{loc || `Passage ${c.ordinal + 1}`}</span>
+                  {c.heading && c.heading !== loc ? (
+                    <span className="section-heading"> {c.heading}</span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
         </details>
       ) : null}
 

@@ -1,4 +1,4 @@
-import type { Entity } from './ontology.js';
+import type { Chunk, Entity } from './ontology.js';
 
 /**
  * Pluggable dense-retrieval interface. Stores accept any provider; firms
@@ -11,7 +11,12 @@ export interface EmbeddingProvider {
   embed(texts: string[]): Promise<number[][]>;
 }
 
-/** What gets embedded for an entity — capped so giant documents don't dominate. */
+/**
+ * What gets embedded for an entity — title/summary/metadata plus the content
+ * preview. For long documents the per-chunk vectors (`chunkEmbeddingText`)
+ * carry deep retrieval; this entity-level vector covers short entities and
+ * whole-document gist (ADR 0006).
+ */
 export function embeddingText(entity: Entity): string {
   return [
     entity.title,
@@ -22,6 +27,11 @@ export function embeddingText(entity: Entity): string {
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/** What gets embedded for one passage — heading for context, then the body. */
+export function chunkEmbeddingText(chunk: Chunk): string {
+  return [chunk.heading ?? '', chunk.text].filter(Boolean).join('\n').slice(0, 2000);
 }
 
 export function cosineSimilarity(a: number[], b: number[]): number {

@@ -88,7 +88,13 @@ export function ProvenanceLine({ entity }: { entity: Entity }) {
   );
 }
 
-export function EntityCard({ entity }: { entity: Entity }) {
+/** The passage a search hit matched on, for citation in the card (ADR 0006). */
+export interface CardMatch {
+  heading?: string;
+  snippet: string;
+}
+
+export function EntityCard({ entity, match }: { entity: Entity; match?: CardMatch }) {
   const warning = REVIEW_WARNINGS[entity.provenance.reviewStatus];
   return (
     <article className="card">
@@ -102,7 +108,14 @@ export function EntityCard({ entity }: { entity: Entity }) {
         </span>
       </div>
       {warning ? <p className="warning">⚠ {warning}</p> : null}
-      {entity.summary ? <p className="summary">{entity.summary}</p> : null}
+      {match ? (
+        <p className="summary">
+          {match.heading ? <span className="match-loc">{match.heading} — </span> : null}
+          <span className="match-snippet">{match.snippet}</span>
+        </p>
+      ) : entity.summary ? (
+        <p className="summary">{entity.summary}</p>
+      ) : null}
       <TagChips tags={entity.tags} />
       <ProvenanceLine entity={entity} />
     </article>

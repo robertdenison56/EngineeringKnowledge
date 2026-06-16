@@ -90,6 +90,93 @@ try {
   const graph = JSON.parse(traverse.content[0].text);
   assert(graph.neighbors?.[0]?.id === 'project:riverside', 'traverse follows relationships');
 
+  // --- Gateway ingestion + client-model description flow (ADR 0005) ---
+  const samples = join(root, '../../services/ingestion/samples');
+
+  const ingested = await request(6, 'tools/call', {
+    name: 'ingest_document',
+    arguments: { path: join(samples, '07 92 00 - Joint Sealants Spec (excerpt).pdf') },
+  });
+  const spec = JSON.parse(ingested.content[0].text);
+  assert(spec.status === 'queued_unverified', 'ingest queues candidate as unverified');
+  assert(spec.parseStatus === 'extracted', 'ingest extracts the PDF text layer (ADR 0004)');
+
+  const described = await request(7, 'tools/call', {
+    name: 'save_description',
+    arguments: {
+      entityId: spec.id,
+      description: 'Joint sealant spec excerpt covering silicone sealant and backer rod.',
+      annotations: ['ASTM C920', 'fabricated-callout-zz9'],
+    },
+  });
+  const report = JSON.parse(described.content[0].text);
+  assert(report.grounded.includes('ASTM C920'), 'verbatim annotation grounds against text layer');
+  assert(
+    report.ungrounded.includes('fabricated-callout-zz9'),
+    'fabricated annotation is flagged ungrounded (ADR 0005 honesty gate)',
+  );
+
+  const refetched = await request(8, 'tools/call', {
+    name: 'fetch',
+    arguments: { id: spec.id },
+  });
+  const stored = JSON.parse(refetched.content[0].text);
+  assert(
+    stored.metadata.provenance.reviewStatus === 'unverified',
+    'described entity stays unverified until curated',
+  );
+  assert(
+    stored.metadata.properties.descriptionUngrounded?.includes('fabricated-callout-zz9'),
+    'ungrounded annotations stored separately for curator review',
+  );
+  // ADR 0006: fetch exposes the document's section index with anchors.
+  assert(stored.metadata.sectionCount >= 1, 'fetch returns the document section index');
+  assert(
+    typeof stored.metadata.sections?.[0]?.anchor?.page === 'number',
+    'sections carry a page anchor for citation (ADR 0006)',
+  );
+
+  // ADR 0006: a query for the document's body matches a passage and the
+  // result cites the section it matched on.
+  const chunkSearch = await request(10, 'tools/call', {
+    name: 'search',
+    arguments: { query: 'backer rod closed-cell polyethylene' },
+  });
+  const chunkPayload = JSON.parse(chunkSearch.content[0].text);
+  const passageHit = chunkPayload.results?.find((r) => r.id === spec.id);
+  assert(passageHit, 'chunk-level search finds the ingested spec by its body text');
+  assert(
+    passageHit.matchedSection && passageHit.provenance?.anchor?.page,
+    'passage hit cites the page/section it matched (ADR 0006)',
+  );
+
+  // Pull one section in full by ordinal.
+  const section = await request(11, 'tools/call', {
+    name: 'fetch',
+    arguments: { id: spec.id, section: 0 },
+  });
+  const sectionDoc = JSON.parse(section.content[0].text);
+  assert(
+    sectionDoc.section?.ordinal === 0 && sectionDoc.text.length > 0,
+    'fetch returns a specific section in full',
+  );
+
+  const scan = await request(9, 'tools/call', {
+    name: 'ingest_document',
+    arguments: { path: join(samples, 'A-501 Curtain Wall Details (scanned).pdf') },
+  });
+  const scanStatus = JSON.parse(scan.content[0].text);
+  assert(scanStatus.parseStatus === 'needs-ocr', 'scanned sheet flagged needs-ocr');
+  const imageBlocks = scan.content.filter((c) => c.type === 'image');
+  if (scanStatus.imagesAttached > 0) {
+    assert(
+      imageBlocks.length === scanStatus.imagesAttached,
+      `sheet images attached for client-model description (${imageBlocks.length})`,
+    );
+  } else {
+    console.log('ok - sheet images skipped (pdftoppm not installed on this host)');
+  }
+
   console.log('smoke: all checks passed');
   child.kill();
   process.exit(0);

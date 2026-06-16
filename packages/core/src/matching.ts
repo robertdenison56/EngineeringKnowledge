@@ -1,5 +1,5 @@
 import type { Caller } from './graph-store.js';
-import type { Entity, ReviewStatus } from './ontology.js';
+import type { Chunk, Entity, ReviewStatus } from './ontology.js';
 
 /**
  * Shared retrieval semantics used by every GraphStore implementation, so the
@@ -100,4 +100,46 @@ export function scoreEntityMatch(entity: Entity, groups: string[][]): number {
   if (!groups.every((g) => g.some((v) => haystack.includes(v)))) return 0;
   const title = normalizeText(`${entity.title} ${(entity.aliases ?? []).join(' ')}`);
   return groups.length + groups.filter((g) => g.some((v) => title.includes(v))).length;
+}
+
+/** Heading + body of a chunk, normalized — the chunk-level haystack. */
+export function chunkHaystack(chunk: Chunk): string {
+  return normalizeText(`${chunk.heading ?? ''} ${chunk.text}`);
+}
+
+/**
+ * Same honesty contract as `scoreEntityMatch`, applied to a single passage:
+ * every concept must co-occur in this chunk (ADR 0006). Stricter than the
+ * entity gate — concepts scattered across 400 pages do not pass — so chunk
+ * hits are precise, and rolling them up to the parent never admits an entity
+ * no concept matched. Heading hits boost.
+ */
+export function scoreChunkMatch(chunk: Chunk, groups: string[][]): number {
+  if (groups.length === 0) return 0;
+  const haystack = chunkHaystack(chunk);
+  if (!groups.every((g) => g.some((v) => haystack.includes(v)))) return 0;
+  const heading = normalizeText(chunk.heading ?? '');
+  return groups.length + groups.filter((g) => g.some((v) => heading.includes(v))).length;
+}
+
+/**
+ * A short text window centered on the first matched concept, for citation
+ * snippets. Operates on the original (un-normalized) text so the snippet
+ * reads naturally; falls back to the opening when no variant is locatable
+ * (normalization can shift offsets).
+ */
+export function snippetForGroups(text: string, groups: string[][], radius = 140): string {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  const lower = clean.toLowerCase();
+  let at = -1;
+  for (const group of groups) {
+    for (const variant of group) {
+      const i = lower.indexOf(variant);
+      if (i >= 0 && (at === -1 || i < at)) at = i;
+    }
+  }
+  if (at === -1) return clean.slice(0, radius * 2).trim();
+  const start = Math.max(0, at - radius);
+  const end = Math.min(clean.length, at + radius);
+  return `${start > 0 ? '…' : ''}${clean.slice(start, end).trim()}${end < clean.length ? '…' : ''}`;
 }

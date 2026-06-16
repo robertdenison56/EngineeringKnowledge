@@ -1,4 +1,4 @@
-import type { Entity, EntityType, Relationship, RelationshipType } from './ontology.js';
+import type { Chunk, Entity, EntityType, Relationship, RelationshipType, SourceAnchor } from './ontology.js';
 
 /**
  * Identity making a request. Every read is tenant-scoped and permission-
@@ -11,6 +11,19 @@ export interface Caller {
   principals: string[];
 }
 
+/**
+ * The passage a hit matched on (ADR 0006). Lets gateways cite the page or
+ * spec section, not just the file (P0-2a), when the match came from a
+ * document chunk rather than the entity's own metadata.
+ */
+export interface ChunkMatch {
+  anchor: SourceAnchor;
+  heading?: string;
+  /** Text window around the matched concepts, for the citation snippet. */
+  snippet: string;
+  ordinal: number;
+}
+
 export interface SearchHit {
   entity: Entity;
   score: number;
@@ -19,6 +32,8 @@ export interface SearchHit {
    * this prominently — flagged items are never served clean (PRD P0-8).
    */
   warning?: string;
+  /** Best-matching passage when the hit came from a chunk (ADR 0006). */
+  chunk?: ChunkMatch;
 }
 
 export interface SearchOptions {
@@ -40,9 +55,17 @@ export interface NeighborHit {
  * Phase 1. All Phase 1 code targets this interface.
  */
 export interface GraphStore {
-  upsertEntity(entity: Entity): Promise<void>;
+  /**
+   * Upsert an entity and, optionally, replace its document chunks (ADR 0006).
+   * `chunks` omitted leaves existing chunks untouched — a curation re-upsert
+   * that only flips `reviewStatus` must not wipe the searchable text. Pass
+   * `[]` to clear chunks explicitly.
+   */
+  upsertEntity(entity: Entity, chunks?: Chunk[]): Promise<void>;
   upsertRelationship(rel: Relationship): Promise<void>;
   getEntity(caller: Caller, id: string): Promise<Entity | undefined>;
+  /** A document's passages in order, permission-trimmed via its parent. */
+  getChunks(caller: Caller, entityId: string): Promise<Chunk[]>;
   search(caller: Caller, query: string, options?: SearchOptions): Promise<SearchHit[]>;
   /** Browse without a query (workspace-app faceted browse, PRD P0-9). */
   list(caller: Caller, options?: SearchOptions): Promise<Entity[]>;

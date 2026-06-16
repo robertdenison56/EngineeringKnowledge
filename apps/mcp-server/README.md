@@ -32,6 +32,23 @@ claude mcp add ekg -- ekg-mcp
 | `search` | Search the knowledge graph; results carry provenance, deep links, and warnings on superseded items. Explicit `no_results` state — the model is told never to substitute general knowledge for firm precedent. |
 | `fetch` | Full record for an entity, including related entities. |
 | `traverse` | Follow typed relationships (`used-in`, `supersedes`, `authored-by`, …) from any entity. |
+| `ingest_document` | Add a document (`.pdf`, `.md`, `.txt`) as an **unverified** candidate — same pipeline as the ingestion CLI (classification, PDF text-layer extraction, ADR 0004 honesty statuses). Drawing sheets come back with rendered images so the *calling* model can describe them. |
+| `save_description` | Store the calling model's sheet description. Quoted annotations are mechanically grounded against the document text layer; ungrounded ones are flagged for curator review (ADR 0005). |
+
+## Ingest from your assistant — your AI subscription does the reading
+
+Users add documents from inside Claude (or any MCP client): *"Add
+`P-204 Pump Room Piping.pdf` to our knowledge base."* The gateway queues the
+candidate and returns rendered sheet images; the **user's own model** —
+running on their existing AI subscription — describes what is drafted and
+calls `save_description`. The gateway needs no LLM API key of its own; it
+verifies every quoted annotation against the extracted text layer and flags
+anything ungrounded. Everything lands `unverified` in the workspace app's
+curation queue.
+
+Sheet rendering requires poppler (`brew install poppler` /
+`apt-get install poppler-utils`) on the gateway host; without it, documents
+still ingest — images are skipped with an explicit note.
 
 ## Demo
 

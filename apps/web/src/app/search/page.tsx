@@ -1,4 +1,4 @@
-import { ENTITY_TYPES } from '@ekg/core';
+import { ENTITY_TYPES, type SearchHit } from '@ekg/core';
 import { DEV_CALLER, getStore } from '../../lib/store';
 import { EntityCard } from '../../components/ui';
 
@@ -12,9 +12,9 @@ export default async function SearchPage({
   const types = type ? [type] : undefined;
   const tags = tag ? [tag] : undefined;
 
-  const entities = q
-    ? (await store.search(DEV_CALLER, q, { types, tags, limit: 25 })).map((h) => h.entity)
-    : await store.list(DEV_CALLER, { types, tags, limit: 50 });
+  const hits: SearchHit[] = q
+    ? await store.search(DEV_CALLER, q, { types, tags, limit: 25 })
+    : (await store.list(DEV_CALLER, { types, tags, limit: 50 })).map((entity) => ({ entity, score: 0 }));
 
   return (
     <>
@@ -44,7 +44,7 @@ export default async function SearchPage({
         </p>
       ) : null}
 
-      {entities.length === 0 ? (
+      {hits.length === 0 ? (
         <div className="empty">
           {q ? (
             <>
@@ -60,8 +60,16 @@ export default async function SearchPage({
         </div>
       ) : (
         <div className="cards">
-          {entities.map((e) => (
-            <EntityCard key={e.id} entity={e} />
+          {hits.map((h) => (
+            <EntityCard
+              key={h.entity.id}
+              entity={h.entity}
+              match={
+                h.chunk
+                  ? { snippet: h.chunk.snippet, ...(h.chunk.heading ? { heading: h.chunk.heading } : {}) }
+                  : undefined
+              }
+            />
           ))}
         </div>
       )}

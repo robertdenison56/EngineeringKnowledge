@@ -1,24 +1,20 @@
 #!/usr/bin/env node
-import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { basename, extname, join, resolve } from 'node:path';
-import { DEMO_TENANT, type Entity } from '@ekg/core';
+import { readdirSync, statSync } from 'node:fs';
+import { extname, join, resolve } from 'node:path';
+import { DEMO_TENANT } from '@ekg/core';
 import { SqliteGraphStore } from '@ekg/store-sqlite';
-import { classifyFilename, deriveTags } from './classify.js';
+import { KNOWN_EXTENSIONS, buildCandidate, type Candidate } from './candidate.js';
+import { buildReferenceEdges, sheetIndex } from './edges.js';
 
 /**
  * Ingestion v0 (PRD P0-2): walk a folder, classify each file, and create
  * `unverified` candidate entities in the shared SQLite database — they
  * appear in the workspace app's curation workbench for review.
  *
- * Text formats (.txt/.md) get their content summarized. PDFs are recorded
- * with classification + anchors only: class-specific text extraction is
- * gated on the PRD Open Question 8 parser spike (P0-2a), and recording
- * "parsing pending" is more honest than ingesting garbage text.
+ * Per-file behavior (classification, PDF text-layer extraction, honesty
+ * statuses) lives in `buildCandidate` and is shared with the MCP gateway's
+ * `ingest_document` tool (ADR 0004, ADR 0005).
  */
-
-const TEXT_EXTENSIONS = new Set(['.txt', '.md']);
-const KNOWN_EXTENSIONS = new Set(['.txt', '.md', '.pdf']);
 
 function usage(): never {
   console.error('Usage: npm run ingest --workspace @ekg/ingestion -- <folder> [--db <path>] [--tenant <id>]');
@@ -44,61 +40,45 @@ const root = resolve(baseDir, folder);
 const store = new SqliteGraphStore(dbPath);
 const now = new Date().toISOString();
 const counts = new Map<string, number>();
+const candidates: Candidate[] = [];
 let skipped = 0;
+let needsOcr = 0;
 
 for (const name of readdirSync(root, { recursive: true }) as string[]) {
   const filePath = join(root, name);
   if (!statSync(filePath).isFile()) continue;
-  const ext = extname(name).toLowerCase();
-  if (!KNOWN_EXTENSIONS.has(ext)) {
+  if (!KNOWN_EXTENSIONS.has(extname(name).toLowerCase())) {
     skipped += 1;
     continue;
   }
 
-  const file = basename(name);
-  const classification = classifyFilename(file);
-  const { type, anchor } = classification;
-  const id = `ingest:${createHash('sha1').update(filePath).digest('hex').slice(0, 12)}`;
-
-  let summary: string;
-  let content = '';
-  if (TEXT_EXTENSIONS.has(ext)) {
-    content = readFileSync(filePath, 'utf8').replace(/\s+/g, ' ').trim();
-    summary = content.slice(0, 400);
-  } else {
-    summary = '[PDF — text extraction pending the class-specific parsing spike (PRD P0-2a / OQ 8)]';
-  }
-  const tags = deriveTags(file, content, classification);
-
-  const entity: Entity = {
-    id,
-    tenantId,
-    type,
-    title: file.replace(/\.[^.]+$/, ''),
-    summary,
-    properties: { ingestedFrom: filePath, extension: ext, pipeline: 'ingestion-v0' },
-    ...(tags.length > 0 ? { tags } : {}),
-    // Full extracted text — searchable, and viewable in the workspace app
-    // so users can verify answers against the exact source document.
-    ...(content ? { content: content.slice(0, 20000) } : {}),
-    provenance: {
-      sourceUrl: `file://${filePath}`,
-      createdAt: now,
-      modifiedAt: now,
-      reviewStatus: 'unverified',
-      ...(anchor ? { anchor } : {}),
-    },
-    acl: { allowedPrincipals: ['*'] },
-  };
-
-  await store.upsertEntity(entity);
-  counts.set(type, (counts.get(type) ?? 0) + 1);
+  const candidate = await buildCandidate(filePath, { tenantId, pipeline: 'ingestion-v0', now });
+  if (candidate.parseStatus === 'needs-ocr') needsOcr += 1;
+  await store.upsertEntity(candidate.entity, candidate.chunks);
+  candidates.push(candidate);
+  counts.set(candidate.entity.type, (counts.get(candidate.entity.type) ?? 0) + 1);
 }
+
+// Cross-sheet callouts → `references` edges (Phase B): resolve against this
+// batch plus what the store already knows, so a sheet ingested today links
+// to one ingested last week.
+const existing = await store.list({ tenantId, principals: ['ingestion-cli'] });
+const index = sheetIndex([...existing, ...candidates.map((c) => c.entity)]);
+const { edges, unresolved, ambiguous } = buildReferenceEdges(candidates, index, tenantId);
+for (const edge of edges) await store.upsertRelationship(edge);
 
 store.close();
 
 const total = [...counts.values()].reduce((a, b) => a + b, 0);
+const chunkTotal = candidates.reduce((n, c) => n + (c.chunks?.length ?? 0), 0);
 console.log(`Ingested ${total} candidate(s) into ${dbPath} (tenant: ${tenantId})`);
 for (const [type, n] of counts) console.log(`  ${type}: ${n}`);
+if (chunkTotal > 0) console.log(`  ${chunkTotal} searchable passage(s) indexed across documents (ADR 0006)`);
+if (needsOcr > 0) console.log(`  ${needsOcr} scanned PDF(s) flagged needs-ocr — no text layer to extract`);
 if (skipped > 0) console.log(`  skipped ${skipped} file(s) with unsupported extensions`);
+if (edges.length > 0) console.log(`  ${edges.length} cross-sheet reference edge(s) created from callouts/match lines`);
+if (unresolved.length > 0)
+  console.log(`  ${unresolved.length} referenced sheet(s) not in the graph yet: ${unresolved.slice(0, 8).join(', ')}`);
+if (ambiguous.length > 0)
+  console.log(`  ${ambiguous.length} reference(s) skipped — multiple entities claim the sheet: ${ambiguous.join(', ')}`);
 console.log('Candidates are queued as "unverified" — review them in the workspace app at /curation.');

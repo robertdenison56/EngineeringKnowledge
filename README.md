@@ -12,11 +12,11 @@ Full product definition: [PRD](PRD-engineering-knowledge-graph.md).
 
 | Path | What it is | PRD |
 |---|---|---|
-| `packages/core` | Ontology, `GraphStore` interface, shared retrieval semantics, in-memory dev store, demo seed | P0-1 |
-| `packages/store-sqlite` | Persistent `GraphStore` on SQLite (`node:sqlite`, no native deps) | OQ 1 reference |
-| `apps/mcp-server` | MCP gateway — `search` / `fetch` / `traverse` tools (stdio for now; set `EKG_DB_PATH` to serve the curated database) | P0-3…P0-6 |
+| `packages/core` | Ontology (entities, relationships, document chunks), `GraphStore` interface, shared retrieval semantics, in-memory dev store, demo seed | P0-1 |
+| `packages/store-sqlite` | Persistent `GraphStore` on SQLite (`node:sqlite`, no native deps) — entity + chunk-level FTS and embeddings, hybrid retrieval (ADR 0003, 0006) | OQ 1 reference |
+| `apps/mcp-server` | MCP gateway — `search` / `fetch` / `traverse` plus `ingest_document` / `save_description`: users add documents from their assistant, and *their* model describes drawing sheets (stdio for now; set `EKG_DB_PATH` to serve the curated database) | P0-2, P0-3…P0-6 |
 | `apps/web` | Knowledge workspace app — dashboard, search/browse, entity pages with graph view, curation workbench, capture form (`npm run dev --workspace @ekg/web`) | P0-9 |
-| `services/ingestion` | Ingestion CLI v0 — classify files, queue candidates for curation (PDF text extraction pending OQ 8) | P0-2, P0-2a |
+| `services/ingestion` | Ingestion CLI v0 — classify files, extract PDF text layers (scans flagged `needs-ocr`), CAD-native vector parsing of drawing sheets (title blocks, views, dimensions, schedules, callouts → cross-sheet `references` edges), queue candidates for curation | P0-2, P0-2a |
 | `docs/decisions` | Architecture decision records | — |
 
 ## Getting started
@@ -52,11 +52,29 @@ EKG_DB_PATH=$PWD/apps/web/.data/ekg.db node apps/mcp-server/dist/index.js
 # the gateway now serves exactly what curators approved
 ```
 
+Users can also ingest **from their assistant** (ADR 0005): ask Claude to
+"add this drawing to our knowledge base" — the gateway's `ingest_document`
+tool queues it and returns rendered sheet images, the user's own model (on
+their existing AI subscription — the gateway has no LLM API key) describes
+what is drafted, and `save_description` stores it with every quoted
+annotation mechanically grounded against the document text layer. Sheet
+rendering needs poppler on the gateway host (`brew install poppler`).
+
 ## Status
 
 Phase 1 functionally complete (see PRD Timeline Considerations): ontology,
-persistent store, ingestion v0, curation workbench, capture form, and the
-stdio MCP gateway sharing one database with the app. Open before Phase 2
-exit: production graph engine (OQ 1), PDF parsing spike (OQ 8), SharePoint
-sync, and the remote transport (Streamable HTTP + OAuth) with real
-identity — today's dev caller is fixed.
+persistent store, ingestion v0 with PDF text extraction (ADR 0004 resolves
+OQ 8: pdf.js text layers, scans flagged `needs-ocr`), curation workbench,
+capture form, and the stdio MCP gateway sharing one database with the app.
+Vector drawing sheets get CAD-native parsing (docs/plans/2026-06-10,
+Phases A+B shipped): geometry-derived title blocks and reading order,
+views/dimensions/match lines/schedules with per-claim evidence, and
+callout bubbles resolved into `references` edges — a drawing set becomes
+a navigable graph, from both the CLI and the gateway's `ingest_document`.
+Long documents are split into per-page/per-section **chunks** (ADR 0006):
+the whole document is searchable and embeddable, and every hit cites the
+page or spec section, not just the file — a 494-page spec book that was
+searchable through ~page 12 now indexes all 490 passages.
+Open before Phase 2 exit: production graph engine (OQ 1), SharePoint sync,
+OCR for scanned sets, and the remote transport (Streamable HTTP + OAuth)
+with real identity — today's dev caller is fixed.

@@ -1,0 +1,182 @@
+[
+ {
+  "file": "03-0H6704.pdf",
+  "mb": "0.0",
+  "pages": 27,
+  "layers": 0,
+  "charsPerPage": 1576,
+  "pathsPerPage": 0,
+  "textOpsPerPage": 51,
+  "class": "text document"
+ },
+ {
+  "file": "03-0J8704plans.pdf",
+  "mb": "37.7",
+  "pages": 168,
+  "layers": 0,
+  "charsPerPage": 1382,
+  "pathsPerPage": 3868,
+  "textOpsPerPage": 396,
+  "class": "vector drawing set"
+ },
+ {
+  "file": "03-0J8704sp.pdf",
+  "mb": "4.3",
+  "pages": 413,
+  "layers": 0,
+  "charsPerPage": 1396,
+  "pathsPerPage": 139,
+  "textOpsPerPage": 147,
+  "class": "text document"
+ },
+ {
+  "file": "03-0J9234plans.pdf",
+  "mb": "16.3",
+  "pages": 84,
+  "layers": 0,
+  "charsPerPage": 1435,
+  "pathsPerPage": 2436,
+  "textOpsPerPage": 644,
+  "class": "vector drawing set"
+ },
+ {
+  "file": "03-0J9234sp.pdf",
+  "mb": "3.8",
+  "pages": 418,
+  "layers": 0,
+  "charsPerPage": 1004,
+  "pathsPerPage": 106,
+  "textOpsPerPage": 60,
+  "class": "text document"
+ },
+ {
+  "file": "03-1H8204.pdf",
+  "mb": "0.0",
+  "pages": 11,
+  "layers": 0,
+  "charsPerPage": 1707,
+  "pathsPerPage": 0,
+  "textOpsPerPage": 45,
+  "class": "text document"
+ },
+ {
+  "file": "03-1H8604.pdf",
+  "mb": "0.0",
+  "pages": 33,
+  "layers": 0,
+  "charsPerPage": 1136,
+  "pathsPerPage": 0,
+  "textOpsPerPage": 34,
+  "class": "text document"
+ },
+ {
+  "file": "03-1J0104plans.pdf",
+  "mb": "20.0",
+  "pages": 85,
+  "layers": 0,
+  "charsPerPage": 1546,
+  "pathsPerPage": 2362,
+  "textOpsPerPage": 367,
+  "class": "vector drawing set"
+ },
+ {
+  "file": "03-1J0104sp.pdf",
+  "mb": "2.1",
+  "pages": 402,
+  "layers": 0,
+  "charsPerPage": 1287,
+  "pathsPerPage": 137,
+  "textOpsPerPage": 72,
+  "class": "text document"
+ },
+ {
+  "file": "03-2H4504plans.pdf",
+  "mb": "9.3",
+  "pages": 27,
+  "layers": 0,
+  "charsPerPage": 1668,
+  "pathsPerPage": 2450,
+  "textOpsPerPage": 337,
+  "class": "vector drawing set"
+ },
+ {
+  "file": "03-2H4504sp.pdf",
+  "mb": "2.6",
+  "pages": 386,
+  "layers": 0,
+  "charsPerPage": 1138,
+  "pathsPerPage": 147,
+  "textOpsPerPage": 141,
+  "class": "text document"
+ },
+ {
+  "file": "03-2J7904sp.pdf",
+  "mb": "1.4",
+  "pages": 336,
+  "layers": 0,
+  "charsPerPage": 1346,
+  "pathsPerPage": 58,
+  "textOpsPerPage": 69,
+  "class": "text document"
+ },
+ {
+  "file": "03-3H3904plans.pdf",
+  "mb": "13.2",
+  "pages": 54,
+  "layers": 0,
+  "charsPerPage": 2509,
+  "pathsPerPage": 4143,
+  "textOpsPerPage": 464,
+  "class": "vector drawing set"
+ },
+ {
+  "file": "03-3H3904sp.pdf",
+  "mb": "2.9",
+  "pages": 384,
+  "layers": 0,
+  "charsPerPage": 1170,
+  "pathsPerPage": 127,
+  "textOpsPerPage": 67,
+  "class": "text document"
+ },
+ {
+  "file": "03-3H5404plans.pdf",
+  "mb": "43.8",
+  "pages": 179,
+  "layers": 306,
+  "layerSample": [
+   "0318000012ea004.dgn<Default>",
+   "Levels",
+   "10 Sheet Format",
+   "15 Main Align",
+   "16 Main Anno",
+   "19 Undefined",
+   "20 Pave Edges",
+   "23 Layout Notes"
+  ],
+  "charsPerPage": 1927,
+  "pathsPerPage": 2780,
+  "textOpsPerPage": 278,
+  "class": "vector drawing set"
+ },
+ {
+  "file": "03-3H5404sp.pdf",
+  "mb": "3.6",
+  "pages": 422,
+  "layers": 0,
+  "charsPerPage": 1130,
+  "pathsPerPage": 99,
+  "textOpsPerPage": 89,
+  "class": "text document"
+ },
+ {
+  "file": "03-4H5814sp.pdf",
+  "mb": "3.0",
+  "pages": 494,
+  "layers": 0,
+  "charsPerPage": 1610,
+  "pathsPerPage": 107,
+  "textOpsPerPage": 71,
+  "class": "text document"
+ }
+]

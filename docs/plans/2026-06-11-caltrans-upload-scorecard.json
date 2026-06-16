@@ -1,0 +1,844 @@
+{
+ "corpus": "/Volumes/RobertsExternalSSD/repos/ai-spec-reviewer/District 3",
+ "date": "2026-06-12",
+ "files": [
+  {
+   "file": "03-0H6704.pdf",
+   "mb": 0,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 27,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": null,
+   "sheet": null,
+   "semantics": null,
+   "sheetRefs": [],
+   "tags": [],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1135,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 27,
+    "found": 0,
+    "sheetNumbers": []
+   },
+   "ms": 90
+  },
+  {
+   "file": "03-0J8704plans.pdf",
+   "mb": 37.7,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 168,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": "X-1",
+   "sheet": {
+    "number": "X-1",
+    "title": "1:1 OR FLATTER",
+    "revision": "07-08-22",
+    "index": 2,
+    "total": 168
+   },
+   "semantics": {
+    "views": 33,
+    "dimensions": 37,
+    "callouts": 0,
+    "matchLines": 0,
+    "schedules": 46,
+    "viewLabels": [
+     "ELEVATION",
+     "SECTION",
+     "PROFILE",
+     "TYPICAL PROFILE",
+     "PLAN",
+     "TYPICAL SECTION",
+     "SECTION A-A",
+     "SECTION B-B",
+     "SECTION C-C",
+     "SECTION D-D",
+     "SECTION E-E",
+     "SECTION F-F",
+     "SECTION G-G"
+    ],
+    "scheduleTitles": [
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "7×16 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "3×2 table",
+     "4×2 table",
+     "3×2 table"
+    ],
+    "scales": [
+     "NO SCALE",
+     "1\"=50'",
+     "1\"=25'",
+     "1\" = 10'"
+    ],
+    "analyzedPages": 40
+   },
+   "sheetRefs": [],
+   "tags": [],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 2100,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 40,
+    "sheetNumbers": [
+     "X-1",
+     "X-2",
+     "X-3",
+     "X-4",
+     "PC-1",
+     "L-1",
+     "L-2",
+     "L-3",
+     "L-4",
+     "L-5",
+     "L-6",
+     "L-7"
+    ]
+   },
+   "ms": 2264
+  },
+  {
+   "file": "03-0J8704sp.pdf",
+   "mb": 4.3,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 413,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": null,
+   "sheet": null,
+   "semantics": null,
+   "sheetRefs": [],
+   "tags": [
+    "firestop"
+   ],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1350,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 0,
+    "sheetNumbers": []
+   },
+   "ms": 160
+  },
+  {
+   "file": "03-0J9234plans.pdf",
+   "mb": 16.3,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 84,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": "C-1",
+   "sheet": {
+    "number": "C-1",
+    "title": "STEPHEN T. WRIGHT",
+    "revision": "05-31-22",
+    "index": 2,
+    "total": 84
+   },
+   "semantics": {
+    "views": 19,
+    "dimensions": 76,
+    "callouts": 0,
+    "matchLines": 0,
+    "schedules": 55,
+    "viewLabels": [
+     "SECTION A-A",
+     "SECTION C-C",
+     "SECTION B-B",
+     "ELEVATION"
+    ],
+    "scheduleTitles": [
+     "3×3 table",
+     "4×2 table",
+     "4×2 table",
+     "5×6 table",
+     "4×2 table",
+     "4×2 table",
+     "5×3 table",
+     "4×2 table",
+     "4×2 table",
+     "5×3 table",
+     "4×2 table",
+     "5×2 table"
+    ],
+    "scales": [
+     "NO SCALE",
+     "1\" = 5'",
+     "1\"=20'",
+     "1\"=100'",
+     "1\"=50'"
+    ],
+    "analyzedPages": 40
+   },
+   "sheetRefs": [],
+   "tags": [],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 2178,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 40,
+    "sheetNumbers": [
+     "C-1",
+     "C-2",
+     "C-3",
+     "C-4",
+     "C-5",
+     "C-6",
+     "C-7",
+     "C-8",
+     "C-9",
+     "C-10",
+     "C-11",
+     "C-12"
+    ]
+   },
+   "ms": 2025
+  },
+  {
+   "file": "03-0J9234sp.pdf",
+   "mb": 3.8,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 418,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": null,
+   "sheet": null,
+   "semantics": null,
+   "sheetRefs": [],
+   "tags": [
+    "firestop"
+   ],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1078,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 0,
+    "sheetNumbers": []
+   },
+   "ms": 119
+  },
+  {
+   "file": "03-1H8204.pdf",
+   "mb": 0,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 11,
+   "contentChars": 14476,
+   "contentTruncated": false,
+   "anchorSheet": null,
+   "sheet": null,
+   "semantics": null,
+   "sheetRefs": [],
+   "tags": [],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1284,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 11,
+    "found": 0,
+    "sheetNumbers": []
+   },
+   "ms": 20
+  },
+  {
+   "file": "03-1H8604.pdf",
+   "mb": 0,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 33,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": null,
+   "sheet": null,
+   "semantics": null,
+   "sheetRefs": [],
+   "tags": [
+    "envelope"
+   ],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1133,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 33,
+    "found": 0,
+    "sheetNumbers": []
+   },
+   "ms": 50
+  },
+  {
+   "file": "03-1J0104plans.pdf",
+   "mb": 20,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 85,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": "X-1",
+   "sheet": {
+    "number": "X-1",
+    "title": "RICARDO TINOCO",
+    "revision": "00-00-00",
+    "index": 2,
+    "total": 85
+   },
+   "semantics": {
+    "views": 30,
+    "dimensions": 123,
+    "callouts": 0,
+    "matchLines": 0,
+    "schedules": 56,
+    "viewLabels": [
+     "SECTION A-A",
+     "SECTION B-B",
+     "SECTION C-C",
+     "SECTION D-D",
+     "SECTION E-E",
+     "SECTION F-F",
+     "SECTION G-G",
+     "SECTION H-H",
+     "ELEVATION",
+     "DETAIL",
+     "LAYOUT DETAILS",
+     "PLAN VIEW"
+    ],
+    "scheduleTitles": [
+     "5×5 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "4×2 table"
+    ],
+    "scales": [
+     "NO SCALE",
+     "1\" = 50'",
+     "1\" = 20'",
+     "1\" = 5'",
+     "1\"=10'"
+    ],
+    "analyzedPages": 40
+   },
+   "sheetRefs": [],
+   "tags": [],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 2084,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 40,
+    "sheetNumbers": [
+     "X-1",
+     "L-1",
+     "L-2",
+     "L-3",
+     "L-4",
+     "PS-1",
+     "C-1",
+     "C-2",
+     "C-3",
+     "C-4",
+     "C-5",
+     "C-6"
+    ]
+   },
+   "ms": 2598
+  },
+  {
+   "file": "03-1J0104sp.pdf",
+   "mb": 2.1,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 402,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": null,
+   "sheet": null,
+   "semantics": null,
+   "sheetRefs": [],
+   "tags": [
+    "envelope",
+    "firestop"
+   ],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1646,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 0,
+    "sheetNumbers": []
+   },
+   "ms": 151
+  },
+  {
+   "file": "03-2H4504plans.pdf",
+   "mb": 9.3,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 27,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": "L-1",
+   "sheet": {
+    "number": "L-1",
+    "title": "ME PLOTTED =>",
+    "revision": "6-18-22",
+    "index": 2,
+    "total": 27
+   },
+   "semantics": {
+    "views": 36,
+    "dimensions": 115,
+    "callouts": 0,
+    "matchLines": 0,
+    "schedules": 32,
+    "viewLabels": [
+     "SECTION A-A",
+     "DETAIL 27B",
+     "LAYOUT",
+     "ELEVATION",
+     "PLAN",
+     "PROFILE GRADE",
+     "TYPICAL SECTION",
+     "SECTION B-B",
+     "SECTION C-C",
+     "DETAIL NOT USED",
+     "DETAIL A",
+     "DETAIL B",
+     "SECTION X-X",
+     "DETAIL C",
+     "DETAIL \"A\"",
+     "PROFILE"
+    ],
+    "scheduleTitles": [
+     "4×2 table",
+     "5×2 table",
+     "4×2 table",
+     "4×2 table",
+     "6×5 table",
+     "4×2 table",
+     "4×2 table",
+     "2×4 table",
+     "4×2 table",
+     "2×3 table",
+     "4×2 table",
+     "2×4 table"
+    ],
+    "scales": [
+     "NO SCALE",
+     "1\" = 50'",
+     "1\"=50'",
+     "1\" = 20'",
+     "1\" = 30'-0\"",
+     "1\" = 10'-0\"",
+     "1\" = 5'-0\"",
+     "1\" = 40'"
+    ],
+    "analyzedPages": 27
+   },
+   "sheetRefs": [],
+   "tags": [
+    "envelope",
+    "structural"
+   ],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1718,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 27,
+    "found": 21,
+    "sheetNumbers": [
+     "L-1",
+     "U-1",
+     "CS-1",
+     "TH-1",
+     "THQ-1",
+     "PD-1",
+     "PDQ-1",
+     "Q-1",
+     "ECL-1",
+     "EC-1"
+    ]
+   },
+   "ms": 4866
+  },
+  {
+   "file": "03-2H4504sp.pdf",
+   "mb": 2.6,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 386,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": null,
+   "sheet": null,
+   "semantics": null,
+   "sheetRefs": [],
+   "tags": [
+    "envelope",
+    "firestop"
+   ],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 2000,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 0,
+    "sheetNumbers": []
+   },
+   "ms": 170
+  },
+  {
+   "file": "03-2J7904sp.pdf",
+   "mb": 1.4,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 336,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": null,
+   "sheet": null,
+   "semantics": null,
+   "sheetRefs": [],
+   "tags": [
+    "envelope",
+    "firestop"
+   ],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1691,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 0,
+    "sheetNumbers": []
+   },
+   "ms": 103
+  },
+  {
+   "file": "03-3H3904plans.pdf",
+   "mb": 13.2,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 54,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": "L-1",
+   "sheet": {
+    "number": "L-1",
+    "title": "ME PLOTTED =>",
+    "revision": "03/16/22",
+    "index": 2,
+    "total": 54
+   },
+   "semantics": {
+    "views": 29,
+    "dimensions": 295,
+    "callouts": 0,
+    "matchLines": 0,
+    "schedules": 42,
+    "viewLabels": [
+     "LAYOUT",
+     "SECTION",
+     "PLAN",
+     "SECTION A-A",
+     "TYPICAL SECTION",
+     "ELEVATION",
+     "ELEVATION - EXPANSION FACE",
+     "MIRRORED ELEVATION - FIXED FACE"
+    ],
+    "scheduleTitles": [
+     "4×2 table",
+     "5×8 table",
+     "4×2 table",
+     "6×5 table",
+     "4×2 table",
+     "5×4 table",
+     "4×2 table",
+     "5×4 table",
+     "4×2 table",
+     "3×5 table",
+     "2×6 table",
+     "4×2 table"
+    ],
+    "scales": [
+     "NO SCALE",
+     "1\" = 50'",
+     "1\" = 20'",
+     "1\" = 30'",
+     "3\" = 1'-0\"",
+     "1\" = 10'"
+    ],
+    "analyzedPages": 40
+   },
+   "sheetRefs": [],
+   "tags": [],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1503,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 28,
+    "sheetNumbers": [
+     "L-1",
+     "CS-1",
+     "MI-1",
+     "MI-2",
+     "Q-1",
+     "LD-1",
+     "E-1",
+     "E-2",
+     "ED-1",
+     "ED-2",
+     "ED-3",
+     "EQ-1"
+    ]
+   },
+   "ms": 2646
+  },
+  {
+   "file": "03-3H3904sp.pdf",
+   "mb": 2.9,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 384,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": null,
+   "sheet": null,
+   "semantics": null,
+   "sheetRefs": [],
+   "tags": [
+    "firestop"
+   ],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1768,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 0,
+    "sheetNumbers": []
+   },
+   "ms": 166
+  },
+  {
+   "file": "03-3H5404plans.pdf",
+   "mb": 43.8,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 179,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": "X-1",
+   "sheet": {
+    "number": "X-1",
+    "title": "ME PLOTTED =>",
+    "revision": "7-25-22",
+    "index": 2,
+    "total": 179
+   },
+   "semantics": {
+    "views": 13,
+    "dimensions": 203,
+    "callouts": 0,
+    "matchLines": 0,
+    "schedules": 47,
+    "viewLabels": [
+     "ELEVATION",
+     "LAYOUT",
+     "PROFILE",
+     "PLAN",
+     "SECTION A-A",
+     "SECTION B-B"
+    ],
+    "scheduleTitles": [
+     "4×2 table",
+     "4×2 table",
+     "4×2 table",
+     "7×32 table",
+     "4×2 table",
+     "4×2 table",
+     "3×3 table",
+     "4×2 table",
+     "4×2 table",
+     "3×2 table",
+     "4×2 table",
+     "4×2 table"
+    ],
+    "scales": [
+     "NO SCALE",
+     "1\" = 50'",
+     "1\" = 5'",
+     "1\"=10'",
+     "1\" = 10'"
+    ],
+    "analyzedPages": 40
+   },
+   "sheetRefs": [],
+   "tags": [],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 83,
+    "layerAttribution": false,
+    "charsPerPage": 2011,
+    "strokesPerPage": 113
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 40,
+    "sheetNumbers": [
+     "X-1",
+     "X-2",
+     "PC-1",
+     "L-1",
+     "L-2",
+     "L-3",
+     "L-4",
+     "PS-1",
+     "PS-2",
+     "PS-3",
+     "PS-4",
+     "C-1"
+    ]
+   },
+   "ms": 2179
+  },
+  {
+   "file": "03-3H5404sp.pdf",
+   "mb": 3.6,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 422,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": null,
+   "sheet": null,
+   "semantics": null,
+   "sheetRefs": [],
+   "tags": [
+    "firestop"
+   ],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1354,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 0,
+    "sheetNumbers": []
+   },
+   "ms": 112
+  },
+  {
+   "file": "03-4H5814sp.pdf",
+   "mb": 3,
+   "type": "document",
+   "parseStatus": "extracted",
+   "pages": 494,
+   "contentChars": 20000,
+   "contentTruncated": true,
+   "anchorSheet": null,
+   "sheet": null,
+   "semantics": null,
+   "sheetRefs": [],
+   "tags": [],
+   "capability": {
+    "hasTextLayer": true,
+    "layerTable": 0,
+    "layerAttribution": false,
+    "charsPerPage": 1730,
+    "strokesPerPage": 0
+   },
+   "titleBlocks": {
+    "analyzedPages": 40,
+    "found": 0,
+    "sheetNumbers": []
+   },
+   "ms": 164
+  }
+ ],
+ "edges": [],
+ "unresolvedSheetRefs": [],
+ "ambiguousSheetRefs": []
+}

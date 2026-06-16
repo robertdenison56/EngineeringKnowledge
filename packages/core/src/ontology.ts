@@ -33,6 +33,12 @@ export const RELATIONSHIP_TYPES = [
   'complies-with',
   'had-issue',
   'applies-to',
+  /**
+   * Document-to-document cross-reference, e.g. a callout bubble on one
+   * drawing sheet pointing at a detail on another (ingestion Phase B). A
+   * drawing set becomes a navigable graph instead of a pile of files.
+   */
+  'references',
 ] as const;
 
 export type BuiltInRelationshipType = (typeof RELATIONSHIP_TYPES)[number];
@@ -105,4 +111,28 @@ export interface Relationship {
   fromId: string;
   toId: string;
   properties?: Record<string, unknown>;
+}
+
+/**
+ * A retrievable passage of a document, owned by its parent entity (ADR 0006).
+ * Long documents — 400-page spec books, multi-sheet plan sets — are too big
+ * for one searchable/embeddable unit: a hit must resolve to the page or spec
+ * section, not the whole file (P0-2a), and one vector cannot represent
+ * hundreds of pages. Chunks carry the authoritative full text, each its own
+ * FTS row and embedding and `anchor`; the parent entity keeps only a bounded
+ * preview. Chunks are not entities — they inherit the parent's ACL and review
+ * status and are never curated or traversed on their own.
+ */
+export interface Chunk {
+  /** Stable within the document, e.g. `${entityId}#${ordinal}`. */
+  id: string;
+  entityId: string;
+  tenantId: string;
+  /** Position within the parent document (page order / section order). */
+  ordinal: number;
+  /** Where this passage lives in the source — the citation target. */
+  anchor: SourceAnchor;
+  /** Human label, e.g. "Sheet L-1" or "07 92 00 · PART 2 — PRODUCTS". */
+  heading?: string;
+  text: string;
 }
