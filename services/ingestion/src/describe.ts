@@ -130,6 +130,11 @@ export function formatSheetFacts(facts: SheetFacts): string {
     '\n\nUse the facts above as ground truth: do not contradict the sheet number, ' +
     'view names, or dimension strings listed. Describe what is drafted around ' +
     'them and quote any additional annotations verbatim — still no symbol ' +
-    'counts, no inferred dimensions, and say so if a region is illegible.'
+    'counts, no inferred dimensions, and say so if a region is illegible.\n' +
+    'When you quote a dimension or identifier, make it ONE atomic annotation — ' +
+    'the bare printed value by itself (e.g. `18\'-11"`), NOT bundled with ' +
+    'descriptive words; put context like "after strengthening" in the ' +
+    'description prose. Atomic quotes can be mechanically verified; bundled ' +
+    'ones cannot.'
   );
 }

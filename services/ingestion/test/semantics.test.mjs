@@ -215,6 +215,28 @@ test('a stray sheet-shaped string without drawing labels is not a title block', 
   assert.equal(tb, undefined);
 });
 
+test('title harvest never emits stamp fragments or engineer names (feeds vision)', () => {
+  // A wrong title is misinformation to the fusion prompt — these Caltrans
+  // band fragments must yield NO title, not a garbage one.
+  const band = (extra) =>
+    harvestTitleBlock(
+      [
+        span('L-1', 1350, 280),
+        span('SHEET', 1400, 300),
+        span('No.', 1430, 300),
+        span('2', 1455, 300),
+        span('SCALE', 100, 300),
+        ...extra,
+      ],
+      2448,
+    );
+  assert.equal(band([span('ME PLOTTED =>', 1300, 200)])?.title, undefined, 'plot stamp rejected');
+  assert.equal(band([span('JIN SHEN LOW', 1300, 200)])?.title, undefined, 'engineer name rejected');
+  assert.equal(band([span('MELAKU A. ZELEKE', 1300, 200)])?.title, undefined, 'name w/ initial rejected');
+  // A genuine sheet title (carries a drawing-domain word) is still harvested.
+  assert.equal(band([span('GENERAL PLAN', 1300, 200)])?.title, 'GENERAL PLAN', 'real title kept');
+});
+
 test('curve-data angles and station artifacts are not dimensions', () => {
   const page = {
     pageNumber: 1,

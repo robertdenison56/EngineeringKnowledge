@@ -345,6 +345,24 @@ const BAND = 0.16; // bottom fraction of the page examined
 const LABELS =
   /^(INDEX|SHEET|NO\.?|LAST|REVISION|DESCRIPTION|DATE|FY\b|STANDARD PLANS|DEMO STANDARD PLANS|OF|SCALE|TOTAL|POST MILES|DIST|COUNTY|ROUTE|PROJECT)\b/i;
 /**
+ * Plot-stamp, file-path, and registration-block vocabulary that the bottom
+ * band carries alongside the real title — a title candidate containing any of
+ * these is noise, not a sheet title (Caltrans-corpus eval).
+ */
+const STAMP_NOISE =
+  /PLOTTED|USERNAME|DGN|FILENAME|PLANS APPROVAL|REGISTERED|CIVIL\b|\bEXP\b|LICENSE|CONTRACT/i;
+/** Engineer signature names ("MELAKU A. ZELEKE", "JOHN P SMITH"). */
+const PERSON_NAME = /^[A-Z]+\s+[A-Z]\.?\s+[A-Z]+$/;
+/**
+ * Real engineering sheet titles carry a drawing-domain noun; engineer names
+ * and stamp fragments do not. Requiring one is the reliable discriminator
+ * (Caltrans bands surface "JIN SHEN LOW" as a 3-word all-caps candidate that
+ * is structurally indistinguishable from a title — only the vocabulary tells
+ * them apart). A title we cannot confirm is dropped, never guessed.
+ */
+const TITLE_WORD =
+  /\b(PLAN|PLANS|ELEVATION|ELEVATIONS|SECTION|SECTIONS|DETAIL|DETAILS|LAYOUT|GENERAL|TYPICAL|PROFILE|PROFILES|NOTES|QUANTITIES|SCHEDULE|SCHEDULES|BORINGS?|LOG|CONSTRUCTION|STAGE|DRAINAGE|UTILITY|UTILITIES|PAVING|PAVEMENT|GRADING|SIGNING|STRIPING|MARKINGS?|LIGHTING|ELECTRICAL|STRUCTURE|STRUCTURES|ABUTMENT|BENT|FOUNDATION|GIRDER|DECK|BARRIER|WALL|WALLS|ENDWALLS?|RAMP|ROADWAY|ALIGNMENT|CONTOURS?|EROSION|CONTROL|LANDSCAPE|IRRIGATION|INDEX|TITLE|KEY|SUMMARY|COVER|CULVERT|DRIVE|HEADWALL|JOINT|REINFORCEMENT|FRAMING|GEOMETRY|SURVEY)\b/;
+/**
  * A bare sheet-number-shaped string is only a title block when drawing
  * labels corroborate it — "SW-846" in a spec-book footer must not mint a
  * drawing sheet (Caltrans-corpus eval false positive).
@@ -436,7 +454,11 @@ export function harvestTitleBlock(
     }
   });
 
-  // Title: the longest mostly-uppercase multi-word string that isn't a label.
+  // Title: the longest coherent uppercase multi-word string that is plausibly
+  // a sheet title. A WRONG title is worse than none — it feeds the vision
+  // model misinformation (Caltrans bands surface plot-stamp fragments like
+  // "ME PLOTTED =>" and engineer names like "MELAKU A. ZELEKE"), so the gate
+  // is strict and a missing title is the honest default.
   const title = raw
     .filter(
       (s) =>
@@ -444,8 +466,14 @@ export function harvestTitleBlock(
         /\s/.test(s) &&
         !LABELS.test(s) &&
         !DATE.test(s) &&
+        !STAMP_NOISE.test(s) && // plot stamps, file names, registration blocks
+        !PERSON_NAME.test(s) && // engineer signatures
+        !/[\d=^>]/.test(s) && // titles carry no digits, equals, carets, arrows
         s === s.toUpperCase() &&
-        /[A-Z]{3}/.test(s),
+        TITLE_WORD.test(s) && // must read like a sheet title, not a name
+        // At least two real words (3+ letters each) — rejects char-fragment
+        // joins like "TYPE 1, Typ | RAILING".
+        (s.match(/\b[A-Z]{3,}\b/g)?.length ?? 0) >= 2,
     )
     .sort((a, b) => b.length - a.length)[0];
 

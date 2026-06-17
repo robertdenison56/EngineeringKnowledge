@@ -69,11 +69,34 @@ model should collaborate** — both directions, as a standard part of the flow.
   readers agree — trust), text-grounded only (one source), and ungrounded
   (neither — review). That triage is the point: the queue surfaces exactly
   what needs a human.
-- Remaining gap: dimensions only the vision model read — the stacked-fraction
-  span dimensions (`118'-4⅛"±`) the parser's regex does not yet capture — stay
-  ungrounded. Closing that means deeper dimension extraction in the parser
-  (stacked fractions), a follow-up; collaboration already reclaims everything
-  both readers find.
 - Still open from Phase C: spatial grounding (an annotation must sit in the
   view the description places it in), a fuller structured description schema,
   OCR for scans, and the per-gateway golden-sheet scorecard.
+
+## Accuracy refinements (2026-06-17)
+
+A focused accuracy pass on what the parser feeds and verifies:
+
+- **The title harvest never emits a wrong title.** Caltrans bottom bands are
+  character-fragmented and surfaced plot-stamp text (`ME PLOTTED =>`) and
+  engineer names (`JIN SHEN LOW`) as the "title" — i.e. the fusion prompt was
+  handing the vision model *misinformation*. The harvest now requires a
+  coherent multi-word string carrying a drawing-domain word (`PLAN`, `SECTION`,
+  `DETAILS`…) and rejects stamp/file/registration vocabulary, names, and
+  digit/`=>`-bearing fragments. A missing title is the honest default; real
+  fixture titles (`DRAINAGE PLAN AND DETAILS`, `WIDGET WALL DETAILS`) survive.
+  Verified null across all 54 sheets of 03-3H3904 where no clean title exists.
+- **Atomic-annotation contract.** The describe prompt now asks the model to
+  quote each dimension/identifier as its bare printed value alone
+  (`18'-11"`), with descriptive context in the prose — so atomic quotes verify
+  against the text layer directly instead of failing as bundled strings
+  (`18'-11"± LEFT BRIDGE`). Re-run on sheet 26: 14 dimension annotations now
+  ground directly, 18 parser-confirmed.
+- **The honest ceiling.** On a dense bridge sheet ~half the precise content is
+  *genuinely* unconfirmable by any deterministic source: rotated
+  stacked-fraction span dimensions (`118'-4⅛"±`) whose digits the rotated text
+  does not even tokenize into the text layer (probed — `118'` is absent), plus
+  bearings and station equations. The system confirms what it can, flags the
+  rest for curator review, and fabricates nothing — the limit is the data, not
+  the gate. Closing more of it means extracting bearings/stations and rotated
+  text in the parser (a follow-up), not relaxing the gate.

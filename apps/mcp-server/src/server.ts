@@ -409,7 +409,9 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
                     '`annotations` (labels, dimensions, callouts quoted VERBATIM from the sheet). Rules: ' +
                     'quote, never paraphrase identifiers or dimensions; do NOT count symbols or report ' +
                     'quantities; do NOT infer dimensions that are not printed; if a region is illegible, ' +
-                    'say so instead of guessing.',
+                    'say so instead of guessing. Make each quoted dimension or identifier ONE atomic ' +
+                    "annotation — the bare printed value alone (e.g. `18'-11\"`), not bundled with " +
+                    'descriptive words; put that context in the description. Atomic quotes verify; bundled ones do not.',
                 },
               ]
             : []),
