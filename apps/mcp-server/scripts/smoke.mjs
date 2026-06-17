@@ -177,6 +177,48 @@ try {
     console.log('ok - sheet images skipped (pdftoppm not installed on this host)');
   }
 
+  // VLM fusion (ADR 0007): a drawing ingest surfaces deterministic vector
+  // facts as ground truth for the describing model. Gated on poppler — the
+  // facts ride with the rendered images.
+  const drawing = await request(10, 'tools/call', {
+    name: 'ingest_document',
+    arguments: { path: join(samples, 'C-102 Drainage Plan (callouts).pdf'), describe: true },
+  });
+  const drawingStatus = JSON.parse(drawing.content[0].text);
+  if (drawingStatus.imagesAttached > 0) {
+    assert(
+      drawingStatus.deterministicFacts?.sheetNumber === 'C-102',
+      'drawing ingest fuses deterministic facts (sheet number C-102)',
+    );
+    const instr = drawing.content.find(
+      (c) => c.type === 'text' && c.text.includes('DETERMINISTIC PARSE'),
+    );
+    assert(instr && /Sheet: C-102/.test(instr.text), 'describe instructions carry the ground-truth facts block');
+
+    // ADR 0008: save_description grounds against the parser facts too — a
+    // dimension quoted with extra words the text layer lacks is still
+    // confirmed by the geometry parse.
+    const desc = await request(11, 'tools/call', {
+      name: 'save_description',
+      arguments: {
+        entityId: drawingStatus.id,
+        description: 'Drainage plan with a wall section and a pipe schedule.',
+        annotations: [`12'-6" at the wall section`, 'SECTION A-A', 'ZZ-fabricated-note'],
+      },
+    });
+    const descReport = JSON.parse(desc.content[0].text);
+    assert(
+      descReport.parserConfirmed?.some((a) => a.includes(`12'-6"`)),
+      'save_description confirms a dimension-with-words against the parser facts (ADR 0008)',
+    );
+    assert(
+      descReport.ungrounded?.includes('ZZ-fabricated-note'),
+      'fabricated annotation still flagged ungrounded under two-source grounding',
+    );
+  } else {
+    console.log('ok - fusion + collaboration checks skipped (pdftoppm not installed on this host)');
+  }
+
   console.log('smoke: all checks passed');
   child.kill();
   process.exit(0);

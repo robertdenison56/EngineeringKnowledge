@@ -74,7 +74,11 @@ a navigable graph, from both the CLI and the gateway's `ingest_document`.
 Long documents are split into per-page/per-section **chunks** (ADR 0006):
 the whole document is searchable and embeddable, and every hit cites the
 page or spec section, not just the file — a 494-page spec book that was
-searchable through ~page 12 now indexes all 490 passages.
+searchable through ~page 12 now indexes all 490 passages. When the gateway
+hands a drawing to a vision model to describe (ADR 0005), it now **fuses**
+the deterministic vector facts (sheet number, views, dimensions, callouts,
+layers) into the prompt as ground truth (ADR 0007) so the model narrates on
+top of facts instead of misreading identifiers from pixels.
 Open before Phase 2 exit: production graph engine (OQ 1), SharePoint sync,
 OCR for scanned sets, and the remote transport (Streamable HTTP + OAuth)
 with real identity — today's dev caller is fixed.

@@ -1,8 +1,9 @@
 # Plan: Geometric/CAD-native parsing of vector engineering PDFs
 
 Date: 2026-06-10 · Status: **Phases A+B shipped** (`vector.ts` 2026-06-10,
-`semantics.ts` + `references` edges 2026-06-11) — Phase C planned; ADR 0006
-when it lands
+`semantics.ts` + `references` edges 2026-06-11); **Phase C fusion shipped**
+2026-06-16 (ADR 0007). Note: this plan originally reserved "ADR 0006" for
+Phase C, but 0006 became chunk-level retrieval — Phase C is **ADR 0007**.
 
 ## Goal
 
@@ -125,12 +126,12 @@ states which tiers ran. Same honesty contract as ADRs 0003–0005.
 2. **Cross-sheet callouts → graph edges**: `references` relationships
    between sheet entities. A drawing set becomes a navigable graph — the
    product's core differentiator, and pure win for `traverse`.
-3. **VLM fusion (ADR 0005 v2)**: `ingest_document` injects the vector facts
-   (layer list, detected views, title-block fields, dimension inventory)
-   into the describe instructions — the client model narrates *on top of*
-   deterministic facts instead of reading everything from pixels. The
-   grounding gate gains spatial checking: a quoted annotation must exist
-   *and* sit in the view the description places it in.
+3. **VLM fusion (ADR 0007 — shipped)**: `ingest_document` injects the vector
+   facts (layer list, detected views, title-block fields, dimension
+   inventory) into the describe instructions — the client model narrates
+   *on top of* deterministic facts instead of reading everything from pixels.
+   Still to come: the grounding gate gains spatial checking — a quoted
+   annotation must exist *and* sit in the view the description places it in.
 4. **Schedules** stored as structured tables on the entity, searchable.
 
 ## Phasing
@@ -179,8 +180,18 @@ states which tiers ran. Same honesty contract as ADRs 0003–0005.
   attributed corpus exists — Phase A proved 03-3H5404 kept only the layer
   *table* (membership stripped); attribution coverage lives in the
   authored OCG fixture instead.
-- **Phase C — fusion.** VLM instruction enrichment, spatial grounding v2,
-  schedule search; write ADR 0006 documenting what shipped.
+- **Phase C — fusion. ◑ Partially shipped 2026-06-16 (ADR 0007).**
+  `describe.ts` (`extractSheetFacts` / `formatSheetFacts`): the gateway's
+  `ingest_document` injects the deterministic vector facts for the rendered
+  page — sheet number/title/revision, view labels, scales, dimension
+  inventory, callouts, match lines, schedules, attributed CAD layers — into
+  the describe instructions as ground truth, so the client model narrates on
+  top of facts instead of re-reading identifiers from pixels (directly
+  attacks the Caltrans-eval misreads). Facts also returned structured as
+  `deterministicFacts`. Still open in Phase C: spatial grounding v2 (an
+  annotation must sit in the view the description places it in), a fuller
+  structured-output description schema, schedule search, OCR for scans, and
+  the per-gateway golden-sheet description scorecard.
 
 ## Risks and honest limits
 

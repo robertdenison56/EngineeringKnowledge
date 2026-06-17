@@ -17,11 +17,15 @@ import {
   buildCandidate,
   buildReferenceEdges,
   chunksToText,
+  extractSheetFacts,
+  formatSheetFacts,
   groundAnnotations,
   rasterizeSheet,
   rasterizerAvailable,
   sheetIndex,
+  type SheetFacts,
 } from '@ekg/ingestion';
+import { readFileSync } from 'node:fs';
 
 /**
  * The canonical gateway (PRD P0-3). One MCP server serves Claude, ChatGPT,
@@ -342,6 +346,26 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         }
       }
 
+      // VLM fusion (Phase C, ADR 0007): deterministic vector facts for the
+      // rendered page, fed to the describing model as ground truth so it
+      // narrates on top of them instead of re-reading identifiers from
+      // pixels. A bonus — never block ingestion if extraction fails.
+      let sheetFacts: SheetFacts | null = null;
+      if (images.length > 0 && candidate.parseStatus === 'extracted') {
+        try {
+          sheetFacts = await extractSheetFacts(new Uint8Array(readFileSync(filePath)), page ?? 1);
+        } catch {
+          /* facts are enrichment, not a precondition */
+        }
+      }
+      // Persist the rendered page's facts so save_description can verify the
+      // model's annotations against them too — the parser feeds the prompt
+      // AND checks the reading (ADR 0008). Chunks preserved (omitted arg).
+      if (sheetFacts) {
+        entity.properties.parserFacts = sheetFacts;
+        await store.upsertEntity(entity);
+      }
+
       const status = {
         status: 'queued_unverified',
         id: entity.id,
@@ -356,6 +380,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
           : {}),
         url: appUrl(entity),
         imagesAttached: images.length,
+        ...(sheetFacts ? { deterministicFacts: sheetFacts } : {}),
         ...(rasterNote ? { note: rasterNote } : {}),
         guidance:
           'Queued as unverified — a curator must verify it at the workspace /curation page before it is firm knowledge.' +
@@ -377,6 +402,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
                 {
                   type: 'text' as const,
                   text:
+                    (sheetFacts ? `${formatSheetFacts(sheetFacts)}\n\n` : '') +
                     `Sheet renderings above (${images.map((i) => i.label).join('; ')}). ` +
                     'Describe what is drafted: views/details present, components, materials, and what the ' +
                     'annotations say. Then call save_description with `description` (plain language) and ' +
@@ -426,12 +452,16 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         return asContent({ error: 'not_found', entityId });
       }
 
-      // Ground against the full document text (all chunks), not the bounded
-      // entity preview — a description of page 200 must still be checkable
-      // (ADR 0006). Falls back to the preview for chunkless entities.
+      // Ground against TWO sources, so the parser and vision model collaborate
+      // (ADR 0008): the full document text (all chunks, not the bounded preview
+      // — a description of page 200 must still be checkable, ADR 0006) AND the
+      // deterministic parser facts stored at ingest. A quote the text layer
+      // mangles (stacked fractions, ± suffixes) still grounds if the geometry
+      // parse independently found it.
       const chunks = await store.getChunks(caller, entityId);
       const groundingSource = chunks.length > 0 ? chunksToText(chunks) : entity.content;
-      const report = groundAnnotations(annotations, groundingSource);
+      const parserFacts = entity.properties.parserFacts as SheetFacts | undefined;
+      const report = groundAnnotations(annotations, groundingSource, parserFacts);
       const updated: Entity = {
         ...entity,
         summary: `[AI-generated description — unverified] ${description}`.slice(0, 700),
@@ -440,6 +470,9 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
           drawingDescription: description,
           descriptionSource: 'gateway-client-model',
           descriptionAnnotations: report.grounded,
+          ...(report.parserConfirmed.length > 0
+            ? { descriptionParserConfirmed: report.parserConfirmed }
+            : {}),
           ...(report.ungrounded.length > 0
             ? { descriptionUngrounded: report.ungrounded }
             : {}),
@@ -454,11 +487,15 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
       };
       await store.upsertEntity(updated);
 
+      const confirmedNote =
+        report.parserConfirmed.length > 0
+          ? ` ${report.parserConfirmed.length} of them were independently confirmed by the geometry parser (strongest evidence).`
+          : '';
       const guidance = !report.groundable
-        ? 'No text layer to ground against (scanned sheet) — the whole description is low-confidence pending curator review. Tell the user it is an unverified machine reading.'
+        ? 'No text layer or parser facts to ground against (scanned sheet) — the whole description is low-confidence pending curator review. Tell the user it is an unverified machine reading.'
         : report.ungrounded.length > 0
-          ? 'Some annotations were NOT found in the document text layer (listed in ungrounded). They are stored for curator review only — do not present them to the user as facts from the document.'
-          : 'All quoted annotations were found in the document text layer. Still unverified until a curator approves it.';
+          ? `Some annotations were NOT confirmed by the document text layer or the geometry parse (listed in ungrounded). They are stored for curator review only — do not present them to the user as facts from the document.${confirmedNote}`
+          : `All quoted annotations were confirmed against the document.${confirmedNote} Still unverified until a curator approves it.`;
 
       return asContent({
         entityId,
@@ -467,6 +504,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         reviewStatus: 'unverified',
         groundable: report.groundable,
         grounded: report.grounded,
+        parserConfirmed: report.parserConfirmed,
         ungrounded: report.ungrounded,
         guidance,
       });

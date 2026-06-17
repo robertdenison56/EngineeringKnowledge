@@ -44,3 +44,47 @@ test('letter-spaced CAD text grounds space-blind, on token boundaries only', () 
   // "ROUTE 50" ends mid-token (inside 505) — not grounded.
   assert.deepEqual(report.ungrounded, ['ROUTE 50']);
 });
+
+// --- Grounding v2: parser facts as a second source (ADR 0008) --------------
+
+test('parser facts reclaim a dimension the text layer mangled', () => {
+  // The text layer scrambles the dimension, but the geometry parser found
+  // "18'-11\"" — and the model quoted it with descriptive words appended.
+  const facts = { dimensions: [`18'-11"`, `71'-0"`], views: ['ELEVATION'] };
+  const report = groundAnnotations(
+    [`18'-11"± AFTER STRENGTHEN`, `71'-0"± LEFT BRIDGE`, 'ELEVATION'],
+    'unrelated text with no dimensions',
+    facts,
+  );
+  assert.deepEqual(report.grounded, [`18'-11"± AFTER STRENGTHEN`, `71'-0"± LEFT BRIDGE`, 'ELEVATION']);
+  assert.deepEqual(report.ungrounded, []);
+  assert.equal(report.parserConfirmed.length, 3, 'all three confirmed by the parser');
+});
+
+test('parserConfirmed marks two-source agreement even when text also grounds', () => {
+  const facts = { dimensions: [`12'-6"`] };
+  const report = groundAnnotations([`12'-6"`, 'random note'], `the wall is 12'-6" tall`, facts);
+  assert.ok(report.grounded.includes(`12'-6"`));
+  assert.deepEqual(report.parserConfirmed, [`12'-6"`]);
+  assert.deepEqual(report.ungrounded, ['random note']);
+});
+
+test('parser grounding does not admit fabrications or numeric fragments', () => {
+  const facts = { dimensions: [`8'-0"`, `48'-0"`], views: ['PLAN'] };
+  const report = groundAnnotations(
+    ['ZZ-NOT-ON-SHEET', '8', `99'-9"`],
+    'plain text',
+    facts,
+  );
+  // "8" is too unspecific to confirm against "8'-0\""; the others aren't facts.
+  assert.deepEqual(report.grounded, []);
+  assert.equal(report.parserConfirmed.length, 0);
+});
+
+test('facts alone make a scan groundable (no text layer)', () => {
+  const facts = { sheetNumber: 'S-101', views: ['SECTION A-A'] };
+  const report = groundAnnotations(['SECTION A-A', 'illegible note'], undefined, facts);
+  assert.equal(report.groundable, true);
+  assert.deepEqual(report.grounded, ['SECTION A-A']);
+  assert.deepEqual(report.parserConfirmed, ['SECTION A-A']);
+});

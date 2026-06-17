@@ -9,6 +9,7 @@ export {
   type SheetReference,
 } from './candidate.js';
 export { buildReferenceEdges, sheetIndex, type ReferenceEdgeResult } from './edges.js';
+export { extractSheetFacts, formatSheetFacts, type SheetFacts } from './describe.js';
 export {
   chunkDocument,
   chunksToText,
