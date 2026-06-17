@@ -14,7 +14,7 @@ Full product definition: [PRD](PRD-engineering-knowledge-graph.md).
 |---|---|---|
 | `packages/core` | Ontology (entities, relationships, document chunks), `GraphStore` interface, shared retrieval semantics, in-memory dev store, demo seed | P0-1 |
 | `packages/store-sqlite` | Persistent `GraphStore` on SQLite (`node:sqlite`, no native deps) — entity + chunk-level FTS and embeddings, hybrid retrieval (ADR 0003, 0006) | OQ 1 reference |
-| `apps/mcp-server` | MCP gateway — `search` / `fetch` / `traverse` plus `ingest_document` / `save_description`: users add documents from their assistant, and *their* model describes drawing sheets (stdio for now; set `EKG_DB_PATH` to serve the curated database) | P0-2, P0-3…P0-6 |
+| `apps/mcp-server` | MCP gateway — `search` / `fetch` / `traverse` / `find_experts` / `get_project_context` plus `ingest_document` / `save_description`: users add documents from their assistant, and *their* model describes drawing sheets. Runs on stdio (single-user dev) or remote **Streamable HTTP** with per-request JWT identity, per-caller ACL/tenant trimming, and an audit trail (P0-7); set `EKG_DB_PATH` to serve the curated database | P0-2, P0-3…P0-6 |
 | `apps/web` | Knowledge workspace app — dashboard, search/browse, entity pages with graph view, curation workbench, capture form (`npm run dev --workspace @ekg/web`) | P0-9 |
 | `services/ingestion` | Ingestion CLI v0 — classify files, extract PDF text layers (scans flagged `needs-ocr`), CAD-native vector parsing of drawing sheets (title blocks, views, dimensions, schedules, callouts → cross-sheet `references` edges), queue candidates for curation | P0-2, P0-2a |
 | `docs/decisions` | Architecture decision records | — |
@@ -58,7 +58,8 @@ tool queues it and returns rendered sheet images, the user's own model (on
 their existing AI subscription — the gateway has no LLM API key) describes
 what is drafted, and `save_description` stores it with every quoted
 annotation mechanically grounded against the document text layer. Sheet
-rendering needs poppler on the gateway host (`brew install poppler`).
+rendering is own code (ADR 0009) — no external binary; poppler is only an
+optional fallback for scanned/image-only pages.
 
 ## Status
 
@@ -78,7 +79,17 @@ searchable through ~page 12 now indexes all 490 passages. When the gateway
 hands a drawing to a vision model to describe (ADR 0005), it now **fuses**
 the deterministic vector facts (sheet number, views, dimensions, callouts,
 layers) into the prompt as ground truth (ADR 0007) so the model narrates on
-top of facts instead of misreading identifiers from pixels.
+top of facts instead of misreading identifiers from pixels, and **grounds**
+the model's annotations against both the text layer and those facts (ADR
+0008). Sheet rasterization is **own code** (ADR 0009) — a vector renderer
+built on the pdf.js primitives we already parse, so the gateway needs no
+external binary (poppler is an optional fallback for scanned pages).
+The gateway now ships its **remote transport**: Streamable HTTP with
+per-request identity from a bearer JWT, so ACL trimming and tenant isolation
+follow the calling token (two tokens hit one server and see different
+knowledge), plus an append-only audit trail of every call (P0-7). The richer
+P0-3 tools `find_experts` and `get_project_context` round out the surface.
 Open before Phase 2 exit: production graph engine (OQ 1), SharePoint sync,
-OCR for scanned sets, and the remote transport (Streamable HTTP + OAuth)
-with real identity — today's dev caller is fixed.
+OCR for scanned sets, and OAuth 2.1 + Entra federation on the gateway — the
+JWT identity uses the same claim shape, so that work swaps only the token
+verifier.

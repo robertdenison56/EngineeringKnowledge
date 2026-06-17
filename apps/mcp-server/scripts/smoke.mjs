@@ -7,9 +7,15 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+// Audit to a temp file so we can assert the P0-7 trail was written (cleaned up
+// on exit).
+const auditPath = join(tmpdir(), `ekg-audit-smoke-${process.pid}.jsonl`);
 const child = spawn(process.execPath, [join(root, 'dist/index.js')], {
+  env: { ...process.env, EKG_AUDIT_LOG: auditPath },
   stdio: ['pipe', 'pipe', 'inherit'],
 });
 
@@ -62,7 +68,9 @@ try {
   const tools = await request(2, 'tools/list', {});
   const names = tools.tools.map((t) => t.name).sort();
   assert(
-    ['fetch', 'search', 'traverse'].every((n) => names.includes(n)),
+    ['fetch', 'find_experts', 'get_project_context', 'search', 'traverse'].every((n) =>
+      names.includes(n),
+    ),
     `tools registered (${names.join(', ')})`,
   );
 
@@ -89,6 +97,62 @@ try {
   });
   const graph = JSON.parse(traverse.content[0].text);
   assert(graph.neighbors?.[0]?.id === 'project:riverside', 'traverse follows relationships');
+
+  // --- Richer P0-3 tools: find_experts + get_project_context ---
+  const experts = await request(20, 'tools/call', {
+    name: 'find_experts',
+    arguments: { query: 'curtain wall firestop' },
+  });
+  const expertPayload = JSON.parse(experts.content[0].text);
+  const okafor = expertPayload.experts?.find((e) => e.id === 'person:james-okafor');
+  assert(okafor, 'find_experts surfaces the author of matching knowledge');
+  assert(
+    okafor.evidence?.some((ev) => ev.id === 'detail:cw-firestop-02'),
+    'expert ships with the authored evidence that grounds the expertise (P0-8)',
+  );
+
+  const noExperts = await request(21, 'tools/call', {
+    name: 'find_experts',
+    arguments: { query: 'zzz-no-such-topic-zzz' },
+  });
+  const noExpertPayload = JSON.parse(noExperts.content[0].text);
+  assert(
+    noExpertPayload.no_results === true && noExpertPayload.guidance,
+    'find_experts has an explicit no_results state (P0-8)',
+  );
+
+  const context = await request(22, 'tools/call', {
+    name: 'get_project_context',
+    arguments: { projectId: 'project:riverside' },
+  });
+  const ctx = JSON.parse(context.content[0].text);
+  assert(ctx.project?.id === 'project:riverside', 'get_project_context resolves the project');
+  assert(
+    ctx.detailsAndDocuments?.some((d) => d.id === 'detail:cw-firestop-02'),
+    'project context lists the details used on the project',
+  );
+  assert(
+    ctx.specifications?.some((s) => s.id === 'spec:07-84-00'),
+    'project context lists the applicable specifications',
+  );
+  assert(
+    ctx.issuesAndLessons?.some((l) => l.id === 'lesson:firestop-mockup-failure'),
+    'project context lists issues and lessons learned',
+  );
+  assert(
+    ctx.team?.some((p) => p.id === 'person:james-okafor'),
+    'project context names the people who worked on it (second degree)',
+  );
+
+  const byName = await request(23, 'tools/call', {
+    name: 'get_project_context',
+    arguments: { query: 'Riverside' },
+  });
+  const byNameCtx = JSON.parse(byName.content[0].text);
+  assert(
+    byNameCtx.project?.id === 'project:riverside',
+    'get_project_context resolves a project by name',
+  );
 
   // --- Gateway ingestion + client-model description flow (ADR 0005) ---
   const samples = join(root, '../../services/ingestion/samples');
@@ -219,11 +283,46 @@ try {
     console.log('ok - fusion + collaboration checks skipped (pdftoppm not installed on this host)');
   }
 
+  // --- Audit trail (PRD P0-7): every tool call left an immutable record ---
+  // Audit writes are synchronous on the server before each response returns, so
+  // by now the file holds an event for every call above.
+  const auditEvents = readFileSync(auditPath, 'utf8')
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+  assert(auditEvents.length > 0, 'audit log captured tool calls (P0-7)');
+  assert(
+    auditEvents.every(
+      (e) =>
+        e.tenantId === 'demo-firm' &&
+        e.principal === 'user:dev' &&
+        e.transport === 'stdio' &&
+        typeof e.ts === 'string',
+    ),
+    'audit events carry caller identity, transport, and timestamp (P0-7)',
+  );
+  const expertsAudit = auditEvents.find((e) => e.tool === 'find_experts' && e.outcome === 'ok');
+  assert(
+    expertsAudit?.resultIds?.includes('person:james-okafor'),
+    'audit records which items a call surfaced (find_experts → the expert)',
+  );
+  assert(
+    auditEvents.some((e) => e.tool === 'search' && e.outcome === 'no_results'),
+    'audit distinguishes no_results outcomes',
+  );
+  assert(
+    auditEvents.some((e) => e.tool === 'get_project_context'),
+    'every tool is wrapped by the audit boundary',
+  );
+
   console.log('smoke: all checks passed');
+  rmSync(auditPath, { force: true });
   child.kill();
   process.exit(0);
 } catch (err) {
   console.error(String(err));
+  rmSync(auditPath, { force: true });
   child.kill();
   process.exit(1);
 }
