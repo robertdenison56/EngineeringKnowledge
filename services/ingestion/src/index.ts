@@ -47,3 +47,13 @@ export {
   type VectorStroke,
 } from './vector.js';
 export { pngSize, rasterizeSheet, rasterizerAvailable, type SheetImage } from './raster.js';
+export {
+  renderSheetImages,
+  renderModelImages,
+  hasVectorContent,
+  loadPageModel,
+  rasterize,
+  type PageModel,
+  type RasterOptions,
+} from './raster/render.js';
+export { rasterizeSheetForVision, type SheetRasterResult } from './raster/sheet.js';
