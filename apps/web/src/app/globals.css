@@ -1,16 +1,63 @@
 :root {
   --bg: #f6f7f9;
   --surface: #ffffff;
+  /* Subtle inset panels (doc text, map canvas) — one step off --surface. */
+  --surface-2: #fcfdff;
   --text: #0f172a;
   --muted: #64748b;
   --border: #e2e8f0;
   --accent: #2563eb;
+  --accent-contrast: #ffffff;
   --warning-bg: #fef3c7;
   --warning-fg: #92400e;
+  /* Tag / relationship chips. */
+  --chip-bg: #eef2ff;
+  --chip-fg: #3730a3;
+  --chip-border: #c7d2fe;
+  --chip-hover: #e0e7ff;
+  /* Density-driven spacing knobs (overridden by [data-density]). */
+  --card-pad: 0.9rem 1.1rem;
+  --card-gap: 0.9rem;
+  --section-gap: 2rem;
+}
+
+/* Dark theme — set on <html data-theme="dark"> by the no-flash script in
+   the layout, driven by the Settings → Appearance control. The app already
+   themes through these variables, so this is mostly a palette swap. */
+html[data-theme='dark'] {
+  --bg: #0b1220;
+  --surface: #141d30;
+  --surface-2: #0f1828;
+  --text: #e6edf6;
+  --muted: #94a3b8;
+  --border: #25324b;
+  --accent: #5b9bff;
+  --accent-contrast: #07101f;
+  --warning-bg: #3a2f12;
+  --warning-fg: #fcd34d;
+  --chip-bg: #1d2540;
+  --chip-fg: #c7d2fe;
+  --chip-border: #34406a;
+  --chip-hover: #273158;
+  color-scheme: dark;
+}
+
+/* Compact density — tighter spacing for dense knowledge lists. */
+html[data-density='compact'] {
+  --card-pad: 0.6rem 0.8rem;
+  --card-gap: 0.55rem;
+  --section-gap: 1.3rem;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Keyboard focus — visible everywhere, themed to the accent. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 body {
@@ -148,14 +195,16 @@ h2 {
 
 .cards {
   display: grid;
-  gap: 0.8rem;
+  gap: var(--card-gap);
 }
 
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
+  /* Type-colored accent rail; entity cards set --accent-rail to their type. */
+  border-left: 3px solid var(--accent-rail, var(--border));
   border-radius: 12px;
-  padding: 0.9rem 1.1rem;
+  padding: var(--card-pad);
 }
 .card-head {
   display: flex;
@@ -377,15 +426,15 @@ h2 {
 .tag-chip {
   font-size: 0.74rem;
   font-weight: 600;
-  color: #3730a3;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
+  color: var(--chip-fg);
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-border);
   border-radius: 999px;
   padding: 0.1rem 0.55rem;
 }
 .tag-chip:hover {
   text-decoration: none;
-  background: #e0e7ff;
+  background: var(--chip-hover);
 }
 
 .map-card {
@@ -400,7 +449,7 @@ h2 {
   display: block;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fcfdff;
+  background: var(--surface-2);
 }
 .map-toolbar {
   display: flex;
@@ -430,9 +479,9 @@ h2 {
   text-decoration: line-through;
 }
 .chip-btn.tag.active {
-  background: #eef2ff;
-  border-color: #6366f1;
-  color: #3730a3;
+  background: var(--chip-bg);
+  border-color: var(--accent);
+  color: var(--chip-fg);
 }
 .chip-count {
   font-weight: 400;
@@ -486,7 +535,7 @@ h2 {
   word-break: break-word;
   max-height: 420px;
   overflow-y: auto;
-  background: #fcfdff;
+  background: var(--surface-2);
   border-radius: 0 0 10px 10px;
 }
 .section-list {
@@ -514,4 +563,154 @@ h2 {
 }
 .match-snippet {
   color: var(--text);
+}
+
+/* --- Skip link (a11y) ----------------------------------------------------- */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  padding: 0.5rem 0.9rem;
+  border-radius: 0 0 8px 0;
+}
+.skip-link:focus {
+  left: 0;
+  text-decoration: none;
+}
+
+/* --- Settings page -------------------------------------------------------- */
+.settings-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.1rem 1.2rem;
+  margin-top: var(--section-gap);
+}
+.settings-head h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1.05rem;
+}
+.settings-head .meta {
+  margin: 0 0 0.9rem;
+}
+.settings-grid {
+  display: grid;
+  gap: 1.2rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.seg-field {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+.seg-field legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0;
+  margin-bottom: 0.4rem;
+}
+.seg-control {
+  display: inline-flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 3px;
+}
+.seg-option {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.seg-option:hover {
+  color: var(--text);
+}
+.seg-option.active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+.kv-list {
+  margin: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+.kv-list > div {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 0.8rem;
+  align-items: baseline;
+}
+.kv-list dt {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.kv-list dd {
+  margin: 0;
+  font-size: 0.9rem;
+}
+.inline-code {
+  margin: 0 0.2rem;
+}
+.settings-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.9rem;
+}
+.settings-stat {
+  display: flex;
+  flex-direction: column;
+}
+.settings-stat-num {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.settings-stat-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.status-rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.status-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+}
+.status-count {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+/* --- Responsive header ---------------------------------------------------- */
+@media (max-width: 640px) {
+  .site-header {
+    flex-wrap: wrap;
+    gap: 0.6rem 1rem;
+  }
+  .site-header nav {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+  }
+  .identity {
+    margin-left: 0;
+  }
 }

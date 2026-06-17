@@ -97,7 +97,10 @@ export interface CardMatch {
 export function EntityCard({ entity, match }: { entity: Entity; match?: CardMatch }) {
   const warning = REVIEW_WARNINGS[entity.provenance.reviewStatus];
   return (
-    <article className="card">
+    <article
+      className="card"
+      style={{ ['--accent-rail' as string]: typeColor(entity.type) }}
+    >
       <div className="card-head">
         <Link href={entityHref(entity.id)} className="card-title">
           {entity.title}
