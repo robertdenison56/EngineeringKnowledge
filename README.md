@@ -7,6 +7,8 @@ experts), and multiple gateways ground the AI assistants they already use —
 provenance on every answer.
 
 Full product definition: [PRD](PRD-engineering-knowledge-graph.md).
+How to set up, use, add to, and refine it: [Guides](docs/guides/) (start with
+[Getting started](docs/guides/01-getting-started.md)).
 
 ## Repository layout
 
