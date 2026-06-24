@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { getFirmName } from '../lib/store';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -20,7 +21,8 @@ const THEME_INIT = `(function(){try{
   document.documentElement.setAttribute('data-density', d);
 }catch(e){}})();`;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const firmName = await getFirmName();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -37,15 +39,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <nav>
             <Link href="/search">Browse &amp; search</Link>
             <Link href="/map">Map</Link>
+            <Link href="/ingest">Add documents</Link>
             <Link href="/curation">Curate</Link>
             <Link href="/capture">Capture</Link>
             <Link href="/settings">Settings</Link>
           </nav>
           <div
             className="identity"
-            title="Fixed development identity — production signs in with Entra ID SSO (PRD P0-9)"
+            title="Firm name is set in Settings → Identity by an admin. The signed-in identity is fixed in development — production signs in with Entra ID SSO (PRD P0-9)."
           >
-            demo-firm · user:dev
+            {firmName} · user:dev
           </div>
         </header>
         <main id="main">{children}</main>

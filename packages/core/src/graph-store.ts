@@ -83,4 +83,12 @@ export interface GraphStore {
   listRelationships(caller: Caller): Promise<Relationship[]>;
   /** Follow relationships from an entity (MCP `traverse` tool, PRD P0-3). */
   neighbors(caller: Caller, entityId: string, type?: RelationshipType): Promise<NeighborHit[]>;
+  /**
+   * Tenant-scoped workspace settings — a small key→value store for config
+   * that belongs to the firm rather than the graph (e.g. the firm's display
+   * name). Set by an admin in the workspace app (PRD P0-9); like every other
+   * read, lookups are scoped to a single tenant. Returns undefined when unset.
+   */
+  getSetting(tenantId: string, key: string): Promise<string | undefined>;
+  setSetting(tenantId: string, key: string, value: string): Promise<void>;
 }

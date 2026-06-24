@@ -72,6 +72,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
   id UNINDEXED, entity_id UNINDEXED, tenant_id UNINDEXED, text,
   tokenize = 'unicode61 remove_diacritics 2'
 );
+CREATE TABLE IF NOT EXISTS settings (
+  tenant_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, key)
+);
 `;
 
 interface EntityRow {
@@ -604,5 +610,21 @@ export class SqliteGraphStore implements GraphStore {
       if (other) hits.push({ relationship: rel, entity: other, direction });
     }
     return hits;
+  }
+
+  async getSetting(tenantId: string, key: string): Promise<string | undefined> {
+    const row = this.db
+      .prepare('SELECT value FROM settings WHERE tenant_id = ? AND key = ?')
+      .get(tenantId, key) as { value: string } | undefined;
+    return row?.value;
+  }
+
+  async setSetting(tenantId: string, key: string, value: string): Promise<void> {
+    this.db
+      .prepare(
+        `INSERT INTO settings (tenant_id, key, value) VALUES (?, ?, ?)
+         ON CONFLICT(tenant_id, key) DO UPDATE SET value = excluded.value`,
+      )
+      .run(tenantId, key, value);
   }
 }

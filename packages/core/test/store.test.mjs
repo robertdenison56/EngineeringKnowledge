@@ -103,3 +103,13 @@ test('neighbors traverses typed relationships in both directions', async () => {
   assert.equal(supersedes.length, 1);
   assert.equal(supersedes[0].direction, 'in');
 });
+
+test('settings: round-trip, upsert in place, and tenant isolation', async () => {
+  const store = new InMemoryGraphStore();
+  assert.equal(await store.getSetting(DEMO_TENANT, 'firm-name'), undefined, 'unset reads undefined');
+  await store.setSetting(DEMO_TENANT, 'firm-name', 'Acme Engineering');
+  assert.equal(await store.getSetting(DEMO_TENANT, 'firm-name'), 'Acme Engineering');
+  await store.setSetting(DEMO_TENANT, 'firm-name', 'Acme Structural');
+  assert.equal(await store.getSetting(DEMO_TENANT, 'firm-name'), 'Acme Structural');
+  assert.equal(await store.getSetting('other-firm', 'firm-name'), undefined, 'scoped per tenant');
+});

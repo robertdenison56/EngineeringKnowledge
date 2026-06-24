@@ -19,6 +19,8 @@ export class InMemoryGraphStore implements GraphStore {
   private entities = new Map<string, Entity>();
   private relationships = new Map<string, Relationship>();
   private chunks = new Map<string, Chunk[]>();
+  /** Tenant-scoped key→value settings, keyed `${tenantId} ${key}`. */
+  private settings = new Map<string, string>();
 
   async upsertEntity(entity: Entity, chunks?: Chunk[]): Promise<void> {
     this.entities.set(entity.id, entity);
@@ -130,5 +132,13 @@ export class InMemoryGraphStore implements GraphStore {
       }
     }
     return hits;
+  }
+
+  async getSetting(tenantId: string, key: string): Promise<string | undefined> {
+    return this.settings.get(`${tenantId} ${key}`);
+  }
+
+  async setSetting(tenantId: string, key: string, value: string): Promise<void> {
+    this.settings.set(`${tenantId} ${key}`, value);
   }
 }

@@ -1,6 +1,7 @@
 import type { ReviewStatus } from '@ekg/core';
-import { DEV_CALLER, getStore } from '../../lib/store';
+import { DEV_CALLER, getFirmName, getStore, isAdmin } from '../../lib/store';
 import { AppearanceSettings } from '../../components/AppearanceSettings';
+import { FirmNameSettings } from '../../components/FirmNameSettings';
 import { ReviewBadge } from '../../components/ui';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,9 @@ export default async function SettingsPage() {
     const s = e.provenance.reviewStatus;
     byStatus.set(s, (byStatus.get(s) ?? 0) + 1);
   }
+
+  const firmName = await getFirmName();
+  const canEditFirmName = isAdmin(DEV_CALLER);
 
   const provider = process.env.EKG_EMBEDDINGS_PROVIDER;
   const dbPath = process.env.EKG_DB_PATH ?? '.data/ekg.db';
@@ -45,13 +49,16 @@ export default async function SettingsPage() {
         <div className="settings-head">
           <h3>Identity</h3>
           <p className="meta">
-            Fixed development identity. Production resolves the caller per request from Entra ID
-            SSO and trims every read by it (PRD P0-7, P0-9).
+            The firm name is how this workspace presents itself — in the header and in grounded
+            answers. Only an admin can change it. The tenant id and principals are the fixed
+            development identity; production resolves the caller per request from Entra ID SSO and
+            trims every read by it (PRD P0-7, P0-9).
           </p>
         </div>
+        <FirmNameSettings initialFirmName={firmName} canEdit={canEditFirmName} />
         <dl className="kv-list">
           <div>
-            <dt>Tenant</dt>
+            <dt>Tenant id</dt>
             <dd>
               <code>{DEV_CALLER.tenantId}</code>
             </dd>

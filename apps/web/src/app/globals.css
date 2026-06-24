@@ -639,6 +639,62 @@ h2 {
   color: var(--accent);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
 }
+.firm-name-form {
+  display: grid;
+  gap: 0.6rem;
+  max-width: 420px;
+  margin-bottom: 1rem;
+}
+.firm-name-form label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.firm-name-form input {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-family: inherit;
+  font-weight: 400;
+  background: var(--surface);
+  color: var(--text);
+}
+.firm-name-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.firm-name-actions button {
+  padding: 0.5rem 1.1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.firm-name-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.firm-name-msg {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.firm-name-msg.ok {
+  color: var(--accent);
+}
+.firm-name-msg.err {
+  color: var(--warning-fg);
+}
+.firm-name-readonly {
+  margin: 0 0 1rem;
+}
+
 .kv-list {
   margin: 0;
   display: grid;
@@ -713,4 +769,152 @@ h2 {
   .identity {
     margin-left: 0;
   }
+}
+
+/* --- Document upload (gaps G1 + interim G2) -------------------------------- */
+/* Drag-drop / pick files that run through the same buildCandidate pipeline as
+   bulk ingestion (PRD P0-2). */
+.ingest {
+  display: grid;
+  gap: 1rem;
+  max-width: 640px;
+}
+.dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  text-align: center;
+  padding: 2.2rem 1rem;
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.dropzone.dragging {
+  border-color: var(--accent);
+  background: var(--chip-bg);
+}
+/* Native control is visually hidden but still focusable; the wrapping label
+   opens the picker on click. */
+.dropzone input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.dz-strong {
+  font-weight: 600;
+  color: var(--text);
+}
+.dz-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+.file-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.7rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.file-list li.bad {
+  border-color: #dc2626;
+}
+.file-list .fl-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-list .fl-size {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.file-list li.bad .fl-size {
+  color: #dc2626;
+}
+
+.batch-tags {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.batch-tags input {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 400;
+}
+
+.ingest > button {
+  justify-self: start;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.ingest > button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ingest-results {
+  border-top: 1px solid var(--border);
+  padding-top: 0.9rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.res-ok {
+  margin: 0;
+  font-weight: 600;
+  color: #166534;
+}
+.res-fail {
+  margin: 0;
+  font-weight: 600;
+  color: #991b1b;
+}
+html[data-theme='dark'] .res-ok {
+  color: #4ade80;
+}
+html[data-theme='dark'] .res-fail {
+  color: #f87171;
+}
+.result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+.result-list.failed li {
+  color: var(--muted);
 }

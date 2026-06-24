@@ -88,6 +88,22 @@ test('upsert updates in place (curation verify flow)', async () => {
   store.close();
 });
 
+test('settings: round-trip, upsert, tenant isolation, and persistence', async () => {
+  const path = freshDbPath();
+  const first = new SqliteGraphStore(path);
+  assert.equal(await first.getSetting(DEMO_TENANT, 'firm-name'), undefined, 'unset reads undefined');
+  await first.setSetting(DEMO_TENANT, 'firm-name', 'Acme Engineering');
+  assert.equal(await first.getSetting(DEMO_TENANT, 'firm-name'), 'Acme Engineering');
+  await first.setSetting(DEMO_TENANT, 'firm-name', 'Acme Structural'); // upsert in place
+  assert.equal(await first.getSetting(DEMO_TENANT, 'firm-name'), 'Acme Structural');
+  assert.equal(await first.getSetting('other-firm', 'firm-name'), undefined, 'scoped per tenant');
+  first.close();
+
+  const second = new SqliteGraphStore(path);
+  assert.equal(await second.getSetting(DEMO_TENANT, 'firm-name'), 'Acme Structural', 'survives reopen');
+  second.close();
+});
+
 test('persistence: chunks survive reopening and stay searchable (ADR 0006)', async () => {
   const path = freshDbPath();
   const first = new SqliteGraphStore(path);

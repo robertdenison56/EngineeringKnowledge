@@ -46,11 +46,37 @@ export async function getStore(): Promise<GraphStore> {
 }
 
 /**
+ * Principal that grants firm-wide admin rights (workspace settings, and the
+ * role management to come). Production derives it from Entra ID group/role
+ * claims; here it's carried on the fixed dev identity below (PRD P0-9).
+ */
+export const ADMIN_PRINCIPAL = 'role:admin';
+
+/**
  * Fixed development identity — same as the MCP server's dev caller, so the
  * app and the gateways show an identical permission-trimmed view (PRD P0-7).
- * Production resolves the caller from Entra ID SSO (PRD P0-9).
+ * Carries the admin role so the single dev user can exercise admin-only
+ * controls. Production resolves the caller from Entra ID SSO (PRD P0-9).
  */
 export const DEV_CALLER: Caller = {
   tenantId: DEMO_TENANT,
-  principals: ['user:dev', 'group:engineering'],
+  principals: ['user:dev', 'group:engineering', ADMIN_PRINCIPAL],
 };
+
+/** Whether a caller may change workspace-wide settings (PRD P0-9 admin role). */
+export function isAdmin(caller: Caller): boolean {
+  return caller.principals.includes(ADMIN_PRINCIPAL);
+}
+
+/** Settings key for the firm's display name (see {@link getFirmName}). */
+export const FIRM_NAME_KEY = 'firm-name';
+
+/**
+ * The firm's display name — set by an admin in Settings → Identity, surfaced
+ * in the header badge and reports. Falls back to the tenant id when unset, so
+ * a fresh workspace still reads sensibly.
+ */
+export async function getFirmName(): Promise<string> {
+  const store = await getStore();
+  return (await store.getSetting(DEV_CALLER.tenantId, FIRM_NAME_KEY)) ?? DEV_CALLER.tenantId;
+}

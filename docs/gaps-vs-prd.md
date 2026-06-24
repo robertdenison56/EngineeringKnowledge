@@ -19,9 +19,14 @@ replaces the folder walk"* ([`services/ingestion/README.md`](../services/ingesti
 so it does **not** count as the steady-state user path.
 
 **Verdict:** the principle is the PRD's own intent, but the current build does
-not yet meet it. The single largest miss: **there is no way to add a document
-through the GUI at all** — no upload control exists anywhere in the app. Several
-core curation actions are also GUI-absent.
+not yet meet it. Several core curation actions remain GUI-absent.
+
+> **Update 2026-06-23 — G1 + interim G2 shipped.** In-app document upload now
+> exists at [`/ingest`](../apps/web/src/app/ingest/page.tsx): drag-drop or pick
+> one-or-many PDF/MD/TXT files, which run through the **same** `buildCandidate`
+> pipeline as the CLI and gateway and land in the curation queue as
+> `unverified`. This closes G1 and the interim multi-file slice of G2; the full
+> SharePoint/OneDrive OAuth **sync wizard** (G2 step 2) is still pending.
 
 ## Coverage matrix
 
@@ -34,8 +39,8 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 | View entity + provenance | ✅ | P0-9 entity pages | — |
 | Capture lesson / detail by hand | 🟡 | P0-9 guided capture | [G9](#g9--guided-capture-without-type-ahead-linking) |
 | Verify / reject a candidate | 🟡 | P0-9 workbench | [G3](#g3--curation-workbench-is-verifyreject-only) |
-| **Add a document (upload)** | ❌ | P0-2, P0-9 | [G1](#g1--no-in-app-document-upload) |
-| **Bulk ingest a folder / source** | ❌ | P0-2, P0-9 wizard | [G2](#g2--no-ingestion-setup-wizard-or-bulk-import-gui) |
+| **Add a document (upload)** | ✅ | P0-2, P0-9 | [G1](#g1--no-in-app-document-upload) |
+| **Bulk ingest a folder / source** | 🟡 | P0-2, P0-9 wizard | [G2](#g2--no-ingestion-setup-wizard-or-bulk-import-gui) |
 | **Edit / correct an entity** | ❌ | P0-1, P0-9 inline edit | [G4](#g4--no-inline-entity-editing) |
 | **Merge duplicates** | ❌ | P0-9 merge | [G3](#g3--curation-workbench-is-verifyreject-only) |
 | **Set tags / aliases on an item** | ❌ | P0-1, P0-9 | [G4](#g4--no-inline-entity-editing) |
@@ -51,6 +56,12 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G1 · No in-app document upload
 
+- **Status: ✅ Shipped (2026-06-23)** — [`/ingest`](../apps/web/src/app/ingest/page.tsx)
+  + [`actions.ts`](../apps/web/src/app/ingest/actions.ts). Upload writes to a
+  managed `.data/uploads/<uuid>/` location and runs the existing `buildCandidate`
+  pipeline via `store.upsertEntity(entity, chunks)`; result lands in the curation
+  queue. Body-size limit raised in `next.config.mjs` (25 MB); `pdfjs-dist` kept
+  external. The original-text below is retained for history.
 - **PRD:** P0-2 *"manual… ingestion"*; P0-9 the app is the *"build"* surface.
 - **Persona:** Knowledge Manager (Marcus), any engineer.
 - **Now:** No file-upload control exists in the app (`apps/web/src/app/**` has no
@@ -72,6 +83,11 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G2 · No ingestion setup wizard or bulk-import GUI
 
+- **Status: 🟡 Interim shipped (2026-06-23)** — the `/ingest` page accepts
+  **multiple files at once** (Approach step 1 below) with optional batch tags, so
+  a knowledge manager can self-serve a bulk import without the CLI. Still pending:
+  step 2 (SharePoint/OneDrive OAuth connector + scheduled sync + sync-health
+  panel) and step 3 (CSV project-list import).
 - **PRD:** P0-9 *"Ingestion setup wizard: connect a source (SharePoint…), pick
   libraries/projects, confirm permission mapping, and monitor sync health —
   designed so Marcus can do it without IT after initial OAuth consent."* P0-2
@@ -228,8 +244,9 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 A pragmatic order that closes the principle-breaking gaps first and reuses the
 most existing code:
 
-1. **G1 + interim G2** — in-app upload running the existing `buildCandidate`
-   pipeline. One change closes "can't add a document in a browser."
+1. ~~**G1 + interim G2** — in-app upload running the existing `buildCandidate`
+   pipeline. One change closes "can't add a document in a browser."~~ **✅ Done
+   2026-06-23** (`/ingest` single + multi-file upload).
 2. **G4 + G5** — inline entity edit + supersede/deprecate controls (both mostly
    `upsertEntity`/`upsertRelationship`; high trust value).
 3. **G3** — workbench edit + bulk + merge (merge needs the store extension).
