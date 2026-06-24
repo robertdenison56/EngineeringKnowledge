@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | **Product** | Engineering Knowledge Graph (working name: "EKG") |
-| **Status** | Draft v0.1 |
+| **Status** | Draft v0.2 |
 | **Author** | Robert Denison |
-| **Last updated** | 2026-06-09 |
+| **Last updated** | 2026-06-16 |
 | **Target release** | v1 GA — phased, see [Timeline](#timeline-considerations) |
 
 ---
@@ -14,7 +14,7 @@
 
 AEC (Architecture, Engineering, Construction) firms run on institutional knowledge — design details that worked, products that failed, code interpretations a jurisdiction accepted, lessons learned from RFIs and change orders — but that knowledge lives in silos: project folders, retired engineers' heads, Procore/ACC archives, and email. When staff ask general-purpose AI assistants (ChatGPT, Claude, Microsoft 365 Copilot) engineering questions, the assistants answer from public training data with no awareness of the firm's standards, precedents, or hard-won failures, producing confident but firm-inaccurate answers in a domain where errors carry liability and life-safety consequences.
 
-The cost of not solving this: engineers spend hours re-finding precedents that exist somewhere in the firm (industry studies consistently put engineers' search time at 15–30% of working hours), firms repeat mistakes already paid for on past projects, and an aging workforce walks out the door with undocumented expertise. Meanwhile, staff are already using LLMs — ungrounded — which converts a knowledge-management gap into an accuracy and liability risk.
+The cost of not solving this, in order of severity: firms **repeat mistakes already paid for** on past projects (rework, change orders, and — on structural/life-safety work — liability exposure); an **aging workforce walks out the door** with undocumented expertise the firm cannot recover (industry surveys put a large share of senior engineers within a decade of retirement); and engineers **burn billable hours re-finding precedents** that already exist somewhere in the firm. (The oft-cited "knowledge workers spend 15–30% of their time searching" figure traces to early-2000s IDC studies and is contested; we treat it as directional color, not a load-bearing claim — the rework and attrition costs are the real driver.) Meanwhile, staff are already using LLMs — ungrounded — which converts a knowledge-management gap into an accuracy and liability risk.
 
 ## Solution Overview
 
@@ -48,13 +48,28 @@ Every answer path returns **provenance**: source document, project, author, date
                           └────────────────────────────┘
 ```
 
+### Where the defensibility lives
+
+Two of this product's surface features are *not* the moat, and we should not position on them:
+
+- **"Ground your AI assistant in company knowledge"** is now table stakes — Microsoft (Copilot + Work IQ), Glean, and others all do it horizontally.
+- **"Connect to multiple assistants"** is a distribution choice, not a differentiator — Glean already grounds ChatGPT/Claude/Gemini through an MCP gateway, and Microsoft grounds Copilot. Breadth helps adoption; it does not defend the position.
+
+The defensible wedge is the **intersection no horizontal or single-vendor player occupies**:
+
+1. **AEC-native document understanding** — drawing sets parsed to sheet/title-block/region level, spec books split by MasterFormat section, CAD-native vector parsing, OCR-confidence gating, and page/sheet-anchored citations (P0-2a). Glean, Work IQ, and AEC intranet tools treat these as opaque files; we turn them into a navigable graph.
+2. **Provenance and EOR-liability rigor** — every answer carries source, author, date, and review status; superseded/known-bad items are flagged, not silently served (P0-8). This is a vertical trust requirement horizontal tools deprioritize.
+3. **Cross-vendor source neutrality** — we span M365 **and** Procore/ACC **and** network drives. This is the structural advantage over both the platform walled gardens (Autodesk, Procore building AI on *their* data) and the M365-centric context layers (Work IQ). No single platform will build this, because it spans their competitors.
+
+The gateways and the workspace app are *how* this reaches users; the three points above are *why* a firm picks us over Copilot-plus-a-SharePoint-connector. See [Competitive Landscape](#competitive-landscape).
+
 ## Goals
 
 1. **Grounded accuracy**: ≥ 85% of assistant answers to firm-knowledge questions cite a correct, permission-appropriate source from the graph (measured by monthly evaluation set per tenant).
 2. **Findability**: reduce median time for an engineer to locate a relevant precedent (detail, spec section, lesson learned) from hours to **under 5 minutes**, via whichever assistant they already use.
 3. **Adoption where users already are**: ≥ 60% of a customer firm's technical staff issue at least one grounded query per month within 90 days of rollout — *without* requiring them to adopt a new chat interface.
 4. **Knowledge capture**: each active tenant adds or curates ≥ 50 knowledge items per month by month 6 (leading indicator that the graph compounds rather than decays).
-5. **Business**: 10 paying design-team customers (50–2,000 staff) within 2 quarters of GA; gateway breadth (all three assistants) is the differentiator vs. single-ecosystem KM tools.
+5. **Business**: 10 paying design-team customers (50–2,000 staff) within 2 quarters of GA. The differentiator vs. horizontal KM and single-ecosystem tools is the vertical wedge (AEC-native parsing + provenance + cross-vendor coverage — see [Where the defensibility lives](#where-the-defensibility-lives)); gateway breadth is an adoption lever, not the moat.
 
 ## Non-Goals
 
@@ -64,6 +79,24 @@ Every answer path returns **provenance**: source document, project, author, date
 - **Not BIM/IFC model intelligence in v1.** Parsing Revit/IFC geometry into the graph is high-value but a separate, large effort (P2). v1 ingests documents and structured records, not models.
 - **Not government/classified environments in v1.** ITAR/CUI/FedRAMP/GCC High requirements change hosting, staffing, and connector availability (Copilot federated connectors aren't available in DoD clouds). Commercial cloud only for v1; GovCloud is a P2 architectural consideration.
 - **Not cross-firm knowledge sharing.** Tenants are hard-isolated. No benchmarking, pooling, or "industry graph" in v1 — client confidentiality and NDA exposure make this a trust-killer if mishandled (P2, opt-in only).
+- **Not a replacement for the host platforms' own context layers** (Microsoft Work IQ, Glean's enterprise graph, etc.). We *complement* them: we supply AEC-grounded, provenance-rich, page/sheet-anchored knowledge those generic layers cannot extract from a drawing set or spec book, and feed it to whichever assistant the firm uses. When a firm asks "why not just Copilot + Work IQ?", the answer is the vertical wedge — not a competing horizontal index.
+
+## Competitive Landscape
+
+The problem is validated — the AEC software market is ~$10–11B (2026), AI took ~46% of construction-tech VC in Q1 2025, and incumbents are both building ("design brains," "lessons travel with the project") and buying (Trimble's 2026 acquisition of Document Crunch). Validation cuts both ways: every adjacent square is occupied or being entered, so we win on the *intersection* (see [Where the defensibility lives](#where-the-defensibility-lives)), not on either axis alone.
+
+| Competitor | What it is | Overlap | Where we differ |
+|---|---|---|---|
+| **Glean** | Horizontal enterprise graph + MCP gateway; model-agnostic (grounds ChatGPT/Claude/Gemini); 275+ connectors; permission-aware. Category leader (~$200M ARR). | **Highest** — this *is* the multi-gateway, permissioned-graph thesis, already proven at scale. | No AEC ontology; treats drawings/specs as opaque files; no MasterFormat/CAD/sheet parsing; no EOR provenance; Procore/ACC not first-class. |
+| **Microsoft Copilot + Work IQ** | Work IQ is Copilot's semantic context layer (ontologies, glossaries, agentic skills) over M365/Dynamics/Dataverse; APIs GA mid-2026. | High on "understand my work data." | Horizontal and M365-data-centric; no drawing/spec/CAD understanding; won't index Procore/ACC as first-class. We feed it, not fight it. |
+| **Knowledge Architecture — Synthesis** | Incumbent AEC intranet/KM (~170 firms), adding AI Search over intranet content. | High on "AEC firm knowledge" + AI answers. | Intranet-content-centric (not drawings/specs); single surface, not multi-assistant; no document-parsing depth. |
+| **Skema.AI** | BIM knowledge-reuse engine; knowledge graph of a firm's past Revit designs ("Design Catalog"). | High on "firm knowledge graph of past work." | Revit/BIM-model-centric (our P2); aimed at *generating* designs, not grounded Q&A with provenance. |
+| **Trunk Tools** | Jobsite document Q&A grounded in project docs, with citations. | Medium — same "cited answers from docs" UX. | Project/field-scoped, construction phase; not cross-project firm institutional knowledge. |
+| **Document Crunch** (→ Trimble) | Contract/spec risk & compliance AI. | Narrow (contracts). | We are cross-discipline knowledge, not contractual-risk review. |
+| **Procore** (AI / Helix / Agent Builder) | Construction-management platform building its own copilot + agent builder. | Medium — but **owns** the construction-phase data. | Design-side + cross-vendor; Procore is a walled-garden threat we route around by spanning sources. |
+| **Autodesk Assistant** (Revit/Forma/AutoCAD/Civil 3D) + "design & make intelligence" | In-tool AI; explicit "lessons travel with the project" cross-project reuse. | **Highest strategic threat** — owns the authoring tools and the data. | We are tool-agnostic and provenance-first; Autodesk locks value into its own stack, we span stacks. |
+
+**Positioning summary.** Horizontal players (Glean, Work IQ) own breadth but not AEC depth; vertical players (Skema, Trunk Tools, Document Crunch, Synthesis) each own a slice (BIM reuse, field Q&A, contracts, intranet) but not the cross-project, cross-vendor, provenance-first knowledge layer; platform players (Autodesk, Procore) own data and workflow but only within their own walls. Our position is the AEC-native, provenance-rich, cross-vendor knowledge layer that grounds whatever assistant the firm already uses — see [Key Risks](#key-risks) for how the platform players could contest it.
 
 ## Users & Personas
 
@@ -167,7 +200,7 @@ The first-party web application where firms implement, curate, and visually expl
 ### P1 — Nice-to-Have (fast follows)
 
 - **P1-1. Microsoft Graph synced connector**: index knowledge items into the M365 semantic index (`externalItem` schema, ACLs mapped to Entra) so Copilot and Microsoft Search surface them natively without invoking an agent. Biggest single adoption lever for Copilot-first firms; P1 only because the federated path (P0-6) already satisfies "connects to Copilot."
-- **P1-2. Procore and Autodesk Construction Cloud ingestion**: RFIs, submittals, and issues auto-linked to projects — the richest source of lessons learned.
+- **P1-2. Procore and Autodesk Construction Cloud ingestion**: RFIs, submittals, and issues auto-linked to projects — the richest source of lessons learned. **Strategically this is more than a fast-follow: cross-vendor source neutrality (spanning M365 *and* Procore/ACC) is a core moat** vs. both the platform walled gardens and the M365-centric context layers (see [Competitive Landscape](#competitive-landscape)). Candidate to pull into P0 if a design partner's lessons-learned corpus lives primarily in Procore/ACC rather than SharePoint; the GA gate and timeline assume SharePoint-first, so promoting it is a deliberate scope decision, not a default.
 - **P1-3. Contradiction & staleness detection**: flag when a new standard supersedes details in the graph, or when two `verified` items conflict; queue for curator review.
 - **P1-4. Usage analytics dashboard in the workspace app** (user story 11): query themes, zero-result queries, citation counts, per-gateway adoption.
 - **P1-5. Capture-from-chat**: lightweight MCP tool (`propose_knowledge`) letting an engineer say "save this as a lesson learned" in any assistant; lands in the curator review queue, never directly in the verified graph.
@@ -209,6 +242,8 @@ The first-party web application where firms implement, curate, and visually expl
 2. **Platform dependency.** All three host platforms are evolving their connector programs rapidly; spec changes (especially OpenAI's connector requirements) can break a gateway. Mitigation: MCP-first architecture concentrates the surface area; contract tests against each platform run in CI; one engineer owns platform-watch.
 3. **Liability framing.** A grounded-but-wrong answer on a structural question is worse than no answer. Mitigation: provenance everywhere (P0-8), EOR-responsibility framing reviewed by counsel (Open Question 2), and explicitly *not* claiming design validation (Non-Goals).
 4. **Permission mapping errors** are the one-strike trust killer for IT buyers. Mitigation: red-team acceptance suite in P0-7 treated as release-blocking.
+5. **Platform players own the data and the workflow.** Autodesk ("design & make intelligence," Autodesk Assistant) and Procore (Procore AI / Agent Builder) are adding cross-project knowledge reuse on top of the data they already hold, and could out-feature us on *their* content or throttle our ingestion. Mitigation: compete on the cross-vendor graph that spans their competitors (P1-2 neutrality), vertical parsing depth they won't replicate for rivals' file formats, and provenance/EOR rigor; treat ingestion connectors as a contractual/partnership risk to monitor, and never let our value depend on any single source remaining open.
+6. **Differentiation drift.** "Ground your assistant in firm knowledge" and "connect multiple assistants" are commoditizing (Glean, Work IQ). If we position or build toward those, we compete head-on with better-funded horizontal players. Mitigation: hold the line on the vertical wedge (P0-2a parsing, P0-8 provenance, P1-2 cross-vendor) as the headline; treat gateway breadth as distribution. The lagging metric "≥ 2 of 3 gateways actively used" is a check on *adoption breadth*, not a claim that breadth is the moat.
 
 ## Open Questions
 
@@ -236,3 +271,5 @@ No hard external deadline; phasing is driven by dependency order — the graph m
 ---
 
 *Sources for platform capabilities: Microsoft 365 Copilot connectors overview (synced vs. MCP-based federated connectors), Build plugins from an MCP server for Microsoft 365 Copilot (declarative agents + Agents Toolkit), Microsoft Learn, retrieved 2026-06-09. ChatGPT and Claude connector capabilities per OpenAI/Anthropic MCP connector documentation.*
+
+*Competitive Landscape sources (retrieved 2026-06-16): Microsoft Work IQ overview and Work IQ APIs GA (Microsoft Learn / M365 Blog); Glean MCP Gateway, enterprise graph, and ~$200M ARR (glean.com, Futurum Group); Knowledge Architecture Synthesis (knowledge-architecture.com); Skema.AI BIM knowledge-reuse engine; Trunk Tools and Autodesk "design & make intelligence" (BuiltWorlds, Autodesk newsroom); Procore AI / Agent Builder (Procore press); Trimble–Document Crunch acquisition (Trimble newsroom); AEC software market size (Verified Market Reports, AEC Hub). The 15–30% "search time" figure is contested (traces to early-2000s IDC studies).*

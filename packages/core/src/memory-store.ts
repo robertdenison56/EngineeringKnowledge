@@ -1,6 +1,14 @@
-import type { Entity, Relationship, RelationshipType } from './ontology.js';
-import type { Caller, GraphStore, NeighborHit, SearchHit, SearchOptions } from './graph-store.js';
-import { buildQueryGroups, canRead, matchesTagFilter, scoreEntityMatch, warningFor } from './matching.js';
+import type { Chunk, Entity, Relationship, RelationshipType } from './ontology.js';
+import type { Caller, ChunkMatch, GraphStore, NeighborHit, SearchHit, SearchOptions } from './graph-store.js';
+import {
+  buildQueryGroups,
+  canRead,
+  matchesTagFilter,
+  scoreChunkMatch,
+  scoreEntityMatch,
+  snippetForGroups,
+  warningFor,
+} from './matching.js';
 
 /**
  * Development/test implementation of GraphStore. Naive term-match scoring
@@ -10,9 +18,21 @@ import { buildQueryGroups, canRead, matchesTagFilter, scoreEntityMatch, warningF
 export class InMemoryGraphStore implements GraphStore {
   private entities = new Map<string, Entity>();
   private relationships = new Map<string, Relationship>();
+  private chunks = new Map<string, Chunk[]>();
+  /** Tenant-scoped key→value settings, keyed `${tenantId} ${key}`. */
+  private settings = new Map<string, string>();
 
-  async upsertEntity(entity: Entity): Promise<void> {
+  async upsertEntity(entity: Entity, chunks?: Chunk[]): Promise<void> {
     this.entities.set(entity.id, entity);
+    // Omitted chunks preserve the existing passages (ADR 0006) — a curation
+    // re-upsert that only flips reviewStatus must not wipe searchable text.
+    if (chunks !== undefined) this.chunks.set(entity.id, chunks);
+  }
+
+  async getChunks(caller: Caller, entityId: string): Promise<Chunk[]> {
+    const entity = this.entities.get(entityId);
+    if (!entity || !canRead(caller, entity)) return [];
+    return [...(this.chunks.get(entityId) ?? [])].sort((a, b) => a.ordinal - b.ordinal);
   }
 
   async upsertRelationship(rel: Relationship): Promise<void> {
@@ -31,10 +51,31 @@ export class InMemoryGraphStore implements GraphStore {
       if (!canRead(caller, entity)) continue;
       if (options.types && !options.types.includes(entity.type)) continue;
       if (!matchesTagFilter(entity, options.tags)) continue;
-      const score = scoreEntityMatch(entity, groups);
-      if (score > 0) {
-        hits.push({ entity, score, warning: warningFor(entity.provenance.reviewStatus) });
+
+      // Entity-level match (metadata + content preview) OR a chunk match —
+      // a concept hit in any passage admits the parent (ADR 0006). The chunk
+      // gate is per-passage, so this never admits an entity no concept hit.
+      const entityScore = scoreEntityMatch(entity, groups);
+      let bestChunk: { chunk: Chunk; score: number } | undefined;
+      for (const chunk of this.chunks.get(entity.id) ?? []) {
+        const cs = scoreChunkMatch(chunk, groups);
+        if (cs > 0 && (!bestChunk || cs > bestChunk.score)) bestChunk = { chunk, score: cs };
       }
+      const score = Math.max(entityScore, bestChunk?.score ?? 0);
+      if (score <= 0) continue;
+
+      const match: ChunkMatch | undefined = bestChunk && {
+        anchor: bestChunk.chunk.anchor,
+        ordinal: bestChunk.chunk.ordinal,
+        snippet: snippetForGroups(bestChunk.chunk.text, groups),
+        ...(bestChunk.chunk.heading ? { heading: bestChunk.chunk.heading } : {}),
+      };
+      hits.push({
+        entity,
+        score,
+        warning: warningFor(entity.provenance.reviewStatus),
+        ...(match ? { chunk: match } : {}),
+      });
     }
     hits.sort((a, b) => b.score - a.score);
     return hits.slice(0, options.limit ?? 10);
@@ -67,6 +108,7 @@ export class InMemoryGraphStore implements GraphStore {
     const entity = this.entities.get(id);
     if (!entity || !canRead(caller, entity)) return false;
     this.entities.delete(id);
+    this.chunks.delete(id);
     for (const [relId, rel] of this.relationships) {
       if (rel.fromId === id || rel.toId === id) this.relationships.delete(relId);
     }
@@ -90,5 +132,13 @@ export class InMemoryGraphStore implements GraphStore {
       }
     }
     return hits;
+  }
+
+  async getSetting(tenantId: string, key: string): Promise<string | undefined> {
+    return this.settings.get(`${tenantId} ${key}`);
+  }
+
+  async setSetting(tenantId: string, key: string, value: string): Promise<void> {
+    this.settings.set(`${tenantId} ${key}`, value);
   }
 }

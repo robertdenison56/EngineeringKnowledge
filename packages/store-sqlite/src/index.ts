@@ -2,13 +2,17 @@ import { DatabaseSync } from 'node:sqlite';
 import {
   buildQueryGroups,
   canRead,
+  chunkEmbeddingText,
   cosineSimilarity,
   embeddingText,
   matchesTagFilter,
   normalizeText,
   scoreEntityMatch,
+  snippetForGroups,
   warningFor,
   type Caller,
+  type Chunk,
+  type ChunkMatch,
   type EmbeddingProvider,
   type Entity,
   type GraphStore,
@@ -52,6 +56,28 @@ CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
   id UNINDEXED, tenant_id UNINDEXED, text,
   tokenize = 'unicode61 remove_diacritics 2'
 );
+CREATE TABLE IF NOT EXISTS chunks (
+  id TEXT PRIMARY KEY,
+  entity_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL,
+  ordinal INTEGER NOT NULL,
+  anchor TEXT,
+  heading TEXT,
+  text TEXT NOT NULL,
+  embedding TEXT,
+  embedding_provider TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_chunks_entity ON chunks(entity_id);
+CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+  id UNINDEXED, entity_id UNINDEXED, tenant_id UNINDEXED, text,
+  tokenize = 'unicode61 remove_diacritics 2'
+);
+CREATE TABLE IF NOT EXISTS settings (
+  tenant_id TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, key)
+);
 `;
 
 interface EntityRow {
@@ -77,6 +103,36 @@ interface RelationshipRow {
   from_id: string;
   to_id: string;
   properties: string | null;
+}
+
+interface ChunkRow {
+  id: string;
+  entity_id: string;
+  tenant_id: string;
+  ordinal: number;
+  anchor: string | null;
+  heading: string | null;
+  text: string;
+  embedding: string | null;
+  embedding_provider: string | null;
+}
+
+function rowToChunk(row: ChunkRow): Chunk {
+  return {
+    id: row.id,
+    entityId: row.entity_id,
+    tenantId: row.tenant_id,
+    ordinal: row.ordinal,
+    anchor: row.anchor ? JSON.parse(row.anchor) : {},
+    text: row.text,
+    ...(row.heading ? { heading: row.heading } : {}),
+  };
+}
+
+/** Raw + normalized chunk text indexed by FTS5 so both spellings tokenize. */
+function chunkFtsText(chunk: Chunk): string {
+  const raw = `${chunk.heading ?? ''}\n${chunk.text}`;
+  return `${raw}\n${normalizeText(raw)}`;
 }
 
 function rowToEntity(row: EntityRow): Entity {
@@ -212,7 +268,7 @@ export class SqliteGraphStore implements GraphStore {
     }
   }
 
-  async upsertEntity(entity: Entity): Promise<void> {
+  async upsertEntity(entity: Entity, chunks?: Chunk[]): Promise<void> {
     let embedding: string | null = null;
     let provider: string | null = null;
     const vectors = await this.tryEmbed([embeddingText(entity)]);
@@ -220,6 +276,12 @@ export class SqliteGraphStore implements GraphStore {
       embedding = JSON.stringify(vectors[0]);
       provider = this.embeddings!.id;
     }
+    // Embed chunks before opening the write transaction (no await inside it).
+    let chunkVectors: number[][] | undefined;
+    if (chunks && chunks.length > 0) {
+      chunkVectors = await this.tryEmbed(chunks.map(chunkEmbeddingText));
+    }
+
     this.db
       .prepare(
         `INSERT INTO entities (id, tenant_id, type, title, summary, properties, tags, aliases, content, embedding, embedding_provider, provenance, acl)
@@ -251,6 +313,47 @@ export class SqliteGraphStore implements GraphStore {
     this.db
       .prepare('INSERT INTO entities_fts (id, tenant_id, text) VALUES (?, ?, ?)')
       .run(entity.id, entity.tenantId, ftsText(entity));
+
+    // Omitted chunks preserve the existing passages (ADR 0006); an explicit
+    // array (including []) replaces them wholesale.
+    if (chunks !== undefined) this.writeChunks(entity.id, chunks, chunkVectors);
+  }
+
+  /** Replace all chunks for an entity, with their FTS rows and embeddings. */
+  private writeChunks(entityId: string, chunks: Chunk[], vectors?: number[][]): void {
+    this.db.prepare('DELETE FROM chunks WHERE entity_id = ?').run(entityId);
+    this.db.prepare('DELETE FROM chunks_fts WHERE entity_id = ?').run(entityId);
+    const insert = this.db.prepare(
+      `INSERT INTO chunks (id, entity_id, tenant_id, ordinal, anchor, heading, text, embedding, embedding_provider)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    const insertFts = this.db.prepare(
+      'INSERT INTO chunks_fts (id, entity_id, tenant_id, text) VALUES (?, ?, ?, ?)',
+    );
+    chunks.forEach((chunk, i) => {
+      const vec = vectors?.[i];
+      insert.run(
+        chunk.id,
+        entityId,
+        chunk.tenantId,
+        chunk.ordinal,
+        chunk.anchor ? JSON.stringify(chunk.anchor) : null,
+        chunk.heading ?? null,
+        chunk.text,
+        vec ? JSON.stringify(vec) : null,
+        vec ? this.embeddings!.id : null,
+      );
+      insertFts.run(chunk.id, entityId, chunk.tenantId, chunkFtsText(chunk));
+    });
+  }
+
+  async getChunks(caller: Caller, entityId: string): Promise<Chunk[]> {
+    const entity = await this.getEntity(caller, entityId);
+    if (!entity) return [];
+    const rows = this.db
+      .prepare('SELECT * FROM chunks WHERE entity_id = ? ORDER BY ordinal')
+      .all(entityId) as unknown as ChunkRow[];
+    return rows.map(rowToChunk);
   }
 
   /** Embed rows missing a vector from the active provider (bootstrap/backfill). */
@@ -261,17 +364,38 @@ export class SqliteGraphStore implements GraphStore {
         'SELECT * FROM entities WHERE tenant_id = ? AND (embedding IS NULL OR embedding_provider != ?)',
       )
       .all(tenantId, this.embeddings.id) as unknown as EntityRow[];
-    if (rows.length === 0) return 0;
     const entities = rows.map(rowToEntity);
-    const vectors = await this.tryEmbed(entities.map(embeddingText));
-    if (!vectors) return 0;
-    const update = this.db.prepare(
-      'UPDATE entities SET embedding = ?, embedding_provider = ? WHERE id = ?',
-    );
-    entities.forEach((e, i) => {
-      if (vectors[i]) update.run(JSON.stringify(vectors[i]), this.embeddings!.id, e.id);
-    });
-    return entities.length;
+    if (entities.length > 0) {
+      const vectors = await this.tryEmbed(entities.map(embeddingText));
+      if (vectors) {
+        const update = this.db.prepare(
+          'UPDATE entities SET embedding = ?, embedding_provider = ? WHERE id = ?',
+        );
+        entities.forEach((e, i) => {
+          if (vectors[i]) update.run(JSON.stringify(vectors[i]), this.embeddings!.id, e.id);
+        });
+      }
+    }
+
+    // Chunk vectors too (ADR 0006) — deep retrieval needs per-passage dense.
+    const chunkRows = this.db
+      .prepare(
+        'SELECT * FROM chunks WHERE tenant_id = ? AND (embedding IS NULL OR embedding_provider != ?)',
+      )
+      .all(tenantId, this.embeddings.id) as unknown as ChunkRow[];
+    if (chunkRows.length > 0) {
+      const chunks = chunkRows.map(rowToChunk);
+      const vectors = await this.tryEmbed(chunks.map(chunkEmbeddingText));
+      if (vectors) {
+        const update = this.db.prepare(
+          'UPDATE chunks SET embedding = ?, embedding_provider = ? WHERE id = ?',
+        );
+        chunks.forEach((c, i) => {
+          if (vectors[i]) update.run(JSON.stringify(vectors[i]), this.embeddings!.id, c.id);
+        });
+      }
+    }
+    return entities.length + chunkRows.length;
   }
 
   async upsertRelationship(rel: Relationship): Promise<void> {
@@ -321,52 +445,90 @@ export class SqliteGraphStore implements GraphStore {
     if (groups.length === 0) return [];
     const visible = this.tenantEntities(caller, options);
     const byId = new Map(visible.map((e) => [e.id, e]));
+    const ftsExpr = ftsQuery(groups);
 
-    // List 1 — shared lexical matcher (the honesty gate: AND across concepts).
+    // List 1 — shared lexical matcher (the honesty gate: AND across concepts,
+    // over entity metadata + content preview).
     const lexical = visible
       .map((e) => ({ id: e.id, score: scoreEntityMatch(e, groups) }))
       .filter((h) => h.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((h) => h.id);
 
-    // List 2 — FTS5 BM25 over the same AND/OR contract.
+    // List 2 — entity FTS5 BM25 over the same AND/OR contract.
     let fts: string[] = [];
     try {
       const rows = this.db
         .prepare(
           'SELECT id FROM entities_fts WHERE entities_fts MATCH ? AND tenant_id = ? ORDER BY rank LIMIT 50',
         )
-        .all(ftsQuery(groups), caller.tenantId) as unknown as { id: string }[];
+        .all(ftsExpr, caller.tenantId) as unknown as { id: string }[];
       fts = rows.map((r) => r.id).filter((id) => byId.has(id));
     } catch {
       // Malformed MATCH input — lexical list still stands.
     }
 
-    // Candidate set: lexically admitted only. Vectors re-rank; they never
+    // List 2b — chunk FTS (ADR 0006): every concept must co-occur in ONE
+    // passage, rolled up to its parent entity. This is the deep-document
+    // path — the preview that entity FTS sees stops a few pages in, but the
+    // chunks cover the whole file. Stricter than the entity gate, so it only
+    // admits parents that genuinely contain the concepts (P0-8 stays honest).
+    const chunkFts: string[] = [];
+    const bestChunkId = new Map<string, string>();
+    try {
+      const rows = this.db
+        .prepare(
+          'SELECT id, entity_id FROM chunks_fts WHERE chunks_fts MATCH ? AND tenant_id = ? ORDER BY rank LIMIT 100',
+        )
+        .all(ftsExpr, caller.tenantId) as unknown as { id: string; entity_id: string }[];
+      for (const r of rows) {
+        if (!byId.has(r.entity_id)) continue; // parent trimmed by type/tag/ACL
+        if (!bestChunkId.has(r.entity_id)) {
+          bestChunkId.set(r.entity_id, r.id);
+          chunkFts.push(r.entity_id);
+        }
+      }
+    } catch {
+      // Malformed MATCH input — other lists still stand.
+    }
+
+    // Candidate set: admitted by any honest gate. Vectors re-rank; they never
     // admit items no concept matched (keeps no_results honest, P0-8).
-    const admitted = new Set([...lexical, ...fts]);
+    const admitted = new Set([...lexical, ...fts, ...chunkFts]);
     if (admitted.size === 0) return [];
 
-    // List 3 — dense similarity over admitted candidates.
+    // List 3 — dense similarity over admitted candidates: best of the
+    // entity-level vector and the entity's chunk vectors.
     let dense: string[] = [];
     if (this.embeddings) {
       const queryVec = (await this.tryEmbed([query]))?.[0];
       if (queryVec) {
         const provider = this.embeddings.id;
-        dense = this.tenantRows(caller)
-          .filter((r) => admitted.has(r.id) && r.embedding && r.embedding_provider === provider)
-          .map((r) => ({ id: r.id, sim: cosineSimilarity(queryVec, JSON.parse(r.embedding!)) }))
-          .sort((a, b) => b.sim - a.sim)
-          .map((r) => r.id);
+        const sim = new Map<string, number>();
+        for (const r of this.tenantRows(caller)) {
+          if (!admitted.has(r.id) || !r.embedding || r.embedding_provider !== provider) continue;
+          sim.set(r.id, cosineSimilarity(queryVec, JSON.parse(r.embedding)));
+        }
+        const ids = [...admitted];
+        const rows = this.db
+          .prepare(
+            `SELECT entity_id, embedding FROM chunks WHERE embedding_provider = ? AND embedding IS NOT NULL AND entity_id IN (${ids.map(() => '?').join(',')})`,
+          )
+          .all(provider, ...ids) as unknown as { entity_id: string; embedding: string }[];
+        for (const r of rows) {
+          const s = cosineSimilarity(queryVec, JSON.parse(r.embedding));
+          sim.set(r.entity_id, Math.max(sim.get(r.entity_id) ?? -1, s));
+        }
+        dense = [...sim.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
       }
     }
 
     // Reciprocal-rank fusion + review-status adjustment.
     const fused = new Map<string, number>();
-    for (const list of [lexical, fts, dense]) {
+    for (const list of [lexical, fts, chunkFts, dense]) {
       list.forEach((id, rank) => fused.set(id, (fused.get(id) ?? 0) + 1 / (RRF_K + rank + 1)));
     }
-    const hits: SearchHit[] = [...fused.entries()]
+    const ranked = [...fused.entries()]
       .filter(([id]) => admitted.has(id))
       .map(([id, score]) => {
         const entity = byId.get(id)!;
@@ -377,8 +539,27 @@ export class SqliteGraphStore implements GraphStore {
           (status === 'unverified' ? 0.95 : 1);
         return { entity, score: adjusted, warning: warningFor(status) };
       })
-      .sort((a, b) => b.score - a.score);
-    return hits.slice(0, options.limit ?? 10);
+      .sort((a, b) => b.score - a.score)
+      .slice(0, options.limit ?? 10);
+
+    // Attach the matched passage for citation (ADR 0006): page/section anchor
+    // and a snippet, for entities admitted via a chunk.
+    return ranked.map((hit) => {
+      const chunkId = bestChunkId.get(hit.entity.id);
+      if (!chunkId) return hit;
+      const row = this.db.prepare('SELECT * FROM chunks WHERE id = ?').get(chunkId) as
+        | ChunkRow
+        | undefined;
+      if (!row) return hit;
+      const chunk = rowToChunk(row);
+      const match: ChunkMatch = {
+        anchor: chunk.anchor,
+        ordinal: chunk.ordinal,
+        snippet: snippetForGroups(chunk.text, groups),
+        ...(chunk.heading ? { heading: chunk.heading } : {}),
+      };
+      return { ...hit, chunk: match };
+    });
   }
 
   async list(caller: Caller, options: SearchOptions = {}): Promise<Entity[]> {
@@ -391,6 +572,8 @@ export class SqliteGraphStore implements GraphStore {
     this.db.prepare('DELETE FROM relationships WHERE from_id = ? OR to_id = ?').run(id, id);
     this.db.prepare('DELETE FROM entities WHERE id = ?').run(id);
     this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(id);
+    this.db.prepare('DELETE FROM chunks WHERE entity_id = ?').run(id);
+    this.db.prepare('DELETE FROM chunks_fts WHERE entity_id = ?').run(id);
     return true;
   }
 
@@ -427,5 +610,21 @@ export class SqliteGraphStore implements GraphStore {
       if (other) hits.push({ relationship: rel, entity: other, direction });
     }
     return hits;
+  }
+
+  async getSetting(tenantId: string, key: string): Promise<string | undefined> {
+    const row = this.db
+      .prepare('SELECT value FROM settings WHERE tenant_id = ? AND key = ?')
+      .get(tenantId, key) as { value: string } | undefined;
+    return row?.value;
+  }
+
+  async setSetting(tenantId: string, key: string, value: string): Promise<void> {
+    this.db
+      .prepare(
+        `INSERT INTO settings (tenant_id, key, value) VALUES (?, ?, ?)
+         ON CONFLICT(tenant_id, key) DO UPDATE SET value = excluded.value`,
+      )
+      .run(tenantId, key, value);
   }
 }

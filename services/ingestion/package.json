@@ -5,6 +5,8 @@
   "license": "UNLICENSED",
   "private": true,
   "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "node --test test/*.test.mjs",
@@ -12,6 +14,7 @@
   },
   "dependencies": {
     "@ekg/core": "*",
-    "@ekg/store-sqlite": "*"
+    "@ekg/store-sqlite": "*",
+    "pdfjs-dist": "^6.0.227"
   }
 }

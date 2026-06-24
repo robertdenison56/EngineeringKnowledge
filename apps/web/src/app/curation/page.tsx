@@ -14,9 +14,14 @@ export default async function CurationPage() {
     <>
       <div className="card-head">
         <h2 style={{ margin: 0 }}>Curation workbench</h2>
-        <Link href="/capture" className="button-link">
-          + Capture knowledge
-        </Link>
+        <span className="badges">
+          <Link href="/ingest" className="button-link">
+            + Add documents
+          </Link>
+          <Link href="/capture" className="button-link">
+            + Capture knowledge
+          </Link>
+        </span>
       </div>
       <p className="meta" style={{ marginBottom: '1rem' }}>
         {queue.length} candidate{queue.length === 1 ? '' : 's'} awaiting review. Candidates come
@@ -26,7 +31,8 @@ export default async function CurationPage() {
 
       {queue.length === 0 ? (
         <div className="empty">
-          The review queue is empty. Ingest documents or capture knowledge to add candidates.
+          The review queue is empty. <Link href="/ingest">Add documents</Link> or{' '}
+          <Link href="/capture">capture knowledge</Link> to add candidates.
         </div>
       ) : (
         <div className="cards">

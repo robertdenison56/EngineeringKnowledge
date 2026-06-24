@@ -87,3 +87,59 @@ test('upsert updates in place (curation verify flow)', async () => {
   assert.equal(store.countEntities(DEMO_TENANT), 9, 'no duplicate row created');
   store.close();
 });
+
+test('settings: round-trip, upsert, tenant isolation, and persistence', async () => {
+  const path = freshDbPath();
+  const first = new SqliteGraphStore(path);
+  assert.equal(await first.getSetting(DEMO_TENANT, 'firm-name'), undefined, 'unset reads undefined');
+  await first.setSetting(DEMO_TENANT, 'firm-name', 'Acme Engineering');
+  assert.equal(await first.getSetting(DEMO_TENANT, 'firm-name'), 'Acme Engineering');
+  await first.setSetting(DEMO_TENANT, 'firm-name', 'Acme Structural'); // upsert in place
+  assert.equal(await first.getSetting(DEMO_TENANT, 'firm-name'), 'Acme Structural');
+  assert.equal(await first.getSetting('other-firm', 'firm-name'), undefined, 'scoped per tenant');
+  first.close();
+
+  const second = new SqliteGraphStore(path);
+  assert.equal(await second.getSetting(DEMO_TENANT, 'firm-name'), 'Acme Structural', 'survives reopen');
+  second.close();
+});
+
+test('persistence: chunks survive reopening and stay searchable (ADR 0006)', async () => {
+  const path = freshDbPath();
+  const first = new SqliteGraphStore(path);
+  await seedDemo(first);
+  await first.upsertEntity(
+    {
+      id: 'doc:spec-x',
+      tenantId: DEMO_TENANT,
+      type: 'document',
+      title: 'Spec X',
+      summary: 'opening preview',
+      properties: {},
+      content: 'opening preview',
+      provenance: { createdAt: '2026-01-01T00:00:00Z', modifiedAt: '2026-01-01T00:00:00Z', reviewStatus: 'unverified' },
+      acl: { allowedPrincipals: ['*'] },
+    },
+    [
+      {
+        id: 'doc:spec-x#0',
+        entityId: 'doc:spec-x',
+        tenantId: DEMO_TENANT,
+        ordinal: 0,
+        anchor: { page: 142, specSection: '51 10' },
+        heading: '51 10 (p. 142)',
+        text: 'cast-in-place prestressed box girder camber tolerances',
+      },
+    ],
+  );
+  first.close();
+
+  const second = new SqliteGraphStore(path);
+  const chunks = await second.getChunks(ENGINEER, 'doc:spec-x');
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0].anchor.page, 142);
+  const hits = await second.search(ENGINEER, 'prestressed box girder camber');
+  assert.equal(hits[0]?.entity.id, 'doc:spec-x');
+  assert.equal(hits[0].chunk?.anchor.page, 142, 'hit cites the deep page');
+  second.close();
+});
