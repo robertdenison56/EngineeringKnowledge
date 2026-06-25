@@ -1,16 +1,19 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import type { Entity, NeighborHit } from '@ekg/core';
-import { DEV_CALLER, getStore } from '../../../lib/store';
+import { isPublicAcl, type Entity, type NeighborHit } from '@ekg/core';
+import { DEV_CALLER, getStore, isCurator } from '../../../lib/store';
 import {
+  AccessBadge,
   ProvenanceLine,
   REVIEW_WARNINGS,
   ReviewBadge,
   TagChips,
   TypeBadge,
   entityHref,
+  sourceLabel,
   typeColor,
 } from '../../../components/ui';
+import { EntityEditor, RemoveRelationshipButton, type MergeCandidate } from '../../../components/EntityEditor';
 
 function shortTitle(title: string, max = 20): string {
   return title.length > max ? `${title.slice(0, max - 1)}…` : title;
@@ -75,6 +78,20 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
     store.getChunks(DEV_CALLER, id),
   ]);
 
+  const canCurate = isCurator(DEV_CALLER);
+  // Merge candidates are the other entities of this type — duplicates are
+  // almost always same-type; keeping the picker scoped keeps it legible.
+  const mergeCandidates: MergeCandidate[] = canCurate
+    ? (await store.list(DEV_CALLER, { types: [entity.type], limit: 200 }))
+        .filter((e) => e.id !== entity.id)
+        .map((e) => ({
+          id: e.id,
+          title: e.title,
+          type: e.type,
+          reviewStatus: e.provenance.reviewStatus,
+        }))
+    : [];
+
   const warning = REVIEW_WARNINGS[entity.provenance.reviewStatus];
   const supersededBy = neighbors.find(
     (n) => n.relationship.type === 'supersedes' && n.direction === 'in',
@@ -91,6 +108,7 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
         <span className="badges">
           <TypeBadge type={entity.type} />
           <ReviewBadge status={entity.provenance.reviewStatus} />
+          <AccessBadge acl={entity.acl} />
         </span>
       </div>
       {warning ? (
@@ -108,6 +126,7 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
       {entity.summary ? <p className="summary">{entity.summary}</p> : null}
       <TagChips tags={entity.tags} />
       <ProvenanceLine entity={entity} />
+      {canCurate ? <EntityEditor entity={entity} mergeCandidates={mergeCandidates} /> : null}
       {entity.content ? (
         <details className="doc-panel">
           <summary>
@@ -180,6 +199,15 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
                     <td>
                       <ReviewBadge status={n.entity.provenance.reviewStatus} />
                     </td>
+                    {canCurate ? (
+                      <td className="rel-remove-cell">
+                        <RemoveRelationshipButton
+                          relId={n.relationship.id}
+                          entityId={entity.id}
+                          label={`${n.relationship.type} · ${n.entity.title}`}
+                        />
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -204,6 +232,20 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
                   <td>Review status</td>
                   <td>{entity.provenance.reviewStatus}</td>
                 </tr>
+                <tr>
+                  <td>Access</td>
+                  <td>
+                    {isPublicAcl(entity.acl)
+                      ? 'Everyone in the workspace'
+                      : `Restricted — ${entity.acl.allowedPrincipals.join(', ')}`}
+                  </td>
+                </tr>
+                {sourceLabel(entity.provenance.sourceSystem) ? (
+                  <tr>
+                    <td>Source system</td>
+                    <td>{sourceLabel(entity.provenance.sourceSystem)}</td>
+                  </tr>
+                ) : null}
                 {entity.provenance.author ? (
                   <tr>
                     <td>Author</td>

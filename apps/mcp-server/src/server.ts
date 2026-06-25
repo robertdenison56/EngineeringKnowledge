@@ -9,12 +9,16 @@ import { auditSinkFromEnv, type AuditEvent, type AuditSink } from './audit.js';
 import {
   DEMO_TENANT,
   InMemoryGraphStore,
+  RETRIEVAL_ROLES_KEY,
+  findRole,
+  parseRoles,
   seedDemo,
   warningFor,
   type Caller,
   type Chunk,
   type Entity,
   type GraphStore,
+  type RetrievalRole,
   type SearchHit,
 } from '@ekg/core';
 import {
@@ -22,11 +26,13 @@ import {
   buildCandidate,
   buildReferenceEdges,
   chunksToText,
+  createPageOcr,
   extractSheetFacts,
   formatSheetFacts,
   groundAnnotations,
   rasterizeSheetForVision,
   sheetIndex,
+  type PageOcr,
   type SheetFacts,
 } from '@ekg/ingestion';
 import { readFileSync } from 'node:fs';
@@ -52,6 +58,17 @@ const APP_BASE = (process.env.EKG_APP_URL ?? 'http://localhost:3000').replace(/\
 
 function appUrl(entity: Entity): string {
   return `${APP_BASE}/entities/${encodeURIComponent(entity.id)}`;
+}
+
+/**
+ * OCR engine for image-only PDFs, resolved once per process (review #1). Null
+ * when no engine is installed — scans then stay `needs-ocr`, exactly as before.
+ * Set EKG_DISABLE_OCR=1 to opt out even when an engine is present.
+ */
+let ocrEnginePromise: Promise<PageOcr | null> | undefined;
+function getPageOcr(): Promise<PageOcr | null> {
+  if (process.env.EKG_DISABLE_OCR === '1') return Promise.resolve(null);
+  return (ocrEnginePromise ??= createPageOcr());
 }
 
 function chunksTextLength(chunks: Chunk[]): number {
@@ -116,6 +133,22 @@ function asContent(payload: unknown) {
 }
 
 /**
+ * Resolve a retrieval role (focus lens) for the caller's tenant, by id or name.
+ * Roles are admin-defined config stored in the same settings the workspace app
+ * writes; reading them per-request keeps the gateway in sync with the app.
+ * Undefined when unset or unmatched — search then ranks normally.
+ */
+async function resolveRole(
+  store: GraphStore,
+  tenantId: string,
+  idOrName: string | undefined,
+): Promise<RetrievalRole | undefined> {
+  if (!idOrName) return undefined;
+  const roles = parseRoles(await store.getSetting(tenantId, RETRIEVAL_ROLES_KEY));
+  return findRole(roles, idOrName);
+}
+
+/**
  * Fixed local-development identity. stdio is single-user, so the dev caller
  * is resolved for every request. The remote HTTP gateway injects a
  * `resolveCaller` that derives the real caller from the request's verified
@@ -143,7 +176,13 @@ export async function createStore(): Promise<GraphStore> {
     const sqlite = new SqliteGraphStore(process.env.EKG_DB_PATH, {
       embeddings: providerFromEnv(),
     });
-    if (sqlite.countEntities(DEMO_TENANT) === 0) await seedDemo(sqlite);
+    // Only seed the demo corpus (which includes a privileged claims memo) into a
+    // persistent DB when explicitly asked — never silently inject demo/sample
+    // data into a production database on first boot (PRD P0-7). The app's own
+    // dev store seeds its .data DB; opt in here with EKG_SEED_DEMO=1.
+    if (process.env.EKG_SEED_DEMO === '1' && sqlite.countEntities(DEMO_TENANT) === 0) {
+      await seedDemo(sqlite);
+    }
     return sqlite;
   }
   const seeded = new InMemoryGraphStore();
@@ -278,7 +317,9 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         "Search the firm's engineering knowledge graph (projects, design details, specs, standards, " +
         'lessons learned, experts). Results include provenance and a workspace-app URL — always cite them. ' +
         'Results carrying a "warning" field are superseded/deprecated and the warning must be relayed to the user. ' +
-        'If the response has no_results=true, say the firm graph has no answer; never substitute general knowledge.',
+        'If the response has no_results=true, say the firm graph has no answer; never substitute general knowledge. ' +
+        'Pass `role` (a focus lens the firm admin defined, by name or id) to pivot ranking toward the knowledge ' +
+        'that kind of work cares about — it only re-ranks, never hides results.',
       inputSchema: {
         query: z.string().describe('Natural-language or keyword query'),
         types: z
@@ -289,16 +330,27 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
           .array(z.string())
           .optional()
           .describe('Optional tag filter — results must carry every listed tag, e.g. ["firestop"]'),
+        role: z
+          .string()
+          .optional()
+          .describe(
+            'Optional retrieval role / focus lens (name or id), e.g. "Façade & Fire Safety". ' +
+              'Boosts items the firm admin configured that lens to favor; ignored if unknown.',
+          ),
         limit: z.number().int().min(1).max(25).optional(),
       },
     },
-    async ({ query, types, tags, limit }, extra) => {
+    async ({ query, types, tags, role, limit }, extra) => {
       const caller = resolveCaller(extra?.authInfo);
-      const hits = await store.search(caller, query, { types, tags, limit });
+      const boostRole = await resolveRole(store, caller.tenantId, role);
+      const hits = await store.search(caller, query, { types, tags, limit, boostRole });
       if (hits.length === 0) {
         return asContent({ results: [], no_results: true, guidance: NO_RESULTS_GUIDANCE });
       }
-      return asContent({ results: hits.map(searchResult) });
+      return asContent({
+        results: hits.map(searchResult),
+        ...(boostRole ? { focusedBy: boostRole.name } : {}),
+      });
     },
   );
 
@@ -669,9 +721,14 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         });
       }
 
+      // OCR image-only PDFs when an engine is available so a scanned sheet's
+      // description can be grounded and its text searched (review #1). Honest
+      // no-op when no engine is installed — the scan stays needs-ocr.
+      const ocr = await getPageOcr();
       const candidate = await buildCandidate(filePath, {
         tenantId: caller.tenantId,
         pipeline: 'mcp-gateway',
+        ...(ocr ? { ocr } : {}),
       });
       await store.upsertEntity(candidate.entity, candidate.chunks);
       const entity = candidate.entity;
@@ -700,7 +757,9 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         candidate.parseStatus !== undefined &&
         (describe === true ||
           candidate.classification.anchor?.sheet !== undefined ||
-          candidate.parseStatus === 'needs-ocr');
+          // Image-only PDFs (scans) still get a visual description even when OCR
+          // recovered their text — the two are complementary (grounding now works).
+          candidate.imageOnly === true);
       let images: { label: string; png: Buffer }[] = [];
       let rasterNote: string | undefined;
       if (isDrawing) {

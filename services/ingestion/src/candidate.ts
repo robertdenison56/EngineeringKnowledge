@@ -11,6 +11,7 @@ import {
   type DetectionMethod,
   type SheetSemantics,
 } from './semantics.js';
+import type { SourceMeta } from './source.js';
 import { extractVectorContent, type TitleBlock, type VectorContent } from './vector.js';
 
 /**
@@ -80,6 +81,15 @@ export async function buildCandidate(
     ocr?: PageOcr;
     /** Page budget for OCR (default 10); excess pages are left un-OCR'd. */
     maxOcrPages?: number;
+    /**
+     * Provenance + permissions from the connector that produced this item
+     * (PRD P0-2). When supplied, the source's deep link, system label, author,
+     * timestamps, and ACL replace the local-file defaults — this is how
+     * source-system permissions become item ACLs at ingestion. Omitted — the
+     * folder CLI default — the item keeps its `file://` URL and tenant-public
+     * ACL. See {@link SourceMeta}.
+     */
+    source?: SourceMeta;
   },
 ): Promise<Candidate> {
   const ext = extname(filePath).toLowerCase();
@@ -200,7 +210,14 @@ export async function buildCandidate(
   };
 
   const sheetRefs = [...new Set(references.map((r) => r.targetSheet))];
-  const entityId = `ingest:${createHash('sha1').update(filePath).digest('hex').slice(0, 12)}`;
+  // Tenant-scoped id: the hash mixes in the tenant, so two tenants ingesting a
+  // file at the same host path get distinct ids — never a cross-tenant id
+  // collision one tenant's upsert could overwrite (PRD P0-7). The store also
+  // refuses cross-tenant overwrites as defense-in-depth.
+  const entityId = `ingest:${createHash('sha1')
+    .update(`${options.tenantId} ${filePath}`)
+    .digest('hex')
+    .slice(0, 12)}`;
 
   // Document passages for deep retrieval (ADR 0006). The entity keeps a
   // bounded preview; chunks carry the whole document, each with its own
@@ -286,16 +303,19 @@ export async function buildCandidate(
     // chunks (ADR 0006). For short documents the preview IS the full text.
     ...(content ? { content } : {}),
     provenance: {
-      sourceUrl: `file://${filePath}`,
-      createdAt: now,
-      modifiedAt: now,
       // A connector's deep link (SharePoint/Procore URL) beats the local path;
       // the folder/upload paths keep the `file://` default (PRD P0-2).
+      sourceUrl: options.source?.sourceUrl ?? `file://${filePath}`,
+      ...(options.source?.system ? { sourceSystem: options.source.system } : {}),
+      ...(options.source?.author ? { author: options.source.author } : {}),
+      createdAt: options.source?.createdAt ?? now,
+      modifiedAt: options.source?.modifiedAt ?? now,
       reviewStatus: 'unverified',
       ...(Object.keys(anchor).length > 0 ? { anchor } : {}),
     },
-    acl: { allowedPrincipals: ['*'] },
+    // Source-system permissions captured at ingestion → item ACL (PRD P0-2);
     // tenant-public when the source had none (local files, plain uploads).
+    acl: options.source?.acl ?? { allowedPrincipals: ['*'] },
   };
 
   return {

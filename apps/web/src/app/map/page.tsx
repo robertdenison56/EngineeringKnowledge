@@ -1,4 +1,4 @@
-import { DEV_CALLER, getStore } from '../../lib/store';
+import { DEV_CALLER, getRoles, getStore } from '../../lib/store';
 import GraphMap from '../../components/GraphMap';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +7,7 @@ export default async function MapPage() {
   const store = await getStore();
   const entities = await store.list(DEV_CALLER, { limit: 1000 });
   const relationships = await store.listRelationships(DEV_CALLER);
+  const roles = await getRoles();
 
   const nodes = entities.map((e) => ({
     id: e.id,
@@ -28,9 +29,10 @@ export default async function MapPage() {
       <p className="meta" style={{ marginBottom: '0.8rem' }}>
         The whole graph your identity can see — {nodes.length} entities, {links.length}{' '}
         relationships. Scroll to zoom, drag to pan, hover to highlight a neighborhood, click a
-        node to open it. Toggle types and tags to focus the map.
+        node to open it. Toggle types and tags to focus the map, or pick a
+        retrieval role to see the knowledge it favors light up.
       </p>
-      <GraphMap nodes={nodes} links={links} />
+      <GraphMap nodes={nodes} links={links} roles={roles} />
     </>
   );
 }

@@ -5,7 +5,32 @@ export interface Classification {
   anchor?: SourceAnchor;
 }
 
-const SPEC_SECTION = /\b(\d{2})\s?(\d{2})\s?(\d{2})\b/;
+/**
+ * A MasterFormat section code: exactly three 2-digit groups with a CONSISTENT
+ * separator (all space, dot, dash, or none — `\2` backreference) and NOT part of
+ * a longer digit run (the `(?<!\d)`/`(?!\d)` guards). Those rules keep dates and
+ * IDs out: "2024 06 24" can't match (its first two pairs have no separator, the
+ * next does), and "1078400" / "12345678" are rejected as longer runs. A level-4
+ * code with a separator before its 4th pair ("09 91 23.13") still resolves to
+ * its 2-2-2 section because the trailing "." is a non-digit; only a *fully
+ * compact* 8-digit level-4 ("09912313") is skipped — a rare case, and worth
+ * trading away to reject 8-digit invoice/job numbers.
+ */
+const SPEC_SECTION = /(?<!\d)(\d{2})([ .\-]?)(\d{2})\2(\d{2})(?!\d)/;
+
+/**
+ * Extract a MasterFormat section code from text as normalized "NN NN NN", or
+ * undefined. Rejects digit runs that merely look like one (dates, invoice/job
+ * numbers) and divisions outside the MasterFormat range (00–49) — so a non-spec
+ * document never gets a bogus `specSection` anchor or `division-NN` tag.
+ */
+export function parseSpecSection(text: string): string | undefined {
+  const m = text.match(SPEC_SECTION);
+  if (!m) return undefined;
+  if (Number(m[1]) > 49) return undefined; // not a real MasterFormat division
+  return `${m[1]} ${m[3]} ${m[4]}`;
+}
+
 const SHEET_NUMBER = /\b([A-Z]{1,2}-\d{3})\b/;
 
 /**
@@ -14,12 +39,9 @@ const SHEET_NUMBER = /\b([A-Z]{1,2}-\d{3})\b/;
  * reclassify. Content-based classification arrives with the real pipeline.
  */
 export function classifyFilename(filename: string): Classification {
-  const spec = filename.match(SPEC_SECTION);
+  const spec = parseSpecSection(filename);
   if (spec) {
-    return {
-      type: 'spec-section',
-      anchor: { specSection: `${spec[1]} ${spec[2]} ${spec[3]}` },
-    };
+    return { type: 'spec-section', anchor: { specSection: spec } };
   }
   const sheet = filename.match(SHEET_NUMBER);
   if (sheet) {

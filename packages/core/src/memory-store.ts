@@ -1,9 +1,18 @@
 import type { Chunk, Entity, Relationship, RelationshipType } from './ontology.js';
-import type { Caller, ChunkMatch, GraphStore, NeighborHit, SearchHit, SearchOptions } from './graph-store.js';
+import type {
+  Caller,
+  ChunkMatch,
+  GraphStore,
+  MergeResult,
+  NeighborHit,
+  SearchHit,
+  SearchOptions,
+} from './graph-store.js';
 import {
   buildQueryGroups,
   canRead,
   matchesTagFilter,
+  roleBoostFactor,
   scoreChunkMatch,
   scoreEntityMatch,
   snippetForGroups,
@@ -23,25 +32,93 @@ export class InMemoryGraphStore implements GraphStore {
   private settings = new Map<string, string>();
 
   async upsertEntity(entity: Entity, chunks?: Chunk[]): Promise<void> {
-    this.entities.set(entity.id, entity);
+    // Never let one tenant's write land on another tenant's row (PRD P0-7).
+    // Ids are tenant-scoped upstream, so a same-id different-tenant collision is
+    // a bug or an attack, not a legitimate update.
+    const existing = this.entities.get(entity.id);
+    if (existing && existing.tenantId !== entity.tenantId) {
+      throw new Error(`refusing cross-tenant overwrite of entity ${entity.id}`);
+    }
+    // Store a copy, not the caller's object — value semantics matching the
+    // SQLite store, so a caller that later mutates what it passed (or what it
+    // read back) can't retroactively change stored state or a captured undo
+    // before-image (PRD P0-9).
+    this.entities.set(entity.id, structuredClone(entity));
     // Omitted chunks preserve the existing passages (ADR 0006) — a curation
     // re-upsert that only flips reviewStatus must not wipe searchable text.
-    if (chunks !== undefined) this.chunks.set(entity.id, chunks);
+    if (chunks !== undefined) this.chunks.set(entity.id, structuredClone(chunks));
   }
 
   async getChunks(caller: Caller, entityId: string): Promise<Chunk[]> {
     const entity = this.entities.get(entityId);
     if (!entity || !canRead(caller, entity)) return [];
-    return [...(this.chunks.get(entityId) ?? [])].sort((a, b) => a.ordinal - b.ordinal);
+    return structuredClone([...(this.chunks.get(entityId) ?? [])].sort((a, b) => a.ordinal - b.ordinal));
   }
 
   async upsertRelationship(rel: Relationship): Promise<void> {
     this.relationships.set(rel.id, rel);
   }
 
+  async deleteRelationship(caller: Caller, id: string): Promise<boolean> {
+    const rel = this.relationships.get(id);
+    if (!rel || rel.tenantId !== caller.tenantId) return false;
+    const from = this.entities.get(rel.fromId);
+    const to = this.entities.get(rel.toId);
+    // Don't let a caller delete an edge whose endpoints they can't both see.
+    if (!from || !to || !canRead(caller, from) || !canRead(caller, to)) return false;
+    this.relationships.delete(id);
+    return true;
+  }
+
+  async mergeEntities(
+    caller: Caller,
+    survivorId: string,
+    duplicateId: string,
+  ): Promise<MergeResult | undefined> {
+    if (survivorId === duplicateId) return undefined;
+    const survivor = this.entities.get(survivorId);
+    const duplicate = this.entities.get(duplicateId);
+    if (!survivor || !duplicate || !canRead(caller, survivor) || !canRead(caller, duplicate)) {
+      return undefined;
+    }
+
+    const key = (type: string, from: string, to: string) => `${type}\u0000${from}\u0000${to}`;
+    // Edges the survivor already has — a repointed dup edge matching one of
+    // these is a duplicate and gets dropped, not added twice.
+    const seen = new Set<string>();
+    for (const rel of this.relationships.values()) {
+      if (rel.tenantId !== caller.tenantId) continue;
+      if (rel.fromId === survivorId || rel.toId === survivorId) {
+        seen.add(key(rel.type, rel.fromId, rel.toId));
+      }
+    }
+
+    let repointed = 0;
+    let dropped = 0;
+    for (const [relId, rel] of [...this.relationships]) {
+      if (rel.tenantId !== caller.tenantId) continue;
+      if (rel.fromId !== duplicateId && rel.toId !== duplicateId) continue;
+      const fromId = rel.fromId === duplicateId ? survivorId : rel.fromId;
+      const toId = rel.toId === duplicateId ? survivorId : rel.toId;
+      const k = key(rel.type, fromId, toId);
+      if (fromId === toId || seen.has(k)) {
+        this.relationships.delete(relId);
+        dropped += 1;
+      } else {
+        this.relationships.set(relId, { ...rel, fromId, toId });
+        seen.add(k);
+        repointed += 1;
+      }
+    }
+
+    this.entities.delete(duplicateId);
+    this.chunks.delete(duplicateId);
+    return { survivorId, repointed, dropped };
+  }
+
   async getEntity(caller: Caller, id: string): Promise<Entity | undefined> {
     const entity = this.entities.get(id);
-    return entity && canRead(caller, entity) ? entity : undefined;
+    return entity && canRead(caller, entity) ? structuredClone(entity) : undefined;
   }
 
   async search(caller: Caller, query: string, options: SearchOptions = {}): Promise<SearchHit[]> {
@@ -61,8 +138,11 @@ export class InMemoryGraphStore implements GraphStore {
         const cs = scoreChunkMatch(chunk, groups);
         if (cs > 0 && (!bestChunk || cs > bestChunk.score)) bestChunk = { chunk, score: cs };
       }
-      const score = Math.max(entityScore, bestChunk?.score ?? 0);
-      if (score <= 0) continue;
+      const baseScore = Math.max(entityScore, bestChunk?.score ?? 0);
+      if (baseScore <= 0) continue;
+      // Role re-rank: scale an admitted item's score when the active lens
+      // favors it. Applied after the gate, so it never admits a non-match.
+      const score = baseScore * roleBoostFactor(entity, options.boostRole);
 
       const match: ChunkMatch | undefined = bestChunk && {
         anchor: bestChunk.chunk.anchor,
@@ -140,5 +220,9 @@ export class InMemoryGraphStore implements GraphStore {
 
   async setSetting(tenantId: string, key: string, value: string): Promise<void> {
     this.settings.set(`${tenantId} ${key}`, value);
+  }
+
+  async deleteSetting(tenantId: string, key: string): Promise<void> {
+    this.settings.delete(`${tenantId} ${key}`);
   }
 }

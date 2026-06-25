@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getFirmName } from '../lib/store';
+import HeaderNav from '../components/HeaderNav';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -33,17 +34,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           Skip to content
         </a>
         <header className="site-header">
-          <Link href="/" className="logo">
-            EKG<span> · Engineering Knowledge</span>
+          <Link href="/" className="logo" aria-label="Engineering Knowledge — home">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/ek-mark.png" alt="" className="logo-mark" width={34} height={34} />
+            <span className="logo-word">
+              <b>Engineering</b> <span>Knowledge</span>
+            </span>
           </Link>
-          <nav>
-            <Link href="/search">Browse &amp; search</Link>
-            <Link href="/map">Map</Link>
-            <Link href="/ingest">Add documents</Link>
-            <Link href="/curation">Curate</Link>
-            <Link href="/capture">Capture</Link>
-            <Link href="/settings">Settings</Link>
-          </nav>
+          <HeaderNav firmName={firmName} />
           <div
             className="identity"
             title="Firm name is set in Settings → Identity by an admin. The signed-in identity is fixed in development — production signs in with Entra ID SSO (PRD P0-9)."

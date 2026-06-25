@@ -41,11 +41,11 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 | Verify / reject a candidate | 🟡 | P0-9 workbench | [G3](#g3--curation-workbench-is-verifyreject-only) |
 | **Add a document (upload)** | ✅ | P0-2, P0-9 | [G1](#g1--no-in-app-document-upload) |
 | **Bulk ingest a folder / source** | 🟡 | P0-2, P0-9 wizard | [G2](#g2--no-ingestion-setup-wizard-or-bulk-import-gui) |
-| **Edit / correct an entity** | ❌ | P0-1, P0-9 inline edit | [G4](#g4--no-inline-entity-editing) |
-| **Merge duplicates** | ❌ | P0-9 merge | [G3](#g3--curation-workbench-is-verifyreject-only) |
-| **Set tags / aliases on an item** | ❌ | P0-1, P0-9 | [G4](#g4--no-inline-entity-editing) |
+| **Edit / correct an entity** | ✅ | P0-1, P0-9 inline edit | [G4](#g4--no-inline-entity-editing) |
+| **Merge duplicates** | ✅ | P0-9 merge | [G3](#g3--curation-workbench-is-verifyreject-only) |
+| **Set tags / aliases on an item** | ✅ | P0-1, P0-9 | [G4](#g4--no-inline-entity-editing) |
 | **Mark superseded / deprecated** | ❌ | P0-1 lifecycle, P0-8 | [G5](#g5--no-gui-for-the-supersededdeprecated-lifecycle) |
-| **Set / confirm an item's ACL** | ❌ | P0-2, P0-9 curator | [G6](#g6--no-gui-for-aclpermission-curation) |
+| **Set / confirm an item's ACL** | 🟡 | P0-2, P0-9 curator | [G6](#g6--no-gui-for-aclpermission-curation) |
 | Usage analytics (top / zero-result / cited) | ❌ | P1-4 | [G10](#g10--no-usage-analytics-dashboard-p1) |
 | Roles & SSO sign-in | ❌ | P0-9 roles, P0-7 | [G11](#g11--no-roles-or-sso-auth) |
 | Gateway / SSO / embeddings / tokens | ⚙️ CLI | Admin setup | *out of scope (allowed)* |
@@ -83,11 +83,18 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G2 · No ingestion setup wizard or bulk-import GUI
 
-- **Status: 🟡 Interim shipped (2026-06-23)** — the `/ingest` page accepts
-  **multiple files at once** (Approach step 1 below) with optional batch tags, so
-  a knowledge manager can self-serve a bulk import without the CLI. Still pending:
-  step 2 (SharePoint/OneDrive OAuth connector + scheduled sync + sync-health
-  panel) and step 3 (CSV project-list import).
+- **Status: 🟡 Steps 1 + 3 shipped — step 2 (SharePoint sync) pending.** The
+  `/ingest` page accepts **multiple files at once** (step 1, 2026-06-23) and now
+  also **imports a project list from CSV** (step 3, 2026-06-24): paste or upload a
+  register, rows become `project` candidates keyed on project number, malformed
+  rows reported not guessed ([`csv.ts`](../services/ingestion/src/csv.ts), tabbed
+  UI in [`IngestTabs.tsx`](../apps/web/src/app/ingest/IngestTabs.tsx)). The
+  **source-connector seam** that step 2 plugs into also landed —
+  `SourceConnector` + `planSync` change detection + a `FolderConnector` reference
+  impl ([`source.ts`](../services/ingestion/src/source.ts)) — so the SharePoint
+  build is a new connector, not a new ingestion path. Still pending: step 2
+  proper (SharePoint/OneDrive OAuth connector + scheduled sync + sync-health
+  panel).
 - **PRD:** P0-9 *"Ingestion setup wizard: connect a source (SharePoint…), pick
   libraries/projects, confirm permission mapping, and monitor sync health —
   designed so Marcus can do it without IT after initial OAuth consent."* P0-2
@@ -110,6 +117,14 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G3 · Curation workbench is verify/reject only
 
+- **Status: 🟡 Edit + merge shipped (2026-06-24); bulk + in-workbench diff still
+  pending.** The destructive store gap is closed: `GraphStore` now has
+  `deleteRelationship` and a `mergeEntities` primitive that repoints the
+  duplicate's edges onto the survivor, drops the resulting self-loops/duplicate
+  edges, and deletes the loser (with its chunks). Curators **merge** a duplicate
+  and **edit** fields from the entity page ([G4](#g4--no-inline-entity-editing)),
+  both gated by a server-side `isCurator` check. Still open: multi-select for
+  bulk verify/reject and a diff-style preview rendered *in* the workbench queue.
 - **PRD:** P0-9 *"Curation workbench: queue… with accept / **edit** / **reject** /
   **merge** actions, diff-style preview against existing entities, and bulk
   operations; median time to process an item < 2 minutes."*
@@ -129,6 +144,15 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G4 · No inline entity editing
 
+- **Status: ✅ Shipped (2026-06-24)** —
+  [`EntityEditor.tsx`](../apps/web/src/components/EntityEditor.tsx) +
+  [`entities/[id]/actions.ts`](../apps/web/src/app/entities/[id]/actions.ts). A
+  curator opens an inline editor on the entity page to correct title, type,
+  summary, **tags**, and **aliases**; edits go through `upsertEntity` with no
+  `chunks` argument so a field change never wipes a document's indexed passages
+  (ADR 0006). Relationships can be removed inline (`deleteRelationship`). The
+  editor is gated by `isCurator(DEV_CALLER)` server-side — production swaps the
+  fixed dev identity for the Entra curator role ([G11](#g11--no-roles-or-sso-auth)).
 - **PRD:** P0-1 *"Curators can create/edit/merge entities and relationships via the
   workspace app."* P0-9 entity pages *"inline editing for users with curator role."*
 - **Persona:** Curator.
@@ -164,12 +188,21 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G6 · No GUI for ACL / permission curation
 
+- **Status: 🟡 Capture + view shipped (2026-06-24); inline re-edit pending.**
+  Visibility is now **captured at ingestion**: the upload form and CSV importer
+  carry a public / restricted-to-principals control that becomes the item ACL
+  (`buildCandidate({ source: { acl }})`, `aclFromPrincipals`), and a curator can
+  **see** the scope — an `AccessBadge` on the curation workbench and entity page,
+  plus an "Access" row in the entity record. This is also the seam the SharePoint
+  connector writes real source-system ACLs through (G2 step 2). Still pending:
+  editing an item's ACL *after* it exists (an inline editor on the entity page),
+  and source-mapped defaults.
 - **PRD:** P0-2 *"Source-system permissions… stored as item ACLs."* P0-9 curator
   role; P0-7 ACL enforcement.
 - **Persona:** Curator; overlaps IT/Security Admin (Dana).
-- **Now:** ACL enforcement works (data layer), but `acl.allowedPrincipals` is only
-  set programmatically — capture defaults to tenant-public (`*`), ingestion sets it
-  in code. No GUI to view or change who can see an item.
+- **Now:** ACL enforcement works (data layer) and visibility is captured + shown
+  at ingestion (above); what's missing is **re-editing** an existing item's
+  `allowedPrincipals` from the GUI.
 - **Impact:** A curator can't confirm/restrict visibility of sensitive material
   (e.g. legal, client-confidential) before verifying — the review checklist in the
   [curation guide](guides/04-curating-knowledge.md#permissions-and-acls) asks them
@@ -247,9 +280,12 @@ most existing code:
 1. ~~**G1 + interim G2** — in-app upload running the existing `buildCandidate`
    pipeline. One change closes "can't add a document in a browser."~~ **✅ Done
    2026-06-23** (`/ingest` single + multi-file upload).
-2. **G4 + G5** — inline entity edit + supersede/deprecate controls (both mostly
-   `upsertEntity`/`upsertRelationship`; high trust value).
-3. **G3** — workbench edit + bulk + merge (merge needs the store extension).
+2. **G4 + G3 (edit/merge)** — ~~inline entity edit~~ **✅ Done 2026-06-24** plus
+   the `deleteRelationship`/`mergeEntities` store extension and a curator merge
+   action. **G5** (supersede/deprecate controls) remains, on the same
+   `upsertEntity`/`upsertRelationship` footing.
+3. **G3 (bulk)** — multi-select verify/reject and an in-workbench diff preview
+   (the edit + merge primitives now exist; this is the remaining UI).
 4. **G6, G9, G7** — ACL editor, capture type-ahead linking, search facets.
 5. **G2 full wizard, G8, G10, G11** — SharePoint sync, graph scale, analytics, SSO
    (the larger platform builds).

@@ -1,4 +1,5 @@
 import type { Chunk, Entity, EntityType, Relationship, RelationshipType, SourceAnchor } from './ontology.js';
+import type { RetrievalRole } from './roles.js';
 
 /**
  * Identity making a request. Every read is tenant-scoped and permission-
@@ -41,12 +42,30 @@ export interface SearchOptions {
   /** Entities must carry every listed tag. */
   tags?: string[];
   limit?: number;
+  /**
+   * Optional retrieval role (focus lens). When set, the store multiplies the
+   * fused score of items the role favors by its weight — a pure re-rank over
+   * the already-admitted candidate set, never a filter (PRD P0-8).
+   */
+  boostRole?: RetrievalRole;
 }
 
 export interface NeighborHit {
   relationship: Relationship;
   entity: Entity;
   direction: 'out' | 'in';
+}
+
+/**
+ * Outcome of folding a duplicate entity into a survivor (PRD P0-9 merge).
+ * `repointed` edges now hang off the survivor; `dropped` edges were discarded
+ * because the repoint turned them into self-loops or duplicates of an edge the
+ * survivor already had.
+ */
+export interface MergeResult {
+  survivorId: string;
+  repointed: number;
+  dropped: number;
 }
 
 /**
@@ -63,6 +82,27 @@ export interface GraphStore {
    */
   upsertEntity(entity: Entity, chunks?: Chunk[]): Promise<void>;
   upsertRelationship(rel: Relationship): Promise<void>;
+  /**
+   * Remove a single relationship by id (curator edit, PRD P0-9). Returns false
+   * if it is missing or either endpoint is invisible to the caller — you cannot
+   * delete an edge whose existence you are not allowed to see (PRD P0-7).
+   */
+  deleteRelationship(caller: Caller, id: string): Promise<boolean>;
+  /**
+   * Fold a duplicate entity into a survivor (PRD P0-9 curation merge): repoint
+   * every relationship touching the duplicate onto the survivor, drop edges that
+   * the repoint turns into self-loops or duplicates of one the survivor already
+   * has, then delete the duplicate and its chunks. This primitive owns only the
+   * graph topology the app cannot rewrite without a full edge view; reconciling
+   * the two entities' fields (title/tags/aliases) is a curation decision the
+   * caller makes via `upsertEntity` on the survivor beforehand. Returns undefined
+   * if either id is missing/invisible, or the two ids are the same.
+   */
+  mergeEntities(
+    caller: Caller,
+    survivorId: string,
+    duplicateId: string,
+  ): Promise<MergeResult | undefined>;
   getEntity(caller: Caller, id: string): Promise<Entity | undefined>;
   /** A document's passages in order, permission-trimmed via its parent. */
   getChunks(caller: Caller, entityId: string): Promise<Chunk[]>;
@@ -91,4 +131,11 @@ export interface GraphStore {
    */
   getSetting(tenantId: string, key: string): Promise<string | undefined>;
   setSetting(tenantId: string, key: string, value: string): Promise<void>;
+  /**
+   * Remove a tenant setting entirely (no-op if unset). Distinct from setting an
+   * empty value: undo of a setting an operation *created* must leave it truly
+   * absent, so `getSetting` reads undefined again and config falls back to its
+   * default (PRD P0-9 undo).
+   */
+  deleteSetting(tenantId: string, key: string): Promise<void>;
 }

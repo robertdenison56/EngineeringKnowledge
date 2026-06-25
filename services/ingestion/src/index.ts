@@ -9,6 +9,23 @@ export {
   type SheetReference,
 } from './candidate.js';
 export { buildReferenceEdges, sheetIndex, type ReferenceEdgeResult } from './edges.js';
+export {
+  contentVersion,
+  planSync,
+  FolderConnector,
+  type SourceConnector,
+  type SourceItem,
+  type SourceMeta,
+  type SyncManifest,
+  type SyncPlan,
+} from './source.js';
+export {
+  parseProjectCsv,
+  buildProjectCandidates,
+  type ProjectRow,
+  type ProjectCsvParse,
+  type ProjectCandidate,
+} from './csv.js';
 export { extractSheetFacts, formatSheetFacts, type SheetFacts } from './describe.js';
 export {
   chunkDocument,

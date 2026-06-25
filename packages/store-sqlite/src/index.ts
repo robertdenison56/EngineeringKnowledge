@@ -7,6 +7,7 @@ import {
   embeddingText,
   matchesTagFilter,
   normalizeText,
+  roleBoostFactor,
   scoreEntityMatch,
   snippetForGroups,
   warningFor,
@@ -16,6 +17,7 @@ import {
   type EmbeddingProvider,
   type Entity,
   type GraphStore,
+  type MergeResult,
   type NeighborHit,
   type Relationship,
   type RelationshipType,
@@ -23,7 +25,10 @@ import {
   type SearchOptions,
 } from '@ekg/core';
 
+import { SqliteOperationJournal } from './operation-journal-sqlite.js';
+
 export { providerFromEnv } from './providers.js';
+export { SqliteOperationJournal } from './operation-journal-sqlite.js';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS entities (
@@ -236,6 +241,29 @@ export class SqliteGraphStore implements GraphStore {
     this.db.close();
   }
 
+  /**
+   * Run a multi-statement mutation atomically — a crash or thrown error rolls
+   * the whole thing back, so the graph never lands half-merged (orphan chunks,
+   * dangling FTS rows, an edge repointed but its duplicate undeleted). Matches
+   * the in-memory store's natural atomicity (parity, PRD P0-7). The callback
+   * must be synchronous: do every await (e.g. embedding) before opening it.
+   */
+  private tx<T>(fn: () => T): T {
+    this.db.exec('BEGIN');
+    try {
+      const result = fn();
+      this.db.exec('COMMIT');
+      return result;
+    } catch (err) {
+      try {
+        this.db.exec('ROLLBACK');
+      } catch {
+        /* a failed rollback must not mask the original error */
+      }
+      throw err;
+    }
+  }
+
   /** Used by app bootstrap to decide whether to seed a fresh database. */
   countEntities(tenantId: string): number {
     const row = this.db
@@ -269,6 +297,16 @@ export class SqliteGraphStore implements GraphStore {
   }
 
   async upsertEntity(entity: Entity, chunks?: Chunk[]): Promise<void> {
+    // Never let one tenant's write land on another tenant's row (PRD P0-7).
+    // Ids are tenant-scoped upstream, so a same-id different-tenant collision is
+    // a bug or an attack, not a legitimate update.
+    const owner = this.db.prepare('SELECT tenant_id FROM entities WHERE id = ?').get(entity.id) as
+      | { tenant_id: string }
+      | undefined;
+    if (owner && owner.tenant_id !== entity.tenantId) {
+      throw new Error(`refusing cross-tenant overwrite of entity ${entity.id}`);
+    }
+
     let embedding: string | null = null;
     let provider: string | null = null;
     const vectors = await this.tryEmbed([embeddingText(entity)]);
@@ -282,9 +320,11 @@ export class SqliteGraphStore implements GraphStore {
       chunkVectors = await this.tryEmbed(chunks.map(chunkEmbeddingText));
     }
 
-    this.db
-      .prepare(
-        `INSERT INTO entities (id, tenant_id, type, title, summary, properties, tags, aliases, content, embedding, embedding_provider, provenance, acl)
+    // Entity row + its FTS index + its chunks must land together or not at all.
+    this.tx(() => {
+      this.db
+        .prepare(
+          `INSERT INTO entities (id, tenant_id, type, title, summary, properties, tags, aliases, content, embedding, embedding_provider, provenance, acl)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            tenant_id = excluded.tenant_id, type = excluded.type, title = excluded.title,
@@ -293,30 +333,31 @@ export class SqliteGraphStore implements GraphStore {
            embedding = COALESCE(excluded.embedding, entities.embedding),
            embedding_provider = COALESCE(excluded.embedding_provider, entities.embedding_provider),
            provenance = excluded.provenance, acl = excluded.acl`,
-      )
-      .run(
-        entity.id,
-        entity.tenantId,
-        entity.type,
-        entity.title,
-        entity.summary ?? null,
-        JSON.stringify(entity.properties),
-        entity.tags ? JSON.stringify(entity.tags) : null,
-        entity.aliases ? JSON.stringify(entity.aliases) : null,
-        entity.content ?? null,
-        embedding,
-        provider,
-        JSON.stringify(entity.provenance),
-        JSON.stringify(entity.acl),
-      );
-    this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(entity.id);
-    this.db
-      .prepare('INSERT INTO entities_fts (id, tenant_id, text) VALUES (?, ?, ?)')
-      .run(entity.id, entity.tenantId, ftsText(entity));
+        )
+        .run(
+          entity.id,
+          entity.tenantId,
+          entity.type,
+          entity.title,
+          entity.summary ?? null,
+          JSON.stringify(entity.properties),
+          entity.tags ? JSON.stringify(entity.tags) : null,
+          entity.aliases ? JSON.stringify(entity.aliases) : null,
+          entity.content ?? null,
+          embedding,
+          provider,
+          JSON.stringify(entity.provenance),
+          JSON.stringify(entity.acl),
+        );
+      this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(entity.id);
+      this.db
+        .prepare('INSERT INTO entities_fts (id, tenant_id, text) VALUES (?, ?, ?)')
+        .run(entity.id, entity.tenantId, ftsText(entity));
 
-    // Omitted chunks preserve the existing passages (ADR 0006); an explicit
-    // array (including []) replaces them wholesale.
-    if (chunks !== undefined) this.writeChunks(entity.id, chunks, chunkVectors);
+      // Omitted chunks preserve the existing passages (ADR 0006); an explicit
+      // array (including []) replaces them wholesale.
+      if (chunks !== undefined) this.writeChunks(entity.id, chunks, chunkVectors);
+    });
   }
 
   /** Replace all chunks for an entity, with their FTS rows and embeddings. */
@@ -415,6 +456,76 @@ export class SqliteGraphStore implements GraphStore {
         rel.toId,
         rel.properties ? JSON.stringify(rel.properties) : null,
       );
+  }
+
+  async deleteRelationship(caller: Caller, id: string): Promise<boolean> {
+    const row = this.db
+      .prepare('SELECT * FROM relationships WHERE id = ? AND tenant_id = ?')
+      .get(id, caller.tenantId) as RelationshipRow | undefined;
+    if (!row) return false;
+    const rel = rowToRelationship(row);
+    // Both endpoints must be visible — no deleting an edge into a hidden entity.
+    const from = await this.getEntity(caller, rel.fromId);
+    const to = await this.getEntity(caller, rel.toId);
+    if (!from || !to) return false;
+    this.db.prepare('DELETE FROM relationships WHERE id = ?').run(id);
+    return true;
+  }
+
+  async mergeEntities(
+    caller: Caller,
+    survivorId: string,
+    duplicateId: string,
+  ): Promise<MergeResult | undefined> {
+    if (survivorId === duplicateId) return undefined;
+    const survivor = await this.getEntity(caller, survivorId);
+    const duplicate = await this.getEntity(caller, duplicateId);
+    if (!survivor || !duplicate) return undefined;
+
+    const edgeKey = (type: string, from: string, to: string) => `${type} ${from} ${to}`;
+    // Edges the survivor already has, so a repointed dup edge that collides with
+    // one of them is dropped rather than duplicated.
+    const survivorRows = this.db
+      .prepare('SELECT * FROM relationships WHERE tenant_id = ? AND (from_id = ? OR to_id = ?)')
+      .all(caller.tenantId, survivorId, survivorId) as unknown as RelationshipRow[];
+    const seen = new Set(
+      survivorRows.map(rowToRelationship).map((r) => edgeKey(r.type, r.fromId, r.toId)),
+    );
+
+    const dupRows = this.db
+      .prepare('SELECT * FROM relationships WHERE tenant_id = ? AND (from_id = ? OR to_id = ?)')
+      .all(caller.tenantId, duplicateId, duplicateId) as unknown as RelationshipRow[];
+    const update = this.db.prepare('UPDATE relationships SET from_id = ?, to_id = ? WHERE id = ?');
+    const del = this.db.prepare('DELETE FROM relationships WHERE id = ?');
+    // Repoint + dedup the duplicate's edges, then remove the duplicate, its FTS
+    // row, and its chunks — atomically, so a failure can't leave a half-merged
+    // graph (edges repointed but the duplicate still present, or vice versa).
+    return this.tx(() => {
+      let repointed = 0;
+      let dropped = 0;
+      for (const row of dupRows) {
+        const rel = rowToRelationship(row);
+        const fromId = rel.fromId === duplicateId ? survivorId : rel.fromId;
+        const toId = rel.toId === duplicateId ? survivorId : rel.toId;
+        const k = edgeKey(rel.type, fromId, toId);
+        if (fromId === toId || seen.has(k)) {
+          del.run(rel.id);
+          dropped += 1;
+        } else {
+          update.run(fromId, toId, rel.id);
+          seen.add(k);
+          repointed += 1;
+        }
+      }
+
+      // The duplicate now has no edges pointing at it; remove it, its FTS row,
+      // and its chunks (the survivor keeps its own).
+      this.db.prepare('DELETE FROM entities WHERE id = ?').run(duplicateId);
+      this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(duplicateId);
+      this.db.prepare('DELETE FROM chunks WHERE entity_id = ?').run(duplicateId);
+      this.db.prepare('DELETE FROM chunks_fts WHERE entity_id = ?').run(duplicateId);
+      return { survivorId, repointed, dropped };
+    });
   }
 
   async getEntity(caller: Caller, id: string): Promise<Entity | undefined> {
@@ -536,7 +647,10 @@ export class SqliteGraphStore implements GraphStore {
         const adjusted =
           score *
           (status === 'superseded' || status === 'deprecated' ? 0.85 : 1) *
-          (status === 'unverified' ? 0.95 : 1);
+          (status === 'unverified' ? 0.95 : 1) *
+          // Role re-rank (focus lens): scales already-admitted candidates only,
+          // so it never admits a non-match or hides a match (P0-8).
+          roleBoostFactor(entity, options.boostRole);
         return { entity, score: adjusted, warning: warningFor(status) };
       })
       .sort((a, b) => b.score - a.score)
@@ -569,11 +683,14 @@ export class SqliteGraphStore implements GraphStore {
   async deleteEntity(caller: Caller, id: string): Promise<boolean> {
     const entity = await this.getEntity(caller, id);
     if (!entity) return false;
-    this.db.prepare('DELETE FROM relationships WHERE from_id = ? OR to_id = ?').run(id, id);
-    this.db.prepare('DELETE FROM entities WHERE id = ?').run(id);
-    this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(id);
-    this.db.prepare('DELETE FROM chunks WHERE entity_id = ?').run(id);
-    this.db.prepare('DELETE FROM chunks_fts WHERE entity_id = ?').run(id);
+    // Entity, its edges, FTS rows, and chunks drop together or not at all.
+    this.tx(() => {
+      this.db.prepare('DELETE FROM relationships WHERE from_id = ? OR to_id = ?').run(id, id);
+      this.db.prepare('DELETE FROM entities WHERE id = ?').run(id);
+      this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(id);
+      this.db.prepare('DELETE FROM chunks WHERE entity_id = ?').run(id);
+      this.db.prepare('DELETE FROM chunks_fts WHERE entity_id = ?').run(id);
+    });
     return true;
   }
 
@@ -626,5 +743,19 @@ export class SqliteGraphStore implements GraphStore {
          ON CONFLICT(tenant_id, key) DO UPDATE SET value = excluded.value`,
       )
       .run(tenantId, key, value);
+  }
+
+  async deleteSetting(tenantId: string, key: string): Promise<void> {
+    this.db.prepare('DELETE FROM settings WHERE tenant_id = ? AND key = ?').run(tenantId, key);
+  }
+
+  /**
+   * A change journal for undo (PRD P0-9), sharing this store's database
+   * connection so before-images live in the same file and stay consistent with
+   * the graph. node:sqlite is single-handle, so the journal must reuse `this.db`
+   * rather than opening its own.
+   */
+  createJournal(): SqliteOperationJournal {
+    return new SqliteOperationJournal(this.db);
   }
 }

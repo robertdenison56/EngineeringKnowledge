@@ -91,6 +91,13 @@ per-request identity from a bearer JWT, so ACL trimming and tenant isolation
 follow the calling token (two tokens hit one server and see different
 knowledge), plus an append-only audit trail of every call (P0-7). The richer
 P0-3 tools `find_experts` and `get_project_context` round out the surface.
+Clients that send a bearer header connect to it today — Claude Code
+(`--transport http --header`), the Claude API MCP connector, ChatGPT — while an
+admin-managed **claude.ai** organization connector needs the OAuth work below.
+`npm run signoff --workspace @ekg/mcp-server` validates a live deployment
+end-to-end (auth gate, served tool surface, ACL + tenant trimming) and prints a
+sign-off record; see the
+[Administration guide](docs/guides/05-admin-guide.md#connecting-assistants-org-wide).
 Open before Phase 2 exit: production graph engine (OQ 1), SharePoint sync,
 OCR for scanned sets, and OAuth 2.1 + Entra federation on the gateway — the
 JWT identity uses the same claim shape, so that work swaps only the token

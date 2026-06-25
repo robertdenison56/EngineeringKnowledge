@@ -12,6 +12,7 @@ import {
   type SimulationLinkDatum,
   type SimulationNodeDatum,
 } from 'd3-force';
+import type { RetrievalRole } from '@ekg/core';
 import { TYPE_COLORS, entityHref, typeColor } from './ui';
 
 export interface MapNode {
@@ -20,6 +21,15 @@ export interface MapNode {
   type: string;
   reviewStatus: string;
   tags: string[];
+}
+
+/**
+ * Whether a retrieval role favors a node — same tag/type test as the
+ * `entityMatchesRole` boost the store applies, expressed over the map's lighter
+ * node shape so the highlight matches what actually ranks higher.
+ */
+function nodeMatchesRole(node: MapNode, role: RetrievalRole): boolean {
+  return role.boostTypes.includes(node.type) || node.tags.some((t) => role.boostTags.includes(t));
 }
 
 export interface MapLink {
@@ -47,10 +57,20 @@ function shortTitle(title: string, max = 22): string {
  * fine at firm-demo scale; progressive loading is the documented P0-9
  * requirement for 100k+ graphs.
  */
-export default function GraphMap({ nodes, links }: { nodes: MapNode[]; links: MapLink[] }) {
+export default function GraphMap({
+  nodes,
+  links,
+  roles = [],
+}: {
+  nodes: MapNode[];
+  links: MapLink[];
+  roles?: RetrievalRole[];
+}) {
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set());
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+  const [activeRoleId, setActiveRoleId] = useState<string>('');
   const [hoverId, setHoverId] = useState<string | null>(null);
+  const activeRole = roles.find((r) => r.id === activeRoleId);
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
@@ -96,6 +116,17 @@ export default function GraphMap({ nodes, links }: { nodes: MapNode[]; links: Ma
       .stop();
     for (let i = 0; i < 300; i += 1) sim.tick();
 
+    // Round to a fixed precision so SSR and client hydration render
+    // byte-identical coordinates. d3-force leans on Math.sqrt/etc whose
+    // last-ULP results differ between Node and the browser's V8, which
+    // otherwise yields a hydration mismatch on every node, link, and label.
+    // Links reference these same node objects, so this also fixes their
+    // endpoints and the deterministically-derived label midpoints.
+    for (const n of simNodes) {
+      n.x = Math.round((n.x ?? 0) * 100) / 100;
+      n.y = Math.round((n.y ?? 0) * 100) / 100;
+    }
+
     const adj = new Map<string, Set<string>>();
     for (const l of simLinks) {
       const s = (l.source as unknown as SimNode).id;
@@ -130,6 +161,26 @@ export default function GraphMap({ nodes, links }: { nodes: MapNode[]; links: Ma
   return (
     <div className="map-card">
       <div className="map-toolbar">
+        {roles.length > 0 ? (
+          <>
+            <label className="map-role-picker">
+              ◎ Role
+              <select
+                value={activeRoleId}
+                onChange={(e) => setActiveRoleId(e.target.value)}
+                aria-label="Highlight a retrieval role's focus"
+              >
+                <option value="">None</option>
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="toolbar-sep" />
+          </>
+        ) : null}
         {allTypes.map((t) => (
           <button
             key={t}
@@ -229,14 +280,30 @@ export default function GraphMap({ nodes, links }: { nodes: MapNode[]; links: Ma
           {placedNodes.map((n) => {
             const r = 14 + Math.min(n.degree, 6) * 3;
             const flagged = n.reviewStatus === 'superseded' || n.reviewStatus === 'deprecated';
+            const focused = activeRole ? nodeMatchesRole(n, activeRole) : false;
+            // A role pushes everything it does NOT favor into the background, so
+            // the lens's knowledge stands out — mirrors the hover-dim behavior.
+            const roleDimmed = activeRole ? !focused : false;
+            const opacity = dimmed(n.id) ? 0.15 : roleDimmed ? 0.18 : 1;
             return (
               <a
                 key={n.id}
                 href={entityHref(n.id)}
-                style={{ opacity: dimmed(n.id) ? 0.15 : 1 }}
+                style={{ opacity }}
                 onMouseEnter={() => setHoverId(n.id)}
                 onMouseLeave={() => setHoverId(null)}
               >
+                {focused ? (
+                  <circle
+                    cx={n.x}
+                    cy={n.y}
+                    r={r + 7}
+                    fill="#f59e0b"
+                    opacity={0.18}
+                    stroke="#f59e0b"
+                    strokeWidth={2.5}
+                  />
+                ) : null}
                 <circle
                   cx={n.x}
                   cy={n.y}
@@ -276,6 +343,11 @@ export default function GraphMap({ nodes, links }: { nodes: MapNode[]; links: Ma
         <span>
           <span className="legend-dot legend-unverified" /> unverified (faded)
         </span>
+        {activeRole ? (
+          <span>
+            <span className="legend-dot legend-focused" /> focused by {activeRole.name}
+          </span>
+        ) : null}
       </div>
     </div>
   );

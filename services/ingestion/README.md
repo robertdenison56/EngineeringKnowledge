@@ -79,6 +79,34 @@ the description grounding gate are exported as a library — the MCP gateway's
 `ingest_document` / `save_description` tools run the same code
 ([ADR 0005](../../docs/decisions/0005-gateway-ingestion-client-model-description.md)).
 
+**Source connectors + change detection** (`source.ts`, PRD P0-2). Every way a
+document enters the graph is one shape: `SourceConnector.list()` enumerates
+`SourceItem`s — each with a stable `id`, a content-hash `version`, lazy
+`read()`, and a `SourceMeta` (origin system, deep link, author, timestamps, and
+**source-system ACL**). `buildCandidate({ source })` stamps that metadata onto
+the candidate, so source-system permissions become item ACLs at ingestion
+instead of a tenant-public default. `planSync(items, manifest)` is the pure
+change-detection core of scheduled sync — it diffs the current listing against
+the last manifest into added / changed / unchanged / removed, so "selected
+libraries sync on schedule with change detection" is testable without a live
+tenant. `FolderConnector` is the reference implementation over a local
+directory; the SharePoint/OneDrive OAuth connector is a drop-in `SourceConnector`
+(it supplies the Graph driveItem id, etag as `version`, and the Entra-mapped ACL)
+— classification, parsing, and curation downstream are unchanged.
+
+**Source-system permissions → item ACLs** (`buildCandidate({ source: { acl }})`).
+The workspace upload form and CSV importer capture visibility manually (public,
+or restricted to listed principals) today; the SharePoint connector will write
+real source ACLs through the same seam (gap G6).
+
+**CSV project-list import** (`csv.ts`, PRD P0-2 "CSV/bulk import for project
+lists"). `parseProjectCsv` reads a delimited project register (comma or tab
+auto-detected, header matched by name with synonyms, quoted-field aware);
+`buildProjectCandidates` turns rows into `project` candidates keyed on project
+number so a re-import updates rather than duplicates. Malformed rows are reported,
+never guessed. Surfaced in the workspace app at `/ingest` → "Import project list".
+
 Next: ship a bundled OCR engine by default (currently opt-in via tesseract.js /
-system tesseract); SharePoint/OneDrive OAuth sync replaces the folder walk; the
-candidate model and curation flow stay the same.
+system tesseract); the SharePoint/OneDrive OAuth connector implements
+`SourceConnector` and replaces the folder walk; the candidate model and curation
+flow stay the same.

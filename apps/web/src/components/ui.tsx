@@ -1,5 +1,22 @@
 import Link from 'next/link';
-import type { Entity, ReviewStatus } from '@ekg/core';
+import { isPublicAcl, type Acl, type Entity, type ReviewStatus, type SourceSystem } from '@ekg/core';
+
+/** Human labels for where an item entered the graph (PRD P0-2 provenance). */
+const SOURCE_LABELS: Record<string, string> = {
+  upload: 'Uploaded',
+  folder: 'Folder ingest',
+  csv: 'CSV import',
+  manual: 'Manual capture',
+  gateway: 'Assistant ingest',
+  sharepoint: 'SharePoint',
+  onedrive: 'OneDrive',
+  procore: 'Procore',
+  acc: 'Autodesk Construction Cloud',
+};
+
+export function sourceLabel(system: SourceSystem | undefined): string | undefined {
+  return system ? (SOURCE_LABELS[system] ?? system) : undefined;
+}
 
 export const TYPE_COLORS: Record<string, string> = {
   project: '#7c3aed',
@@ -54,6 +71,24 @@ export function entityHref(id: string): string {
   return `/entities/${encodeURIComponent(id)}`;
 }
 
+/**
+ * Visibility chip (PRD P0-2 item ACLs). Public items are the norm, so they show
+ * nothing — only a restricted ACL gets a badge, with the allowed principals on
+ * hover, so a curator can spot and confirm scoped material before verifying.
+ */
+export function AccessBadge({ acl }: { acl: Acl }) {
+  if (isPublicAcl(acl)) return null;
+  const who = acl.allowedPrincipals.join(', ');
+  return (
+    <span
+      className="badge access-badge"
+      title={`Restricted — only ${who} can retrieve this item.`}
+    >
+      🔒 {acl.allowedPrincipals.length} principal{acl.allowedPrincipals.length === 1 ? '' : 's'}
+    </span>
+  );
+}
+
 export function TagChips({ tags }: { tags?: string[] }) {
   if (!tags || tags.length === 0) return null;
   return (
@@ -84,6 +119,7 @@ export function ProvenanceLine({ entity }: { entity: Entity }) {
           </a>
         </>
       ) : null}
+      {sourceLabel(p.sourceSystem) ? <> · via {sourceLabel(p.sourceSystem)}</> : null}
     </p>
   );
 }
@@ -94,11 +130,20 @@ export interface CardMatch {
   snippet: string;
 }
 
-export function EntityCard({ entity, match }: { entity: Entity; match?: CardMatch }) {
+export function EntityCard({
+  entity,
+  match,
+  focused,
+}: {
+  entity: Entity;
+  match?: CardMatch;
+  /** True when the active retrieval role favors this item (boosted its rank). */
+  focused?: boolean;
+}) {
   const warning = REVIEW_WARNINGS[entity.provenance.reviewStatus];
   return (
     <article
-      className="card"
+      className={`card${focused ? ' focused' : ''}`}
       style={{ ['--accent-rail' as string]: typeColor(entity.type) }}
     >
       <div className="card-head">
@@ -106,6 +151,7 @@ export function EntityCard({ entity, match }: { entity: Entity; match?: CardMatc
           {entity.title}
         </Link>
         <span className="badges">
+          {focused ? <span className="badge focus-badge">◎ Focused</span> : null}
           <TypeBadge type={entity.type} />
           <ReviewBadge status={entity.provenance.reviewStatus} />
         </span>

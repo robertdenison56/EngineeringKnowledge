@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ingestUploads, type IngestResult } from './actions';
+import { VisibilityFields } from './VisibilityFields';
 
 const ACCEPT = '.pdf,.md,.txt';
 const ACCEPTED_EXT = new Set(['.pdf', '.md', '.txt']);
@@ -89,6 +90,8 @@ export function Uploader() {
         Tags applied to every file (optional)
         <input name="tags" placeholder="comma-separated, e.g. district-3, drainage" />
       </label>
+
+      <VisibilityFields />
 
       <button type="submit" disabled={pending || count === 0}>
         {pending

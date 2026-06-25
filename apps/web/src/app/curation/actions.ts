@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { Entity } from '@ekg/core';
-import { DEV_CALLER, getStore } from '../../lib/store';
+import { DEV_CALLER, getStore, isCurator, runAsOperation } from '../../lib/store';
 
 /**
  * Curation actions (PRD P0-9 workbench). Mutations run as the dev caller;
@@ -20,20 +20,37 @@ function refreshViews() {
 }
 
 export async function verifyEntity(formData: FormData): Promise<void> {
+  // Promoting an item to `verified` is a curator action — re-checked server-side
+  // (the authorization boundary, not the hidden-in-UI affordance; PRD P0-9).
+  if (!isCurator(DEV_CALLER)) return;
   const id = String(formData.get('id') ?? '');
   const store = await getStore();
   const entity = await store.getEntity(DEV_CALLER, id);
   if (!entity) return;
-  entity.provenance.reviewStatus = 'verified';
-  entity.provenance.modifiedAt = new Date().toISOString();
-  await store.upsertEntity(entity);
+  // Immutable update — never mutate the fetched entity in place, or the undo
+  // journal would capture the already-verified state as its "before" image.
+  const verified: Entity = {
+    ...entity,
+    provenance: { ...entity.provenance, reviewStatus: 'verified', modifiedAt: new Date().toISOString() },
+  };
+  await runAsOperation({ label: `Verified “${entity.title}”`, kind: 'verify-entity' }, async () => {
+    await store.upsertEntity(verified);
+  });
   refreshViews();
 }
 
 export async function rejectEntity(formData: FormData): Promise<void> {
+  // Deleting a candidate is a curator action — re-checked server-side (P0-9).
+  if (!isCurator(DEV_CALLER)) return;
   const id = String(formData.get('id') ?? '');
   const store = await getStore();
-  await store.deleteEntity(DEV_CALLER, id);
+  const entity = await store.getEntity(DEV_CALLER, id);
+  await runAsOperation(
+    { label: entity ? `Rejected “${entity.title}”` : 'Rejected a candidate', kind: 'reject-entity' },
+    async () => {
+      await store.deleteEntity(DEV_CALLER, id);
+    },
+  );
   refreshViews();
 }
 
@@ -87,7 +104,9 @@ export async function captureKnowledge(formData: FormData): Promise<void> {
   };
 
   const store = await getStore();
-  await store.upsertEntity(entity);
+  await runAsOperation({ label: `Captured “${title}”`, kind: 'capture-knowledge' }, async () => {
+    await store.upsertEntity(entity);
+  });
   refreshViews();
   redirect('/curation');
 }
