@@ -18,6 +18,18 @@ export {
 } from './chunking.js';
 export { groundAnnotations, type GroundingReport } from './ground.js';
 export {
+  createPageOcr,
+  ocrAvailable,
+  ocrPdfPages,
+  OCR_CONFIDENCE_THRESHOLD,
+  type OcrEngineName,
+  type OcrMeta,
+  type OcrPage,
+  type OcrPagesResult,
+  type OcrResult,
+  type PageOcr,
+} from './ocr.js';
+export {
   analyzeSheet,
   detectCallouts,
   detectDimensions,

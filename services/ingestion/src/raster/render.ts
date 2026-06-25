@@ -80,7 +80,9 @@ function bezier(
 
 /** Fetch a page's geometry + text once (one getDocument per call). */
 export async function loadPageModel(data: Uint8Array, pageNumber: number): Promise<PageModel> {
-  const task = getDocument({ data, useSystemFonts: true, verbosity: 0 });
+  // Copy: pdf.js detaches the input buffer (see vector.ts), and the vision
+  // flow rasterizes the same bytes it already parsed for facts.
+  const task = getDocument({ data: new Uint8Array(data), useSystemFonts: true, verbosity: 0 });
   try {
     const doc = await task.promise;
     const page = await doc.getPage(pageNumber);

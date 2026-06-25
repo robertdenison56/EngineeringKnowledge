@@ -4,6 +4,7 @@ import { basename, extname } from 'node:path';
 import type { Chunk, Entity } from '@ekg/core';
 import { chunkDocument, type PageText } from './chunking.js';
 import { classifyFilename, deriveTags, type Classification } from './classify.js';
+import { ocrPdfPages, type OcrEngineName, type OcrPage, type PageOcr } from './ocr.js';
 import {
   analyzeSheet,
   normalizeSheetNumber,
@@ -22,7 +23,7 @@ import { extractVectorContent, type TitleBlock, type VectorContent } from './vec
 export const TEXT_EXTENSIONS = new Set(['.txt', '.md']);
 export const KNOWN_EXTENSIONS = new Set(['.txt', '.md', '.pdf']);
 
-export type ParseStatus = 'extracted' | 'needs-ocr' | 'parse-failed';
+export type ParseStatus = 'extracted' | 'ocr-extracted' | 'needs-ocr' | 'parse-failed';
 
 /**
  * An outbound cross-sheet reference detected on a drawing (callout bubble
@@ -45,6 +46,12 @@ export interface Candidate {
   classification: Classification;
   /** Set for PDFs only (ADR 0004). */
   parseStatus?: ParseStatus;
+  /**
+   * True when the PDF carried no text layer (a scan / raster plot), regardless
+   * of whether OCR later recovered text. The gateway still renders these for a
+   * visual description.
+   */
+  imageOnly?: boolean;
   pageCount?: number;
   /** Outbound cross-sheet references awaiting resolution (Phase B). */
   references?: SheetReference[];
@@ -60,7 +67,20 @@ const CONTENT_PREVIEW_CHARS = 20000;
 
 export async function buildCandidate(
   filePath: string,
-  options: { tenantId: string; pipeline: string; now?: string },
+  options: {
+    tenantId: string;
+    pipeline: string;
+    now?: string;
+    /**
+     * OCR engine for image-only PDFs (review #1). When supplied and the PDF has
+     * no text layer, the scan is OCR'd into a searchable, groundable text layer
+     * (`parseStatus: 'ocr-extracted'`). Omitted — the CLI/web default — a scan
+     * stays `needs-ocr`, exactly as before. Build one with `createPageOcr()`.
+     */
+    ocr?: PageOcr;
+    /** Page budget for OCR (default 10); excess pages are left un-OCR'd. */
+    maxOcrPages?: number;
+  },
 ): Promise<Candidate> {
   const ext = extname(filePath).toLowerCase();
   if (!KNOWN_EXTENSIONS.has(ext)) {
@@ -83,6 +103,13 @@ export async function buildCandidate(
   let references: SheetReference[] = [];
   let semanticsSummary: Record<string, unknown> | undefined;
   let chunks: Chunk[] = [];
+  let imageOnly = false;
+  // OCR-recovered pages (image-only PDFs), kept page-anchored for chunking.
+  let ocrPages: OcrPage[] = [];
+  let ocrEngine: OcrEngineName | undefined;
+  let ocrTruncated = false;
+  let ocrLowConfidencePages: number[] = [];
+  let ocrMeanConfidence: number | undefined;
   if (TEXT_EXTENSIONS.has(ext)) {
     fullText = readFileSync(filePath, 'utf8').replace(/\s+/g, ' ').trim();
     content = fullText.slice(0, CONTENT_PREVIEW_CHARS);
@@ -118,8 +145,32 @@ export async function buildCandidate(
           .map((p) => ({ page: p.pageNumber, semantics: analyzeSheet(p) }));
         ({ references, semanticsSummary } = summarizeSemantics(analyzed, vector));
       } else {
-        summary = '[Scanned PDF — no text layer; flagged for OCR (ADR 0004)]';
-        parseStatus = 'needs-ocr';
+        // Image-only PDF (scan / raster plot): no text layer (ADR 0004). When
+        // an OCR engine is supplied, recover one (review #1) so the describe
+        // flow can ground its reading and the document becomes searchable;
+        // otherwise flag it for OCR, never inventing text.
+        imageOnly = true;
+        if (options.ocr) {
+          try {
+            const ocr = await ocrPdfPages(filePath, vector.pageCount, options.ocr, options.maxOcrPages);
+            ocrPages = ocr.pages;
+            ocrEngine = ocr.engine;
+            ocrTruncated = ocr.truncated;
+            ocrLowConfidencePages = ocr.lowConfidencePages;
+            ocrMeanConfidence = ocr.meanConfidence;
+          } catch {
+            /* OCR is best-effort enrichment — fall through to needs-ocr */
+          }
+        }
+        if (ocrPages.length > 0) {
+          fullText = ocrPages.map((p) => p.text).join('\n\n').trim();
+          content = fullText.slice(0, CONTENT_PREVIEW_CHARS);
+          summary = `[OCR-recovered text — unverified scan] ${fullText.replace(/\s+/g, ' ').slice(0, 360)}`;
+          parseStatus = 'ocr-extracted';
+        } else {
+          summary = '[Scanned PDF — no text layer; flagged for OCR (ADR 0004)]';
+          parseStatus = 'needs-ocr';
+        }
       }
     } catch (err) {
       summary = `[PDF could not be parsed: ${err instanceof Error ? err.message : String(err)}]`;
@@ -169,6 +220,14 @@ export async function buildCandidate(
       pages,
       ...(classification.anchor?.specSection ? { specSection: classification.anchor.specSection } : {}),
     });
+  } else if (parseStatus === 'ocr-extracted' && ocrPages.length > 0) {
+    // OCR-recovered text, one chunk per page so a hit still cites the page.
+    chunks = chunkDocument({
+      entityId,
+      tenantId: options.tenantId,
+      pages: ocrPages.map((p) => ({ pageNumber: p.pageNumber, text: p.text })),
+      ...(classification.anchor?.specSection ? { specSection: classification.anchor.specSection } : {}),
+    });
   } else if (fullText.length > 0) {
     chunks = chunkDocument({
       entityId,
@@ -190,6 +249,26 @@ export async function buildCandidate(
       pipeline: options.pipeline,
       ...(pageCount !== undefined ? { pageCount } : {}),
       ...(parseStatus ? { parseStatus } : {}),
+      // Machine-read text is lower-confidence than a born-digital text layer —
+      // record its provenance, per-page confidence, and a review flag so the
+      // workbench and search can weight it (review #1; P0-2a confidence gating).
+      ...(parseStatus === 'ocr-extracted'
+        ? {
+            ocr: {
+              ...(ocrEngine ? { engine: ocrEngine } : {}),
+              pages: ocrPages.length,
+              ...(ocrMeanConfidence !== undefined ? { meanConfidence: ocrMeanConfidence } : {}),
+              ...(ocrLowConfidencePages.length > 0
+                ? { lowConfidencePages: ocrLowConfidencePages }
+                : {}),
+              // Low- or unknown-confidence OCR must be human-reviewed before it
+              // is trusted — never silently promoted to verified (P0-2a). The
+              // entity is already `unverified`; this records WHY.
+              needsReview: ocrLowConfidencePages.length > 0 || ocrMeanConfidence === undefined,
+              ...(ocrTruncated ? { truncated: true } : {}),
+            },
+          }
+        : {}),
       ...(sheetMeta ? { sheet: sheetMeta } : {}),
       ...(vector && vector.capability.layerTable > 0
         ? {
@@ -210,16 +289,20 @@ export async function buildCandidate(
       sourceUrl: `file://${filePath}`,
       createdAt: now,
       modifiedAt: now,
+      // A connector's deep link (SharePoint/Procore URL) beats the local path;
+      // the folder/upload paths keep the `file://` default (PRD P0-2).
       reviewStatus: 'unverified',
       ...(Object.keys(anchor).length > 0 ? { anchor } : {}),
     },
     acl: { allowedPrincipals: ['*'] },
+    // tenant-public when the source had none (local files, plain uploads).
   };
 
   return {
     entity,
     classification,
     parseStatus,
+    ...(imageOnly ? { imageOnly } : {}),
     pageCount,
     ...(references.length > 0 ? { references } : {}),
     ...(chunks.length > 0 ? { chunks } : {}),

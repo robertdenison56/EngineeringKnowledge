@@ -25,8 +25,25 @@ Text files (`.txt`, `.md`) get content summaries. **PDFs get text-layer
 extraction via pdf.js** ([ADR 0004](../../docs/decisions/0004-pdf-parsing.md)):
 born-digital PDFs ingest their full text (searchable, verifiable in the app);
 image-only PDFs (scans) are flagged `parseStatus: needs-ocr` instead of
-ingesting garbage — OCR is a follow-up decision. Every PDF candidate carries
-`parseStatus` (`extracted` / `needs-ocr` / `parse-failed`) and `pageCount`.
+ingesting garbage. Every PDF candidate carries `parseStatus`
+(`extracted` / `ocr-extracted` / `needs-ocr` / `parse-failed`) and `pageCount`.
+
+**OCR for scans** (`ocr.ts`): image-only PDFs are rasterized and recognized into
+a searchable, **groundable** text layer (`parseStatus: ocr-extracted`) — so a
+vision model's description of a scanned sheet can be verified against it, not
+left ungrounded. The engine posture mirrors poppler: no hard dependency.
+`createPageOcr()` prefers `tesseract.js` (pure JS/WASM, `npm i tesseract.js`) and
+falls back to a system `tesseract` binary; with neither installed a scan
+honestly stays `needs-ocr`. **All three ingestion surfaces wire this
+automatically** — the MCP gateway, the folder-walk CLI, and the in-app
+`/ingest` upload — so a scan parses identically however it enters; opt out with
+`EKG_DISABLE_OCR=1`.
+
+OCR text is **confidence-gated** (P0-2a): each page carries its mean per-word
+confidence, pages below `OCR_CONFIDENCE_THRESHOLD` (or whole documents whose
+engine can't score confidence) are recorded on `entity.properties.ocr` and the
+candidate is flagged `needsReview` for the curation workbench. Machine-read text
+is searchable but always lands `unverified` — never silently promoted.
 
 **Vector drawing sheets get CAD-native parsing** (docs/plans/2026-06-10,
 Phases A+B): the decoder (`vector.ts`) recovers positioned text, path
@@ -62,5 +79,6 @@ the description grounding gate are exported as a library — the MCP gateway's
 `ingest_document` / `save_description` tools run the same code
 ([ADR 0005](../../docs/decisions/0005-gateway-ingestion-client-model-description.md)).
 
-Next: confidence-gated OCR for scans; SharePoint/OneDrive OAuth sync replaces
-the folder walk; the candidate model and curation flow stay the same.
+Next: ship a bundled OCR engine by default (currently opt-in via tesseract.js /
+system tesseract); SharePoint/OneDrive OAuth sync replaces the folder walk; the
+candidate model and curation flow stay the same.

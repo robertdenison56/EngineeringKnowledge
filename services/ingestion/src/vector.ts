@@ -540,7 +540,11 @@ export async function extractVectorContent(
   options: VectorOptions = {},
 ): Promise<VectorContent> {
   const maxDecodePages = options.maxDecodePages ?? DEFAULT_DECODE_PAGES;
-  const task = getDocument({ data, useSystemFonts: true, verbosity: 0 });
+  // pdf.js transfers (detaches) the ArrayBuffer it is handed, so the caller's
+  // Uint8Array is left empty after this call. Parse a private copy: the same
+  // file is read once and then handed to facts + rasterizer, and reusing one
+  // shared buffer would otherwise throw DataCloneError on the second parse.
+  const task = getDocument({ data: new Uint8Array(data), useSystemFonts: true, verbosity: 0 });
   try {
     const doc = await task.promise;
 

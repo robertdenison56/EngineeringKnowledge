@@ -5,6 +5,7 @@ import { DEMO_TENANT } from '@ekg/core';
 import { SqliteGraphStore } from '@ekg/store-sqlite';
 import { KNOWN_EXTENSIONS, buildCandidate, type Candidate } from './candidate.js';
 import { buildReferenceEdges, sheetIndex } from './edges.js';
+import { createPageOcr } from './ocr.js';
 
 /**
  * Ingestion v0 (PRD P0-2): walk a folder, classify each file, and create
@@ -39,10 +40,17 @@ const root = resolve(baseDir, folder);
 
 const store = new SqliteGraphStore(dbPath);
 const now = new Date().toISOString();
+// OCR image-only scans into a searchable, page-anchored text layer when an
+// engine is installed (tesseract.js or the tesseract CLI, plus poppler) — an
+// honest no-op otherwise: the scan stays needs-ocr, never fabricated (P0-2a).
+// EKG_DISABLE_OCR=1 opts out even when an engine is present (matches gateway).
+const ocr = process.env.EKG_DISABLE_OCR === '1' ? null : await createPageOcr();
 const counts = new Map<string, number>();
 const candidates: Candidate[] = [];
 let skipped = 0;
 let needsOcr = 0;
+let ocrExtracted = 0;
+let ocrFlagged = 0;
 
 for (const name of readdirSync(root, { recursive: true }) as string[]) {
   const filePath = join(root, name);
@@ -52,8 +60,18 @@ for (const name of readdirSync(root, { recursive: true }) as string[]) {
     continue;
   }
 
-  const candidate = await buildCandidate(filePath, { tenantId, pipeline: 'ingestion-v0', now });
+  const candidate = await buildCandidate(filePath, {
+    tenantId,
+    pipeline: 'ingestion-v0',
+    now,
+    ...(ocr ? { ocr } : {}),
+  });
   if (candidate.parseStatus === 'needs-ocr') needsOcr += 1;
+  if (candidate.parseStatus === 'ocr-extracted') {
+    ocrExtracted += 1;
+    const meta = candidate.entity.properties.ocr as { needsReview?: boolean } | undefined;
+    if (meta?.needsReview) ocrFlagged += 1;
+  }
   await store.upsertEntity(candidate.entity, candidate.chunks);
   candidates.push(candidate);
   counts.set(candidate.entity.type, (counts.get(candidate.entity.type) ?? 0) + 1);
@@ -74,7 +92,15 @@ const chunkTotal = candidates.reduce((n, c) => n + (c.chunks?.length ?? 0), 0);
 console.log(`Ingested ${total} candidate(s) into ${dbPath} (tenant: ${tenantId})`);
 for (const [type, n] of counts) console.log(`  ${type}: ${n}`);
 if (chunkTotal > 0) console.log(`  ${chunkTotal} searchable passage(s) indexed across documents (ADR 0006)`);
-if (needsOcr > 0) console.log(`  ${needsOcr} scanned PDF(s) flagged needs-ocr — no text layer to extract`);
+if (ocrExtracted > 0)
+  console.log(
+    `  ${ocrExtracted} scanned PDF(s) OCR-recovered` +
+      (ocrFlagged > 0 ? ` (${ocrFlagged} flagged low-confidence for review)` : ''),
+  );
+if (needsOcr > 0)
+  console.log(
+    `  ${needsOcr} scanned PDF(s) flagged needs-ocr — ${ocr ? 'nothing legible recovered' : 'no OCR engine installed'}`,
+  );
 if (skipped > 0) console.log(`  skipped ${skipped} file(s) with unsupported extensions`);
 if (edges.length > 0) console.log(`  ${edges.length} cross-sheet reference edge(s) created from callouts/match lines`);
 if (unresolved.length > 0)
