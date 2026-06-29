@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { undoOperation as runUndo } from '@ekg/core';
-import { DEV_CALLER, getJournal, getStore, isCurator } from '../../lib/store';
+import { getCaller, getJournal, getStore, isCurator } from '../../lib/store';
 
 /**
  * Undo actions (PRD P0-9). A curator/admin can roll back a previously journaled
@@ -31,14 +31,15 @@ export async function undoLastOperation(
   _prev: UndoState | null,
   _formData?: FormData,
 ): Promise<UndoState> {
-  if (!isCurator(DEV_CALLER)) return { ok: false, message: 'Only a curator can undo changes.' };
+  const caller = await getCaller();
+  if (!isCurator(caller)) return { ok: false, message: 'Only a curator can undo changes.' };
 
   const journal = await getJournal();
-  const [latest] = journal.list(DEV_CALLER.tenantId, 1);
+  const [latest] = journal.list(caller.tenantId, 1);
   if (!latest) return { ok: false, message: 'Nothing to undo.' };
 
   const store = await getStore();
-  const res = await runUndo(store, journal, latest.id, { caller: DEV_CALLER });
+  const res = await runUndo(store, journal, latest.id, { caller });
   if (!res.ok) return { ok: false, message: res.reason ?? 'Undo failed.' };
 
   refreshAll();
@@ -48,7 +49,8 @@ export async function undoLastOperation(
 
 /** Roll back a specific operation by id (recent-changes list; conflict-guarded). */
 export async function undoOperationById(_prev: UndoState | null, formData: FormData): Promise<UndoState> {
-  if (!isCurator(DEV_CALLER)) return { ok: false, message: 'Only a curator can undo changes.' };
+  const caller = await getCaller();
+  if (!isCurator(caller)) return { ok: false, message: 'Only a curator can undo changes.' };
 
   const opId = String(formData.get('opId') ?? '');
   const force = String(formData.get('force') ?? '') === '1';
@@ -57,7 +59,7 @@ export async function undoOperationById(_prev: UndoState | null, formData: FormD
   const journal = await getJournal();
   const label = journal.get(opId)?.label ?? 'change';
   const store = await getStore();
-  const res = await runUndo(store, journal, opId, { caller: DEV_CALLER, force });
+  const res = await runUndo(store, journal, opId, { caller, force });
   if (!res.ok) return { ok: false, message: res.reason ?? 'Undo failed.' };
 
   refreshAll();

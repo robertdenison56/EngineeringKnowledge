@@ -51,6 +51,9 @@ export type OperationKind =
   | 'remove-relationship'
   | 'verify-entity'
   | 'reject-entity'
+  | 'supersede-entity'
+  | 'deprecate-entity'
+  | 'restore-entity'
   | 'capture-knowledge'
   | 'set-firm-name'
   | 'create-role'
@@ -122,18 +125,26 @@ export interface OperationJournal {
   newerActiveKeys(opId: string): Set<RecordKey>;
 }
 
-/** True when `a` is newer than `b` by (createdAt, id) — the journal sort order. */
+/**
+ * True when `a` is newer than `b` by (createdAt, seq). Ties on the millisecond
+ * createdAt break by a monotonic insertion sequence — NOT the random UUID id —
+ * so two operations committed in the same millisecond still order
+ * deterministically by when they happened. Otherwise "undo last" could target
+ * the wrong one of two same-millisecond operations.
+ */
 function isNewer(
-  a: { createdAt: string; id: string },
-  b: { createdAt: string; id: string },
+  a: { createdAt: string; seq: number },
+  b: { createdAt: string; seq: number },
 ): boolean {
   if (a.createdAt !== b.createdAt) return a.createdAt > b.createdAt;
-  return a.id > b.id;
+  return a.seq > b.seq;
 }
 
 interface MemOp extends OperationMeta {
   status: OperationStatus;
   entries: Map<RecordKey, BeforeImage>;
+  /** Monotonic insertion order — the deterministic tie-break within a createdAt. */
+  seq: number;
 }
 
 /**
@@ -142,9 +153,11 @@ interface MemOp extends OperationMeta {
  */
 export class InMemoryOperationJournal implements OperationJournal {
   private ops = new Map<string, MemOp>();
+  /** Monotonic counter for deterministic same-millisecond ordering. */
+  private seq = 0;
 
   begin(meta: OperationMeta): void {
-    this.ops.set(meta.id, { ...meta, status: 'pending', entries: new Map() });
+    this.ops.set(meta.id, { ...meta, status: 'pending', entries: new Map(), seq: this.seq++ });
   }
 
   record(opId: string, key: RecordKey, image: BeforeImage): void {

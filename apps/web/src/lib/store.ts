@@ -16,8 +16,10 @@ import {
   type OperationSummary,
   type RetrievalRole,
 } from '@ekg/core';
+import { headers } from 'next/headers';
 import { SqliteGraphStore, providerFromEnv } from '@ekg/store-sqlite';
 import { currentOperation, runInOperation } from './operation-context';
+import { resolveCaller } from './auth';
 
 /**
  * Store bootstrap for the workspace app. Persistent SQLite by default
@@ -82,21 +84,23 @@ export async function getJournal(): Promise<OperationJournal> {
 /**
  * Run a mutating server action as one undoable operation (PRD P0-9). Every
  * `store.*` write inside `fn` is journaled under a single operation, so a bulk
- * import or a multi-step merge rolls back as one unit. Defaults the actor to the
- * dev caller, the identity every action already runs as.
+ * import or a multi-step merge rolls back as one unit. The actor defaults to the
+ * request's authenticated caller ({@link getCaller}).
  */
 export async function runAsOperation<T>(
   meta: { label: string; kind: OperationKind; caller?: Caller },
   fn: () => Promise<T>,
 ): Promise<T> {
   const journal = await getJournal();
-  return runInOperation(journal, { label: meta.label, kind: meta.kind, caller: meta.caller ?? DEV_CALLER }, fn);
+  const caller = meta.caller ?? (await getCaller());
+  return runInOperation(journal, { label: meta.label, kind: meta.kind, caller }, fn);
 }
 
 /** Recent undoable operations for the workspace, newest first (admin UI). */
 export async function listRecentOperations(limit = 10): Promise<OperationSummary[]> {
   const journal = await getJournal();
-  return journal.list(DEV_CALLER.tenantId, limit);
+  const caller = await getCaller();
+  return journal.list(caller.tenantId, limit);
 }
 
 /**
@@ -114,15 +118,37 @@ export const ADMIN_PRINCIPAL = 'role:admin';
 export const CURATOR_PRINCIPAL = 'role:curator';
 
 /**
- * Fixed development identity — same as the MCP server's dev caller, so the
- * app and the gateways show an identical permission-trimmed view (PRD P0-7).
- * Carries the admin role so the single dev user can exercise admin-only
- * controls. Production resolves the caller from Entra ID SSO (PRD P0-9).
+ * Fixed development identity — the local-only fallback used by {@link getCaller}
+ * when no real sign-in is present and dev auth is allowed. Carries admin +
+ * curator so a single local developer can exercise every control. It is NOT a
+ * default in production: a deployed app resolves the caller from Entra ID SSO,
+ * and an unauthenticated production request fails closed (PRD P0-7, P0-9).
  */
 export const DEV_CALLER: Caller = {
   tenantId: DEMO_TENANT,
   principals: ['user:dev', 'group:engineering', CURATOR_PRINCIPAL, ADMIN_PRINCIPAL],
 };
+
+/**
+ * The authenticated caller for the current request — the single identity seam
+ * every page and server action reads (PRD P0-7, P0-9). Identity comes from the
+ * platform's sign-in (Entra SSO via an identity proxy); see {@link resolveCaller}.
+ * Falls back to {@link DEV_CALLER} only in local development, and throws on an
+ * unauthenticated production request so no read or write ever runs as an
+ * unintended principal. Every authorization check ({@link isCurator},
+ * {@link isAdmin}) is applied to the caller this returns.
+ */
+export async function getCaller(): Promise<Caller> {
+  const h = await headers();
+  const caller = resolveCaller((name) => h.get(name), process.env, DEV_CALLER);
+  if (!caller) {
+    throw new Error(
+      'Unauthenticated request: no signed-in user. Put the app behind Entra ID SSO ' +
+        '(Azure App Service Authentication), or set EKG_DEV_AUTH=1 for local development.',
+    );
+  }
+  return caller;
+}
 
 /** Whether a caller may change workspace-wide settings (PRD P0-9 admin role). */
 export function isAdmin(caller: Caller): boolean {
@@ -149,7 +175,8 @@ export const FIRM_NAME_KEY = 'firm-name';
  */
 export async function getFirmName(): Promise<string> {
   const store = await getStore();
-  return (await store.getSetting(DEV_CALLER.tenantId, FIRM_NAME_KEY)) ?? DEV_CALLER.tenantId;
+  const { tenantId } = await getCaller();
+  return (await store.getSetting(tenantId, FIRM_NAME_KEY)) ?? tenantId;
 }
 
 /**
@@ -159,7 +186,8 @@ export async function getFirmName(): Promise<string> {
  */
 export async function getRoles(): Promise<RetrievalRole[]> {
   const store = await getStore();
-  return parseRoles(await store.getSetting(DEV_CALLER.tenantId, RETRIEVAL_ROLES_KEY));
+  const { tenantId } = await getCaller();
+  return parseRoles(await store.getSetting(tenantId, RETRIEVAL_ROLES_KEY));
 }
 
 /** One role by id, or undefined — used to resolve the active lens at query time. */
@@ -171,5 +199,6 @@ export async function getRole(id: string | undefined): Promise<RetrievalRole | u
 /** Persist the full role list (admin actions re-check {@link isAdmin} first). */
 export async function saveRoles(roles: RetrievalRole[]): Promise<void> {
   const store = await getStore();
-  await store.setSetting(DEV_CALLER.tenantId, RETRIEVAL_ROLES_KEY, serializeRoles(roles));
+  const { tenantId } = await getCaller();
+  await store.setSetting(tenantId, RETRIEVAL_ROLES_KEY, serializeRoles(roles));
 }

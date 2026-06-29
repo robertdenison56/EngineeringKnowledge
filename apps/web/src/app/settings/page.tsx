@@ -1,5 +1,5 @@
 import type { ReviewStatus } from '@ekg/core';
-import { DEV_CALLER, getFirmName, getRoles, getStore, isAdmin } from '../../lib/store';
+import { getCaller, getFirmName, getRoles, getStore, isAdmin } from '../../lib/store';
 import { AppearanceSettings } from '../../components/AppearanceSettings';
 import { FirmNameSettings } from '../../components/FirmNameSettings';
 import { RolesSettings } from '../../components/RolesSettings';
@@ -16,8 +16,9 @@ export const dynamic = 'force-dynamic';
  */
 export default async function SettingsPage() {
   const store = await getStore();
-  const entities = await store.list(DEV_CALLER, { limit: 2000 });
-  const relationships = await store.listRelationships(DEV_CALLER);
+  const caller = await getCaller();
+  const entities = await store.list(caller, { limit: 2000 });
+  const relationships = await store.listRelationships(caller);
 
   const byStatus = new Map<ReviewStatus, number>();
   for (const e of entities) {
@@ -26,9 +27,9 @@ export default async function SettingsPage() {
   }
 
   const firmName = await getFirmName();
-  const canEditFirmName = isAdmin(DEV_CALLER);
+  const canEditFirmName = isAdmin(caller);
   const roles = await getRoles();
-  const canEditRoles = isAdmin(DEV_CALLER);
+  const canEditRoles = isAdmin(caller);
 
   const provider = process.env.EKG_EMBEDDINGS_PROVIDER;
   const dbPath = process.env.EKG_DB_PATH ?? '.data/ekg.db';
@@ -53,9 +54,10 @@ export default async function SettingsPage() {
           <h3>Identity</h3>
           <p className="meta">
             The firm name is how this workspace presents itself — in the header and in grounded
-            answers. Only an admin can change it. The tenant id and principals are the fixed
-            development identity; production resolves the caller per request from Entra ID SSO and
-            trims every read by it (PRD P0-7, P0-9).
+            answers. Only an admin can change it. The tenant id and principals below are the
+            signed-in caller for this request (a fixed dev identity in local development); a deployed
+            app resolves the caller per request from Entra ID SSO and trims every read by it (PRD
+            P0-7, P0-9).
           </p>
         </div>
         <FirmNameSettings initialFirmName={firmName} canEdit={canEditFirmName} />
@@ -63,13 +65,13 @@ export default async function SettingsPage() {
           <div>
             <dt>Tenant id</dt>
             <dd>
-              <code>{DEV_CALLER.tenantId}</code>
+              <code>{caller.tenantId}</code>
             </dd>
           </div>
           <div>
             <dt>Principals</dt>
             <dd>
-              {DEV_CALLER.principals.map((p) => (
+              {caller.principals.map((p) => (
                 <code key={p} className="inline-code">
                   {p}
                 </code>

@@ -15,7 +15,7 @@ import {
   type Candidate,
 } from '@ekg/ingestion';
 import { aclFromPrincipals, type Acl } from '@ekg/core';
-import { DEV_CALLER, getStore, isCurator, runAsOperation } from '../../lib/store';
+import { getCaller, getStore, isCurator, runAsOperation } from '../../lib/store';
 
 /**
  * In-app document upload (PRD P0-2 manual ingestion; closes gaps G1 and the
@@ -105,9 +105,10 @@ export async function ingestUploads(
   formData: FormData,
 ): Promise<IngestResult> {
   // Server-side authorization boundary — the same check every other mutation
-  // makes, not a hidden-UI affordance (PRD P0-7/P0-9). Inert under the fixed dev
-  // caller; relaxes to a contributor role once SSO lands (gap G11).
-  if (!isCurator(DEV_CALLER)) {
+  // makes, not a hidden-UI affordance (PRD P0-7/P0-9). Gated on the request's
+  // authenticated caller; SSO supplies the curator role in production (gap G11).
+  const caller = await getCaller();
+  if (!isCurator(caller)) {
     return {
       ok: false,
       files: [],
@@ -177,7 +178,7 @@ export async function ingestUploads(
           await writeFile(filePath, Buffer.from(await file.arrayBuffer()));
 
           const candidate = await buildCandidate(filePath, {
-            tenantId: DEV_CALLER.tenantId,
+            tenantId: caller.tenantId,
             pipeline: 'workspace-upload',
             now,
             ...(ocr ? { ocr } : {}),
@@ -214,12 +215,12 @@ export async function ingestUploads(
       }
 
       if (candidates.length > 0) {
-        const existing = await store.list(DEV_CALLER);
+        const existing = await store.list(caller);
         const index = sheetIndex([...existing, ...candidates.map((c) => c.entity)]);
         const { edges, unresolved } = buildReferenceEdges(
           candidates,
           index,
-          DEV_CALLER.tenantId,
+          caller.tenantId,
         );
         for (const edge of edges) await store.upsertRelationship(edge);
         referencesLinked = edges.length;
@@ -282,7 +283,8 @@ export async function importProjectCsv(
   const empty = { imported: [], rowErrors: [], recognized: [], ignored: [] };
 
   // Server-side authorization boundary (PRD P0-7/P0-9), same as every mutation.
-  if (!isCurator(DEV_CALLER)) {
+  const caller = await getCaller();
+  if (!isCurator(caller)) {
     return { ok: false, ...empty, message: 'You need the curator role to import projects.' };
   }
 
@@ -318,7 +320,7 @@ export async function importProjectCsv(
   const batchTags = parseBatchTags(formData);
   const now = new Date().toISOString();
   const candidates = buildProjectCandidates(rows, {
-    tenantId: DEV_CALLER.tenantId,
+    tenantId: caller.tenantId,
     now,
     source: { system: 'csv', acl },
   });

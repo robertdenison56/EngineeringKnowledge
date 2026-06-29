@@ -1,5 +1,5 @@
-import { existsSync } from 'node:fs';
-import { extname, isAbsolute, resolve } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
+import { extname, isAbsolute, resolve, sep } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ZodRawShapeCompat } from '@modelcontextprotocol/sdk/server/zod-compat.js';
@@ -10,10 +10,12 @@ import {
   DEMO_TENANT,
   InMemoryGraphStore,
   RETRIEVAL_ROLES_KEY,
+  aclFromPrincipals,
   findRole,
   parseRoles,
   seedDemo,
   warningFor,
+  type Acl,
   type Caller,
   type Chunk,
   type Entity,
@@ -69,6 +71,52 @@ let ocrEnginePromise: Promise<PageOcr | null> | undefined;
 function getPageOcr(): Promise<PageOcr | null> {
   if (process.env.EKG_DISABLE_OCR === '1') return Promise.resolve(null);
   return (ocrEnginePromise ??= createPageOcr());
+}
+
+/**
+ * Root the remote gateway confines `ingest_document` reads to. A network caller
+ * must never be able to read an arbitrary host file by supplying its path (an
+ * arbitrary-file-read / cross-tenant leak): when this is set — EKG_UPLOAD_ROOT,
+ * which the HTTP gateway should always set — a path may only be read if it
+ * resolves (symlinks included) inside the root. stdio is a single local user
+ * and reads local paths directly, so it leaves this unset.
+ */
+function resolveIngestRoot(root: string | undefined): string | undefined {
+  if (!root) return undefined;
+  try {
+    return realpathSync(resolve(root));
+  } catch {
+    return undefined;
+  }
+}
+
+/** The real path of `filePath` when it lives inside `rootReal`, else null. */
+function confineToRoot(filePath: string, rootReal: string): string | null {
+  let real: string;
+  try {
+    real = realpathSync(filePath);
+  } catch {
+    return null;
+  }
+  return real === rootReal || real.startsWith(rootReal + sep) ? real : null;
+}
+
+/**
+ * Visibility for a document ingested from an assistant. Defaults to the
+ * uploader's own principals — NOT tenant-public — so a chat-added document is
+ * never silently readable by everyone in the firm before a curator reviews it
+ * (PRD P0-2, P0-8). `visibility: 'public'` opts into tenant-wide reads; an
+ * explicit `principals` list overrides the default. Mirrors the workspace
+ * app's `aclFromForm`.
+ */
+function ingestAcl(
+  caller: Caller,
+  visibility: string | undefined,
+  principals: string[] | undefined,
+): Acl {
+  if (visibility === 'public') return { allowedPrincipals: ['*'] };
+  const explicit = (principals ?? []).map((p) => p.trim()).filter(Boolean);
+  return aclFromPrincipals(explicit.length > 0 ? explicit : caller.principals);
 }
 
 function chunksTextLength(chunks: Chunk[]): number {
@@ -203,6 +251,12 @@ export interface ServerOptions {
   audit?: AuditSink;
   /** Transport label recorded in audit events ("stdio" | "http"). */
   transport?: string;
+  /**
+   * Directory that `ingest_document` path reads are confined to. Defaults to
+   * `EKG_UPLOAD_ROOT`. The remote HTTP gateway should set this so a caller
+   * cannot read arbitrary host files by path; stdio leaves it unset.
+   */
+  ingestRoot?: string;
 }
 
 /** Collect entity ids (`id`/`entityId` fields) anywhere in a tool's payload. */
@@ -259,6 +313,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     options.resolveCaller ?? (() => options.caller ?? DEV_CALLER);
   const audit = options.audit ?? auditSinkFromEnv();
   const transport = options.transport ?? 'stdio';
+  const ingestRootReal = resolveIngestRoot(options.ingestRoot ?? process.env.EKG_UPLOAD_ROOT);
 
   const server = new McpServer({ name: 'ekg-mcp', version: '0.1.0' });
 
@@ -692,7 +747,10 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
       inputSchema: {
         path: z
           .string()
-          .describe('Path to the file on the machine running this MCP server'),
+          .describe(
+            'Path to the file to ingest. On the local (stdio) gateway, any path on your machine; ' +
+              'on the remote gateway, a path inside the configured upload directory (EKG_UPLOAD_ROOT).',
+          ),
         page: z
           .number()
           .int()
@@ -706,13 +764,52 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
             'Force sheet rendering for description. Drawing sheets are auto-detected from ' +
               'sheet-number filenames and scans; pass true for drawing PDFs that are not (e.g. DOT standard plans)',
           ),
+        visibility: z
+          .enum(['restricted', 'public'])
+          .optional()
+          .describe(
+            'Who may read the ingested document. "restricted" (default) limits it to you and your ' +
+              'groups until a curator widens it; "public" makes it readable by everyone in your firm.',
+          ),
+        principals: z
+          .array(z.string())
+          .optional()
+          .describe(
+            'When restricting, the exact principals allowed (e.g. ["user:priya","group:legal"]). ' +
+              'Defaults to your own identity.',
+          ),
       },
     },
-    async ({ path, page, describe }, extra) => {
+    async ({ path, page, describe, visibility, principals }, extra) => {
       const caller = resolveCaller(extra?.authInfo);
-      const filePath = isAbsolute(path) ? path : resolve(path);
+      let filePath = isAbsolute(path) ? path : resolve(path);
       if (!existsSync(filePath)) {
-        return asContent({ error: 'not_found', path: filePath });
+        // Don't echo the resolved server path — it leaks host filesystem layout
+        // to a remote caller.
+        return asContent({ error: 'not_found' });
+      }
+      // Confine the read: a remote caller must not read arbitrary host files via
+      // a supplied path (arbitrary-file-read / cross-tenant leak). With an
+      // ingest root configured (the HTTP gateway sets EKG_UPLOAD_ROOT), the file
+      // must resolve inside it (symlinks included); without one, any non-stdio
+      // transport refuses path ingest outright — fail closed. stdio is a single
+      // local user and reads local paths directly.
+      if (ingestRootReal) {
+        const confined = confineToRoot(filePath, ingestRootReal);
+        if (!confined) {
+          return asContent({
+            error: 'path_not_allowed',
+            detail: 'The file is outside the gateway upload directory.',
+          });
+        }
+        filePath = confined;
+      } else if (transport !== 'stdio') {
+        return asContent({
+          error: 'path_ingest_unavailable',
+          detail:
+            'Ingest-by-path is disabled on the remote gateway. Set EKG_UPLOAD_ROOT to a managed ' +
+            'upload directory, or upload through the workspace app.',
+        });
       }
       if (!KNOWN_EXTENSIONS.has(extname(filePath).toLowerCase())) {
         return asContent({
@@ -721,6 +818,10 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         });
       }
 
+      // Stamp the item ACL from the caller's request — restricted to the
+      // uploader by default, never silently tenant-public (PRD P0-2, P0-8).
+      const acl = ingestAcl(caller, visibility, principals);
+
       // OCR image-only PDFs when an engine is available so a scanned sheet's
       // description can be grounded and its text searched (review #1). Honest
       // no-op when no engine is installed — the scan stays needs-ocr.
@@ -728,6 +829,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
       const candidate = await buildCandidate(filePath, {
         tenantId: caller.tenantId,
         pipeline: 'mcp-gateway',
+        source: { system: 'mcp-gateway', acl },
         ...(ocr ? { ocr } : {}),
       });
       await store.upsertEntity(candidate.entity, candidate.chunks);

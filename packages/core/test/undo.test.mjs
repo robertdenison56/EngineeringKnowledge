@@ -302,3 +302,70 @@ test('undo is rejected once already undone', async () => {
   assert.equal(again.ok, false);
   assert.match(again.reason, /already undone/i);
 });
+
+test('undo of a merge restores an edge whose far endpoint is hidden from the actor (P0-7 data-loss)', async () => {
+  // The regression the journal-capture fix closes: the merge repoints every
+  // touching edge regardless of caller visibility, so capturing only
+  // caller-visible edges (the old neighbors-based path) lost a partially-visible
+  // one and undo could not restore it.
+  const raw = new InMemoryGraphStore();
+  const { store, journal, run } = harness(raw);
+  await raw.upsertEntity({ ...BASE, id: 'survivor', type: 'detail', title: 'Survivor' });
+  await raw.upsertEntity({ ...BASE, id: 'dup', type: 'detail', title: 'Duplicate' });
+  // A 'hidden' entity the merging curator (ENGINEER) cannot see, linked from dup.
+  await raw.upsertEntity({
+    ...BASE,
+    id: 'hidden',
+    type: 'standard',
+    title: 'Hidden',
+    acl: { allowedPrincipals: ['user:secret'] },
+  });
+  await raw.upsertRelationship({
+    id: 'e1',
+    tenantId: DEMO_TENANT,
+    type: 'references',
+    fromId: 'dup',
+    toId: 'hidden',
+  });
+
+  // ENGINEER genuinely cannot see the edge — its far endpoint is hidden.
+  assert.equal((await store.neighbors(ENGINEER, 'dup')).length, 0);
+
+  await run({ kind: 'merge-entities', caller: ENGINEER }, async () => {
+    await store.mergeEntities(ENGINEER, 'survivor', 'dup');
+  });
+  // The merge repointed the edge onto the survivor (visibility-independent).
+  assert.equal((await raw.getRelationship(DEMO_TENANT, 'e1')).fromId, 'survivor');
+
+  const opId = journal.list(DEMO_TENANT, 1)[0].id;
+  const res = await undoOperation(store, journal, opId, { caller: ENGINEER });
+  assert.ok(res.ok, res.reason);
+
+  // Undo restored the edge to its EXACT pre-merge endpoints — not deleted it,
+  // not left it repointed.
+  const restored = await raw.getRelationship(DEMO_TENANT, 'e1');
+  assert.ok(restored, 'edge to the hidden entity was restored, not lost');
+  assert.equal(restored.fromId, 'dup');
+  assert.equal(restored.toId, 'hidden');
+});
+
+test('same-millisecond operations order by insertion, not random id (undo-last hits the true latest)', async () => {
+  // Production stamps each op a random UUID id + a millisecond createdAt, so two
+  // ops in the same ms must NOT tie-break by id (that's random) — "undo last"
+  // would otherwise target the wrong one. Ids are chosen so an id tie-break would
+  // (wrongly) make the FIRST op newest.
+  const raw = new InMemoryGraphStore();
+  const { store, journal, run } = harness(raw);
+  const SAME = '2026-06-25T00:00:00.000Z';
+  await run({ id: 'zzz-first', createdAt: SAME, kind: 'capture-knowledge' }, async () => {
+    await store.upsertEntity({ ...BASE, id: 'e-a', type: 'project', title: 'A' });
+  });
+  await run({ id: 'aaa-second', createdAt: SAME, kind: 'capture-knowledge' }, async () => {
+    await store.upsertEntity({ ...BASE, id: 'e-b', type: 'project', title: 'B' });
+  });
+  assert.equal(
+    journal.list(DEMO_TENANT, 1)[0].id,
+    'aaa-second',
+    'the later-inserted op is newest despite a lexicographically smaller id',
+  );
+});

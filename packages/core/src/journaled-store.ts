@@ -65,6 +65,12 @@ export class JournaledGraphStore implements GraphStore {
   neighbors(caller: Caller, entityId: string, type?: RelationshipType): Promise<NeighborHit[]> {
     return this.inner.neighbors(caller, entityId, type);
   }
+  getRelationship(tenantId: string, id: string): Promise<Relationship | undefined> {
+    return this.inner.getRelationship(tenantId, id);
+  }
+  relationshipsTouching(tenantId: string, ids: string[]): Promise<Relationship[]> {
+    return this.inner.relationshipsTouching(tenantId, ids);
+  }
   getSetting(tenantId: string, key: string): Promise<string | undefined> {
     return this.inner.getSetting(tenantId, key);
   }
@@ -192,24 +198,24 @@ export class JournaledGraphStore implements GraphStore {
 
   /* ── capture helpers ──────────────────────────────────────────────────── */
 
-  /** All edges (both directions) touching any of the given entity ids, deduped. */
+  /**
+   * Every edge touching any of the given ids — captured tenant-scoped and
+   * visibility-INDEPENDENT. The inner merge/delete repoints or drops every
+   * touching edge regardless of what `caller` can see, so capturing via the
+   * caller-trimmed `neighbors`/`listRelationships` would silently miss a
+   * partially-visible edge (far endpoint hidden from the caller) and undo would
+   * lose it instead of restoring it.
+   */
   private async edgesTouching(caller: Caller, ...ids: string[]): Promise<Relationship[]> {
-    const out = new Map<string, Relationship>();
-    for (const id of ids) {
-      for (const hit of await this.inner.neighbors(caller, id)) {
-        out.set(hit.relationship.id, hit.relationship);
-      }
-    }
-    return [...out.values()];
+    return this.inner.relationshipsTouching(caller.tenantId, ids);
   }
 
-  /** Current stored relationship matching `rel.id`, if visible to the caller. */
+  /** Current stored relationship matching `rel.id` — tenant-scoped, not trimmed. */
   private async findRelationship(caller: Caller, rel: Relationship): Promise<Relationship | undefined> {
-    const hits = await this.inner.neighbors(caller, rel.fromId);
-    return hits.find((h) => h.relationship.id === rel.id)?.relationship;
+    return this.inner.getRelationship(caller.tenantId, rel.id);
   }
 
   private async findRelationshipById(caller: Caller, id: string): Promise<Relationship | undefined> {
-    return (await this.inner.listRelationships(caller)).find((r) => r.id === id);
+    return this.inner.getRelationship(caller.tenantId, id);
   }
 }

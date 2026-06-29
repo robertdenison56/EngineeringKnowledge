@@ -189,6 +189,18 @@ function ftsQuery(groups: string[][]): string {
 
 const RRF_K = 60;
 
+/**
+ * Weighted reciprocal-rank fusion: a deep passage co-occurrence (chunk FTS — the
+ * identifier/section wedge) and BM25 (entity FTS) are stronger precision signals
+ * than a loose substring match, so they fuse heavier; graph-expanded neighbors
+ * fuse lightest so they never outrank a direct concept match. Plain RRF is the
+ * all-1 special case.
+ */
+const RRF_WEIGHTS = { lexical: 1, fts: 1.5, chunkFts: 2, dense: 1.2, expanded: 0.4 };
+
+/** How many of the strongest base matches we expand 1-hop neighbors from. */
+const EXPAND_FROM = 6;
+
 export interface SqliteStoreOptions {
   /** Optional dense-retrieval provider; lexical-only without it. */
   embeddings?: EmbeddingProvider;
@@ -209,6 +221,14 @@ export class SqliteGraphStore implements GraphStore {
 
   constructor(path: string, options: SqliteStoreOptions = {}) {
     this.db = new DatabaseSync(path);
+    // Concurrency + durability for the documented shared-DB story: the workspace
+    // app and the MCP gateway open the same file at once (README "full loop").
+    // WAL lets a reader and a writer coexist instead of one blocking the other;
+    // busy_timeout makes a contended write wait briefly rather than throwing
+    // SQLITE_BUSY. Pragmas are per-connection, so set them on every open. (WAL is
+    // a no-op on :memory: databases, which is fine.)
+    this.db.exec('PRAGMA journal_mode = WAL');
+    this.db.exec('PRAGMA busy_timeout = 5000');
     this.embeddings = options.embeddings;
     // Migrations for databases created before newer columns existed; must
     // run before SCHEMA so CREATE INDEX statements find current shape.
@@ -634,11 +654,39 @@ export class SqliteGraphStore implements GraphStore {
       }
     }
 
-    // Reciprocal-rank fusion + review-status adjustment.
+    // Weighted reciprocal-rank fusion + review-status adjustment.
     const fused = new Map<string, number>();
-    for (const list of [lexical, fts, chunkFts, dense]) {
-      list.forEach((id, rank) => fused.set(id, (fused.get(id) ?? 0) + 1 / (RRF_K + rank + 1)));
+    const addList = (ids: string[], weight: number) =>
+      ids.forEach((id, rank) => fused.set(id, (fused.get(id) ?? 0) + weight / (RRF_K + rank + 1)));
+    addList(lexical, RRF_WEIGHTS.lexical);
+    addList(fts, RRF_WEIGHTS.fts);
+    addList(chunkFts, RRF_WEIGHTS.chunkFts);
+    addList(dense, RRF_WEIGHTS.dense);
+
+    // Graph-expansion (the GraphRAG payoff): surface 1-hop neighbors of the
+    // strongest matches — a hit on a spec section pulls in the detail it
+    // references, an expert pulls in their projects. Gated on a non-empty honest
+    // admission, so no_results stays no_results (P0-8); neighbors are trimmed to
+    // the caller's visible, type/tag-filtered set (`byId`) and join at a low
+    // weight, so they rank below every direct concept match.
+    if (options.expand !== false && admitted.size > 0) {
+      const topBase = [...fused.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, EXPAND_FROM)
+        .map(([id]) => id);
+      const freq = new Map<string, number>();
+      for (const id of topBase) {
+        for (const hit of await this.neighbors(caller, id)) {
+          const nid = hit.entity.id;
+          if (admitted.has(nid) || !byId.has(nid)) continue;
+          freq.set(nid, (freq.get(nid) ?? 0) + 1);
+        }
+      }
+      const expanded = [...freq.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+      for (const id of expanded) admitted.add(id);
+      addList(expanded, RRF_WEIGHTS.expanded);
     }
+
     const ranked = [...fused.entries()]
       .filter(([id]) => admitted.has(id))
       .map(([id, score]) => {
@@ -706,6 +754,26 @@ export class SqliteGraphStore implements GraphStore {
       if (from && to) out.push(rel);
     }
     return out;
+  }
+
+  // ── journal capture (tenant-scoped, NOT ACL-trimmed; see GraphStore docs) ──
+
+  async getRelationship(tenantId: string, id: string): Promise<Relationship | undefined> {
+    const row = this.db
+      .prepare('SELECT * FROM relationships WHERE tenant_id = ? AND id = ?')
+      .get(tenantId, id) as unknown as RelationshipRow | undefined;
+    return row ? rowToRelationship(row) : undefined;
+  }
+
+  async relationshipsTouching(tenantId: string, ids: string[]): Promise<Relationship[]> {
+    if (ids.length === 0) return [];
+    const ph = ids.map(() => '?').join(', ');
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM relationships WHERE tenant_id = ? AND (from_id IN (${ph}) OR to_id IN (${ph}))`,
+      )
+      .all(tenantId, ...ids, ...ids) as unknown as RelationshipRow[];
+    return rows.map(rowToRelationship);
   }
 
   async neighbors(

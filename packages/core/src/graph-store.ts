@@ -48,6 +48,14 @@ export interface SearchOptions {
    * the already-admitted candidate set, never a filter (PRD P0-8).
    */
   boostRole?: RetrievalRole;
+  /**
+   * Graph-expansion: also surface 1-hop neighbors of the strongest matches (the
+   * knowledge-graph payoff — a query that lands on a spec section can surface
+   * the detail it references). Defaults on. Expansion only fires when the honest
+   * gate already admitted a direct match, and neighbors join at a low weight, so
+   * no_results stays no_results and a neighbor never outranks a real match (P0-8).
+   */
+  expand?: boolean;
 }
 
 export interface NeighborHit {
@@ -123,6 +131,22 @@ export interface GraphStore {
   listRelationships(caller: Caller): Promise<Relationship[]>;
   /** Follow relationships from an entity (MCP `traverse` tool, PRD P0-3). */
   neighbors(caller: Caller, entityId: string, type?: RelationshipType): Promise<NeighborHit[]>;
+  /**
+   * The relationship with `id` in the tenant, WITHOUT ACL trimming — distinct
+   * from the caller-scoped reads above. Used only by the undo journal to capture
+   * the exact pre-state of an edge a privileged merge/edit will mutate, since
+   * those mutations are themselves visibility-independent. Never a user read.
+   */
+  getRelationship(tenantId: string, id: string): Promise<Relationship | undefined>;
+  /**
+   * Every relationship touching any of `ids` within the tenant, WITHOUT ACL
+   * trimming — the journal-capture counterpart to {@link neighbors}. A merge or
+   * delete repoints/drops every touching edge regardless of the caller's
+   * visibility, so undo must snapshot the same superset or it would silently
+   * lose a partially-visible edge (one whose far endpoint the caller can't see).
+   * Never a user read.
+   */
+  relationshipsTouching(tenantId: string, ids: string[]): Promise<Relationship[]>;
   /**
    * Tenant-scoped workspace settings — a small key→value store for config
    * that belongs to the firm rather than the graph (e.g. the firm's display

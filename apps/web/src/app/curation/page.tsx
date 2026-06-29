@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { Entity } from '@ekg/core';
-import { DEV_CALLER, getStore, listRecentOperations } from '../../lib/store';
+import { getCaller, getStore, listRecentOperations } from '../../lib/store';
 import { AccessBadge, ProvenanceLine, TypeBadge, entityHref } from '../../components/ui';
 import { rejectEntity, verifyEntity } from './actions';
 import { UndoLastButton } from './UndoLastButton';
@@ -45,7 +45,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function CurationPage() {
   const store = await getStore();
-  const all = await store.list(DEV_CALLER, { limit: 500 });
+  const caller = await getCaller();
+  const all = await store.list(caller, { limit: 500 });
   const queue = all.filter((e) => e.provenance.reviewStatus === 'unverified');
   const recent = (await listRecentOperations(8)).map((o) => ({
     id: o.id,

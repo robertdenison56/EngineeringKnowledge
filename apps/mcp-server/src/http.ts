@@ -41,6 +41,17 @@ export async function startHttp(): Promise<void> {
   }
   const port = Number(process.env.EKG_PORT ?? 8787);
 
+  // The remote gateway must not read arbitrary host files from a network-
+  // supplied path. `ingest_document` path reads are confined to EKG_UPLOAD_ROOT;
+  // when it is unset they are refused entirely (documents are added through the
+  // workspace app instead). Surface that so an admin isn't surprised.
+  if (!process.env.EKG_UPLOAD_ROOT) {
+    console.error(
+      'ekg-mcp: EKG_UPLOAD_ROOT is not set — ingest_document path reads are disabled over HTTP. ' +
+        'Set it to a managed upload directory to enable ingest-by-path.',
+    );
+  }
+
   // One store and one audit sink, shared across every request — identity is
   // per-request (from the token), these are not. The store is built once so we
   // never re-seed per connection; the sink is shared so all sessions append to

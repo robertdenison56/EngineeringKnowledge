@@ -9,8 +9,8 @@ import {
   type RetrievalRole,
 } from '@ekg/core';
 import {
-  DEV_CALLER,
   FIRM_NAME_KEY,
+  getCaller,
   getRoles,
   getStore,
   isAdmin,
@@ -19,10 +19,10 @@ import {
 } from '../../lib/store';
 
 /**
- * Settings mutations. Like the curation actions, these run as the dev caller;
- * production gates them behind the admin role from Entra SSO. The admin check
- * here is the real authorization boundary — it is enforced server-side, not
- * just hidden in the UI.
+ * Settings mutations. Like the curation actions, these resolve the request's
+ * authenticated caller ({@link getCaller}) and gate on the admin role. The admin
+ * check here is the real authorization boundary — it is enforced server-side,
+ * not just hidden in the UI.
  */
 
 export interface FirmNameState {
@@ -38,7 +38,8 @@ export async function setFirmName(
   _prev: FirmNameState,
   formData: FormData,
 ): Promise<FirmNameState> {
-  if (!isAdmin(DEV_CALLER)) {
+  const caller = await getCaller();
+  if (!isAdmin(caller)) {
     return { ok: false, message: 'Only an admin can change the firm name.' };
   }
 
@@ -52,7 +53,7 @@ export async function setFirmName(
 
   const store = await getStore();
   await runAsOperation({ label: `Set firm name to “${firmName}”`, kind: 'set-firm-name' }, async () => {
-    await store.setSetting(DEV_CALLER.tenantId, FIRM_NAME_KEY, firmName);
+    await store.setSetting(caller.tenantId, FIRM_NAME_KEY, firmName);
   });
 
   // Refresh the header badge everywhere (it lives in the root layout) and the
@@ -130,7 +131,8 @@ function roleFromForm(formData: FormData, id: string): RetrievalRole | { error: 
 }
 
 export async function createRole(_prev: RoleFormState, formData: FormData): Promise<RoleFormState> {
-  if (!isAdmin(DEV_CALLER)) return { ok: false, message: 'Only an admin can manage roles.' };
+  const caller = await getCaller();
+  if (!isAdmin(caller)) return { ok: false, message: 'Only an admin can manage roles.' };
 
   const roles = await getRoles();
   const name = String(formData.get('name') ?? '').trim();
@@ -154,7 +156,8 @@ export async function createRole(_prev: RoleFormState, formData: FormData): Prom
 }
 
 export async function updateRole(_prev: RoleFormState, formData: FormData): Promise<RoleFormState> {
-  if (!isAdmin(DEV_CALLER)) return { ok: false, message: 'Only an admin can manage roles.' };
+  const caller = await getCaller();
+  if (!isAdmin(caller)) return { ok: false, message: 'Only an admin can manage roles.' };
 
   const id = String(formData.get('id') ?? '');
   const roles = await getRoles();
@@ -171,7 +174,8 @@ export async function updateRole(_prev: RoleFormState, formData: FormData): Prom
 }
 
 export async function deleteRole(formData: FormData): Promise<void> {
-  if (!isAdmin(DEV_CALLER)) return;
+  const caller = await getCaller();
+  if (!isAdmin(caller)) return;
   const id = String(formData.get('id') ?? '');
   const roles = await getRoles();
   const removed = roles.find((r) => r.id === id);
@@ -186,7 +190,8 @@ export async function deleteRole(formData: FormData): Promise<void> {
 
 /** One-click seed: add any suggested roles whose id is not already present. */
 export async function addSuggestedRoles(): Promise<void> {
-  if (!isAdmin(DEV_CALLER)) return;
+  const caller = await getCaller();
+  if (!isAdmin(caller)) return;
   const roles = await getRoles();
   const have = new Set(roles.map((r) => r.id));
   const additions = SUGGESTED_ROLES.filter((r) => !have.has(r.id));

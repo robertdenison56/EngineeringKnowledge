@@ -14,7 +14,7 @@ import { spawn } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -73,6 +73,25 @@ async function waitReady() {
 // Audit to a temp file so we can assert the per-request, per-principal P0-7
 // trail (cleaned up on exit).
 const auditPath = join(tmpdir(), `ekg-audit-smoke-http-${process.pid}.jsonl`);
+
+// A managed upload root for the ingest_document confinement checks (P0
+// security): an in-root file may be ingested; a path outside it is refused so a
+// network caller cannot read arbitrary host files.
+const workDir = mkdtempSync(join(tmpdir(), 'ekg-ingest-'));
+const uploadRoot = join(workDir, 'uploads');
+mkdirSync(uploadRoot);
+const insideFile = join(uploadRoot, 'curtain-wall-lesson.txt');
+writeFileSync(insideFile, 'Lesson: seal curtain wall firestop gaps per spec section 07 84 00 at Riverside.');
+const insidePublicFile = join(uploadRoot, 'public-standard-note.txt');
+writeFileSync(insidePublicFile, 'General note: all firestop assemblies follow ASTM E814.');
+const outsideFile = join(workDir, 'host-secret.txt');
+writeFileSync(outsideFile, 'SHOULD NOT BE INGESTIBLE OVER HTTP');
+
+function cleanup() {
+  rmSync(auditPath, { force: true });
+  rmSync(workDir, { recursive: true, force: true });
+}
+
 const child = spawn(process.execPath, [join(root, 'dist/index.js')], {
   env: {
     ...process.env,
@@ -81,6 +100,7 @@ const child = spawn(process.execPath, [join(root, 'dist/index.js')], {
     EKG_PORT: PORT,
     EKG_DB_PATH: '',
     EKG_AUDIT_LOG: auditPath,
+    EKG_UPLOAD_ROOT: uploadRoot,
   },
   stdio: ['ignore', 'inherit', 'inherit'],
 });
@@ -160,6 +180,40 @@ try {
   const otherSearch = body(await other.callTool({ name: 'search', arguments: { query: 'curtain wall firestop' } }));
   assert(otherSearch.no_results === true, 'cross-tenant token retrieves nothing (tenant isolation)');
 
+  // --- ingest_document: path confinement + default-restricted ACL (P0 security) ---
+  // A file inside the configured upload root ingests as an unverified candidate.
+  const ingOk = body(await engineer.callTool({ name: 'ingest_document', arguments: { path: insideFile } }));
+  assert(ingOk.status === 'queued_unverified' && ingOk.id, 'in-root file ingests as an unverified candidate');
+
+  // The uploader can read it back...
+  const ownerFetch = body(await engineer.callTool({ name: 'fetch', arguments: { id: ingOk.id } }));
+  assert(ownerFetch.id === ingOk.id, 'uploader can fetch their own ingested document');
+
+  // ...but another principal in the SAME tenant cannot — it is NOT tenant-public
+  // by default (the headline P0 fix: chat-ingested docs are no longer world-readable).
+  const legalSeesIngest = body(await legal.callTool({ name: 'fetch', arguments: { id: ingOk.id } }));
+  assert(
+    legalSeesIngest.error === 'not_found',
+    'chat-ingested doc is NOT readable by other tenant principals by default (no default-public ACL)',
+  );
+
+  // A path OUTSIDE the upload root is refused — no arbitrary host file read (LFI).
+  const ingOutside = body(await engineer.callTool({ name: 'ingest_document', arguments: { path: outsideFile } }));
+  assert(ingOutside.error === 'path_not_allowed', 'path outside the upload root is refused (LFI blocked)');
+
+  // ...including traversal that climbs out of the root.
+  const ingTraversal = body(
+    await engineer.callTool({ name: 'ingest_document', arguments: { path: join(uploadRoot, '..', 'host-secret.txt') } }),
+  );
+  assert(ingTraversal.error === 'path_not_allowed', 'traversal out of the upload root is refused (LFI blocked)');
+
+  // Explicit visibility:'public' opts back in to tenant-wide reads.
+  const ingPublic = body(
+    await engineer.callTool({ name: 'ingest_document', arguments: { path: insidePublicFile, visibility: 'public' } }),
+  );
+  const legalSeesPublic = body(await legal.callTool({ name: 'fetch', arguments: { id: ingPublic.id } }));
+  assert(legalSeesPublic.id === ingPublic.id, "visibility:'public' makes the doc readable tenant-wide");
+
   // --- Audit trail (PRD P0-7): events are attributed to the calling token ---
   // Close clients first so every request's synchronous audit write has landed.
   for (const c of clients) await c.close().catch(() => {});
@@ -196,13 +250,13 @@ try {
   );
 
   console.log('smoke-http: all checks passed');
-  rmSync(auditPath, { force: true });
+  cleanup();
   child.kill();
   process.exit(0);
 } catch (err) {
   console.error(String(err));
   for (const c of clients) await c.close().catch(() => {});
-  rmSync(auditPath, { force: true });
+  cleanup();
   child.kill();
   process.exit(1);
 }

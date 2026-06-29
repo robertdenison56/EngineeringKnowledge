@@ -86,7 +86,7 @@ const FIELD_ALIASES: Record<string, keyof ProjectRow> = {
  * exports work. Rows missing a project name are reported and skipped.
  */
 export function parseProjectCsv(text: string): ProjectCsvParse {
-  const records = parseDelimited(text);
+  const { records, errors: parseErrors } = parseDelimited(text);
   if (records.length === 0) {
     return { rows: [], errors: [{ line: 1, message: 'file is empty' }], recognized: [], ignored: [] };
   }
@@ -117,7 +117,9 @@ export function parseProjectCsv(text: string): ProjectCsvParse {
   }
 
   const rows: ProjectRow[] = [];
-  const errors: Array<{ line: number; message: string }> = [];
+  // Surface structural parse errors (e.g. an unterminated quote) alongside the
+  // per-row validation errors below.
+  const errors: Array<{ line: number; message: string }> = [...parseErrors];
 
   for (let i = 1; i < records.length; i++) {
     const { cells, line } = records[i];
@@ -233,16 +235,41 @@ interface CsvRecord {
 }
 
 /**
+ * True when a quoted field opened just after `start` has a real closing quote
+ * before EOF (skipping `""` escapes). Lets the reader recognize an UNTERMINATED
+ * quote up front and recover from it, instead of letting an unclosed quote
+ * swallow the rest of the file into one field.
+ */
+function quoteCloses(body: string, start: number): boolean {
+  for (let j = start; j < body.length; j++) {
+    if (body[j] === '"') {
+      if (body[j + 1] === '"') {
+        j++; // a "" escape, not a close
+        continue;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Minimal RFC-4180 reader. Auto-detects comma vs tab from the header line.
  * Handles quoted fields with embedded delimiters, newlines, and `""` escapes;
- * tolerates both CRLF and LF.
+ * tolerates both CRLF and LF. An unterminated quote is recovered (treated as a
+ * literal so following rows still parse) and surfaced via `errors`, never
+ * silently swallowed.
  */
-function parseDelimited(text: string): CsvRecord[] {
+function parseDelimited(text: string): {
+  records: CsvRecord[];
+  errors: Array<{ line: number; message: string }>;
+} {
   const body = text.replace(/^﻿/, ''); // strip BOM
   const firstLine = body.slice(0, body.search(/\r?\n|$/));
   const delimiter = firstLine.includes('\t') && !firstLine.includes(',') ? '\t' : ',';
 
   const records: CsvRecord[] = [];
+  const errors: Array<{ line: number; message: string }> = [];
   let cells: string[] = [];
   let field = '';
   let inQuotes = false;
@@ -281,7 +308,19 @@ function parseDelimited(text: string): CsvRecord[] {
       continue;
     }
     if (ch === '"') {
-      inQuotes = true;
+      if (quoteCloses(body, i + 1)) {
+        inQuotes = true;
+      } else {
+        // Unterminated quote: never swallow the file's tail into one field.
+        // Recover by treating this quote as a literal — so newlines still break
+        // the following rows — and report the malformation (the parser's
+        // "malformed rows are reported, never guessed" contract).
+        field += '"';
+        errors.push({
+          line,
+          message: 'unterminated quoted field — the opening quote is never closed',
+        });
+      }
     } else if (ch === delimiter) {
       pushField();
     } else if (ch === '\r') {
@@ -298,5 +337,5 @@ function parseDelimited(text: string): CsvRecord[] {
   if (startedRecord || field !== '' || cells.length > 0) {
     pushRecord(recordLine);
   }
-  return records;
+  return { records, errors };
 }

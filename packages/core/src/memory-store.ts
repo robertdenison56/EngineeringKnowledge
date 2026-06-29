@@ -184,6 +184,23 @@ export class InMemoryGraphStore implements GraphStore {
     return out;
   }
 
+  // ── journal capture (tenant-scoped, NOT ACL-trimmed; see GraphStore docs) ──
+
+  async getRelationship(tenantId: string, id: string): Promise<Relationship | undefined> {
+    const rel = this.relationships.get(id);
+    return rel && rel.tenantId === tenantId ? rel : undefined;
+  }
+
+  async relationshipsTouching(tenantId: string, ids: string[]): Promise<Relationship[]> {
+    const idSet = new Set(ids);
+    const out: Relationship[] = [];
+    for (const rel of this.relationships.values()) {
+      if (rel.tenantId !== tenantId) continue;
+      if (idSet.has(rel.fromId) || idSet.has(rel.toId)) out.push(rel);
+    }
+    return out;
+  }
+
   async deleteEntity(caller: Caller, id: string): Promise<boolean> {
     const entity = this.entities.get(id);
     if (!entity || !canRead(caller, entity)) return false;

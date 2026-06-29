@@ -103,7 +103,7 @@ export class SqliteOperationJournal implements OperationJournal {
         .prepare(
           `SELECT id FROM operations
            WHERE tenant_id = ? AND status = 'active'
-           ORDER BY created_at DESC, id DESC
+           ORDER BY created_at DESC, rowid DESC
            LIMIT -1 OFFSET ?`,
         )
         .all(op.tenant_id, keep) as unknown as { id: string }[];
@@ -126,7 +126,7 @@ export class SqliteOperationJournal implements OperationJournal {
         `SELECT o.*, (SELECT COUNT(*) FROM operation_entries e WHERE e.op_id = o.id) AS entry_count
          FROM operations o
          WHERE o.tenant_id = ? AND o.status = 'active'
-         ORDER BY o.created_at DESC, o.id DESC
+         ORDER BY o.created_at DESC, o.rowid DESC
          LIMIT ?`,
       )
       .all(tenantId, limit ?? -1) as unknown as OpRow[];

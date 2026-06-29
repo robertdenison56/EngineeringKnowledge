@@ -1,12 +1,13 @@
-import { DEV_CALLER, getRoles, getStore } from '../../lib/store';
+import { getCaller, getRoles, getStore } from '../../lib/store';
 import GraphMap from '../../components/GraphMap';
 
 export const dynamic = 'force-dynamic';
 
 export default async function MapPage() {
   const store = await getStore();
-  const entities = await store.list(DEV_CALLER, { limit: 1000 });
-  const relationships = await store.listRelationships(DEV_CALLER);
+  const caller = await getCaller();
+  const entities = await store.list(caller, { limit: 1000 });
+  const relationships = await store.listRelationships(caller);
   const roles = await getRoles();
 
   const nodes = entities.map((e) => ({

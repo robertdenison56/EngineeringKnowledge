@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { isPublicAcl, type Entity, type NeighborHit } from '@ekg/core';
-import { DEV_CALLER, getStore, isCurator } from '../../../lib/store';
+import type { SheetFacts } from '@ekg/ingestion';
+import { getCaller, getStore, isCurator } from '../../../lib/store';
+import { SheetStructure } from '../../../components/SheetStructure';
+import { LifecycleControls } from '../../../components/LifecycleControls';
 import {
   AccessBadge,
   ProvenanceLine,
@@ -71,18 +74,19 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId);
   const store = await getStore();
-  const entity = await store.getEntity(DEV_CALLER, id);
+  const caller = await getCaller();
+  const entity = await store.getEntity(caller, id);
   if (!entity) notFound();
   const [neighbors, chunks] = await Promise.all([
-    store.neighbors(DEV_CALLER, id),
-    store.getChunks(DEV_CALLER, id),
+    store.neighbors(caller, id),
+    store.getChunks(caller, id),
   ]);
 
-  const canCurate = isCurator(DEV_CALLER);
+  const canCurate = isCurator(caller);
   // Merge candidates are the other entities of this type — duplicates are
   // almost always same-type; keeping the picker scoped keeps it legible.
   const mergeCandidates: MergeCandidate[] = canCurate
-    ? (await store.list(DEV_CALLER, { types: [entity.type], limit: 200 }))
+    ? (await store.list(caller, { types: [entity.type], limit: 200 }))
         .filter((e) => e.id !== entity.id)
         .map((e) => ({
           id: e.id,
@@ -96,7 +100,10 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
   const supersededBy = neighbors.find(
     (n) => n.relationship.type === 'supersedes' && n.direction === 'in',
   );
-  const properties = Object.entries(entity.properties);
+  // The deterministic CAD/spec parse is surfaced in its own panel below, so keep
+  // it out of the raw key/value dump (it renders cleanly, not as a JSON blob).
+  const parserFacts = entity.properties.parserFacts as SheetFacts | undefined;
+  const properties = Object.entries(entity.properties).filter(([k]) => k !== 'parserFacts');
 
   return (
     <>
@@ -126,7 +133,9 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
       {entity.summary ? <p className="summary">{entity.summary}</p> : null}
       <TagChips tags={entity.tags} />
       <ProvenanceLine entity={entity} />
+      <SheetStructure anchor={entity.provenance.anchor} facts={parserFacts} />
       {canCurate ? <EntityEditor entity={entity} mergeCandidates={mergeCandidates} /> : null}
+      {canCurate ? <LifecycleControls entity={entity} mergeCandidates={mergeCandidates} /> : null}
       {entity.content ? (
         <details className="doc-panel">
           <summary>

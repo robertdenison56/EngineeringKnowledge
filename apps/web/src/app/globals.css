@@ -1601,3 +1601,109 @@ html[data-theme='dark'] .access-badge {
   color: #fbbf24;
   border-color: #854d0e;
 }
+
+/* Drawing / spec structure — the deterministic CAD parse made visible (P0-2a) */
+.sheet-structure {
+  margin: 1rem 0;
+  padding: var(--card-pad);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+}
+.sheet-structure-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.sheet-structure-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.sheet-anchors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+.anchor-pill {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  border: 1px solid var(--chip-border);
+  white-space: nowrap;
+}
+.sheet-structure-title {
+  margin: 0.6rem 0 0;
+  font-weight: 600;
+  color: var(--text);
+}
+.fact-grid {
+  display: grid;
+  gap: 0.4rem 0.9rem;
+  margin-top: 0.7rem;
+}
+.fact-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+.fact-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+.fact-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.fact-chip {
+  font-size: 0.78rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+/* Lifecycle controls — supersede / deprecate / restore (gap G5) */
+.lifecycle-panel {
+  margin: 0.6rem 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.lifecycle-panel > summary {
+  cursor: pointer;
+  padding: 0.55rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.lifecycle-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.2rem 0.9rem 0.9rem;
+}
+.lifecycle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.lifecycle-row select {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}

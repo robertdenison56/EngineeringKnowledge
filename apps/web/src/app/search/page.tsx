@@ -1,5 +1,5 @@
 import { ENTITY_TYPES, entityMatchesRole, type SearchHit } from '@ekg/core';
-import { DEV_CALLER, getRole, getRoles, getStore } from '../../lib/store';
+import { getCaller, getRole, getRoles, getStore } from '../../lib/store';
 import { EntityCard } from '../../components/ui';
 
 export default async function SearchPage({
@@ -9,6 +9,7 @@ export default async function SearchPage({
 }) {
   const { q = '', type = '', tag = '', role = '' } = await searchParams;
   const store = await getStore();
+  const caller = await getCaller();
   const types = type ? [type] : undefined;
   const tags = tag ? [tag] : undefined;
 
@@ -17,11 +18,11 @@ export default async function SearchPage({
 
   let hits: SearchHit[];
   if (q) {
-    hits = await store.search(DEV_CALLER, q, { types, tags, limit: 25, boostRole: activeRole });
+    hits = await store.search(caller, q, { types, tags, limit: 25, boostRole: activeRole });
   } else {
     // Browse has no relevance score to boost, but a role still focuses the view:
     // surface the items it favors first.
-    const listed = await store.list(DEV_CALLER, { types, tags, limit: 50 });
+    const listed = await store.list(caller, { types, tags, limit: 50 });
     const ordered = activeRole
       ? [
           ...listed.filter((e) => entityMatchesRole(e, activeRole)),

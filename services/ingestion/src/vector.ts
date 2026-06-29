@@ -579,9 +579,31 @@ export async function extractVectorContent(
     const pageLimit = Math.min(doc.numPages, options.maxPages ?? MAX_PAGES_CEILING);
     for (let p = 1; p <= pageLimit; p++) {
       const page = await doc.getPage(p);
-      const [x0, y0, x1, y1] = page.view;
-      const width = x1 - x0;
-      const height = y1 - y0;
+      // Normalize every position through pdf.js's own viewport transform, which
+      // folds in the view origin (a non-zero CropBox/MediaBox offset — pervasive
+      // on large-format ARCH-E/civil sheets) AND the page /Rotate (90/180/270 —
+      // pervasive on civil/structural sets). We re-flip to the y-up,
+      // title-block-at-low-y convention the band/reading-order logic expects. A
+      // 0-origin, unrotated page reduces to identity, so existing fixtures are
+      // unaffected; without this, geometry-derived claims on offset or rotated
+      // sheets land on the wrong axis/band with no test catching it.
+      const viewport = page.getViewport({ scale: 1 });
+      const width = viewport.width;
+      const height = viewport.height;
+      const vt = viewport.transform;
+      const normPoint = (px: number, py: number): [number, number] => {
+        const dx = vt[0] * px + vt[2] * py + vt[4];
+        const dy = vt[1] * px + vt[3] * py + vt[5];
+        // Viewport device space is y-down, top-left origin; flip back to y-up.
+        return [dx, height - dy];
+      };
+      const normBbox = (
+        b: [number, number, number, number],
+      ): [number, number, number, number] => {
+        const [ax, ay] = normPoint(b[0], b[1]);
+        const [cx, cy] = normPoint(b[2], b[3]);
+        return [Math.min(ax, cx), Math.min(ay, cy), Math.max(ax, cx), Math.max(ay, cy)];
+      };
 
       // Operator-list walk only when needed (layer attribution or strokes)
       // and only within the decode budget — deep pages get text, not geometry.
@@ -618,10 +640,11 @@ export async function extractVectorContent(
         const str = item.str as string;
         if (typeof str !== 'string') continue;
         const tm = item.transform as number[];
+        const [nx, ny] = normPoint(tm[4], tm[5]);
         texts.push({
           str,
-          x: tm[4],
-          y: tm[5],
+          x: nx,
+          y: ny,
           width: (item.width as number) ?? 0,
           height: (item.height as number) ?? 0,
           ...(currentLayer ? { layer: currentLayer } : {}),
@@ -633,12 +656,17 @@ export async function extractVectorContent(
         for (const t of texts) delete t.layer;
       }
 
+      // Normalize stroke geometry to the same view-relative, rotation-corrected
+      // space as the text, so text↔stroke correlation (dimension labels next to
+      // dimension lines, etc.) stays valid on offset/rotated sheets.
+      const strokes = (decoded?.strokes ?? []).map((s) => ({ ...s, bbox: normBbox(s.bbox) }));
+
       const vectorPage: VectorPage = {
         pageNumber: p,
         width,
         height,
         texts,
-        strokes: decoded?.strokes ?? [],
+        strokes,
         orderedText: orderTexts(texts),
         titleBlock: harvestTitleBlock(texts, height),
       };
