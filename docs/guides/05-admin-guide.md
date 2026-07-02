@@ -143,8 +143,12 @@ place and don't move. (See [`auth.ts`](../../apps/mcp-server/src/auth.ts) and th
 
 ## Audit logging
 
-Every tool call emits exactly one audit event, wired at the handler boundary so
-no tool can be added without being audited (PRD P0-7). Set a destination:
+Every gateway tool call emits exactly one audit event, wired at the handler
+boundary so no tool can be added without being audited — and every **workspace
+app mutation** (verify, reject, restore, edit, ACL change, lifecycle change,
+merge, relationship change, capture, upload, settings) emits an event with the
+same schema, so one trail covers every surface that can read or change firm
+knowledge (PRD P0-7). Set a destination:
 
 ```sh
 EKG_AUDIT_LOG=/var/log/ekg/audit.jsonl
@@ -159,10 +163,11 @@ them — they're never silently dropped). Each event is one JSON line:
 | `tenantId` | Tenant the caller belongs to. |
 | `principal` | The calling user (the token subject). |
 | `tool` | Tool invoked, e.g. `search`. |
-| `transport` | `http` or `stdio`. |
+| `transport` | `http` or `stdio` (gateway) or `web` (workspace-app mutation). |
 | `args` | Redacted argument summary (long strings clipped) — enough to know what was asked. |
 | `resultIds` | Ids of the entities surfaced to the caller. |
 | `outcome` | `ok`, `no_results`, or `error`. |
+| `snapshot` | Destructive app actions (reject, merge) carry the removed entity, so a curator mistake is recoverable from the trail. |
 
 This is what satisfies client-confidentiality and insurance audits ("who asked
 what, through which gateway, and what came back"), and it's also the richest
@@ -236,8 +241,12 @@ Every setting is an environment variable — no config file.
 | `EKG_TRANSPORT` | gateway | `stdio` (single-user) or `http` (remote, multi-user). | `stdio` |
 | `EKG_JWT_SECRET` | gateway (http) | HS256 secret for verifying bearer tokens. **Required for http.** | — |
 | `EKG_PORT` | gateway (http) | Port for the HTTP transport. | `8787` |
-| `EKG_AUDIT_LOG` | gateway | Append-only JSONL audit file. Unset → stderr. | stderr |
+| `EKG_AUDIT_LOG` | app, gateway | Append-only JSONL audit file. Unset → gateway logs to stderr; app writes `.data/audit.jsonl`. | see purpose |
 | `EKG_APP_URL` | gateway | Base URL for citation deep links. | `http://localhost:3000` |
+| `EKG_INGEST_ROOT` | gateway | Confine `ingest_document` to one directory tree; paths outside it are refused. Unset → unconfined (local stdio only). | unset |
+| `EKG_SEED_DEMO` | app, gateway | App: `0` keeps a fresh database unseeded. Gateway: `1` seeds a fresh persistent DB (never seeds one implicitly). | app seeds, gateway doesn't |
+| `EKG_UPLOAD_DIR` | app | Where `/ingest` uploads are stored. | `.data/uploads` |
+| `EKG_TRASH_DIR` | app | Where rejected candidates are kept for restore. | `.data/trash` |
 | `EKG_EMBEDDINGS_PROVIDER` | app, gateway, store | `voyage` \| `openai` \| `ollama`. Unset → lexical only. | unset |
 | `EKG_EMBEDDINGS_MODEL` | store | Model override for the provider. | per-provider default |
 | `VOYAGE_API_KEY` / `OPENAI_API_KEY` / `EKG_EMBEDDINGS_API_KEY` | store | API key for the chosen provider. | — |

@@ -28,13 +28,16 @@ For each candidate you have two actions:
 There's a **+ Capture knowledge** shortcut to the [capture form](03-adding-knowledge.md#1-the-capture-form),
 since reviewing often surfaces something you want to add by hand.
 
-> **Build status — what the workbench does today.** The current build exposes
-> **Verify** and **Reject**. The fuller curator workflow in the
-> [PRD](../../PRD-engineering-knowledge-graph.md) (user story 9) — correcting
-> fields, merging duplicates, and editing relationships inline — is on the
-> roadmap; today those refinements are done at the data layer or via re-capture.
-> The review *lifecycle* below is fully honored everywhere (app and gateway)
-> regardless of which UI controls exist.
+> **Build status — what the workbench does today.** The queue supports
+> per-item and **bulk** Verify/Reject (checkbox-select, then the toolbar
+> buttons), and Reject is a soft delete — rejected candidates sit in
+> **Recently rejected** below the queue and can be restored with one click.
+> The fuller curator workflow from the
+> [PRD](../../PRD-engineering-knowledge-graph.md) (user story 9) lives on each
+> **entity page** under *Curate this item*: correcting fields (title, summary,
+> tags, aliases), editing the ACL, the supersede/deprecate lifecycle, merging
+> duplicates, and adding/removing relationships. Every curation action is
+> recorded in the audit trail.
 
 ## A curator's review checklist
 
@@ -77,6 +80,12 @@ replaced or found defective, mark it `superseded`/`deprecated` and link the
 replacement rather than removing it — engineers still find it, but are always
 told not to reuse it. Reject is for things that were never firm knowledge
 (junk, duplicates, misfiles), not for retiring real history.
+
+Both transitions are one action on the entity page (*Curate this item →
+Lifecycle*): **Mark deprecated** flags the item, and **Superseded by…** flags
+it *and* creates the `supersedes` edge from the replacement you pick, so the
+warning always points somewhere. There's also **Send back to review queue**
+for verified items that need another look.
 
 > Any **new machine-generated content always re-enters the queue as
 > `unverified`** — e.g. when an assistant saves a new description for a sheet, it
@@ -130,8 +139,11 @@ answers.
   an assistant what a user couldn't open at the source.
 - A curator's job includes confirming the ACL is right before verifying —
   especially for anything sensitive (e.g. legal or client-confidential
-  material). The mechanics of identity, groups, and tenant isolation are in the
-  [Administration guide](05-admin-guide.md#identity-tenants-and-permissions).
+  material). The entity page shows the item's access under **Record → Access**,
+  and the *Curate this item* panel has an ACL editor: list the allowed
+  principals comma-separated (e.g. `group:legal, user:dana`), or `*` for the
+  whole firm. The mechanics of identity, groups, and tenant isolation are in
+  the [Administration guide](05-admin-guide.md#identity-tenants-and-permissions).
 
 ## Verifying the loop
 

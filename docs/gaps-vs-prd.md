@@ -28,6 +28,21 @@ not yet meet it. Several core curation actions remain GUI-absent.
 > `unverified`. This closes G1 and the interim multi-file slice of G2; the full
 > SharePoint/OneDrive OAuth **sync wizard** (G2 step 2) is still pending.
 
+> **Update 2026-07-02 — G3, G4, G5, G6 shipped; G7 and G9 partial.** The
+> entity page gains a *Curate this item* panel
+> ([`CurationPanel.tsx`](../apps/web/src/app/entities/%5Bid%5D/CurationPanel.tsx)):
+> inline field editing (G4), an ACL editor (G6), supersede-with-replacement +
+> deprecate lifecycle controls (G5), merge with edge repointing (G3 — the
+> store gained `deleteRelationship`/`mergeEntities`), and relationship
+> add/remove. The workbench gains bulk verify/reject, pagination past the old
+> 500-item silent truncation, and a soft-delete trash with restore. Capture
+> links `used-in` (project select) and `authored-by` (person-matched author)
+> at entry — the G9 type-ahead slice. Search gains a review-status facet (G7
+> slice; project/discipline/date facets still pending). Every app mutation now
+> emits a P0-7 audit event (transport `web`) into the same trail as the
+> gateway, with snapshots on destructive actions. Still open: G2 (SharePoint
+> wizard), G7/G8 depth, G10 (analytics dashboard), G11 (roles/SSO).
+
 ## Coverage matrix
 
 Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / assistant only)
@@ -38,14 +53,14 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 | Explore graph (map + neighborhood) | 🟡 | P0-9 graph explorer | [G8](#g8--graph-explorer-filters--scale) |
 | View entity + provenance | ✅ | P0-9 entity pages | — |
 | Capture lesson / detail by hand | 🟡 | P0-9 guided capture | [G9](#g9--guided-capture-without-type-ahead-linking) |
-| Verify / reject a candidate | 🟡 | P0-9 workbench | [G3](#g3--curation-workbench-is-verifyreject-only) |
+| Verify / reject a candidate | ✅ | P0-9 workbench | [G3](#g3--curation-workbench-is-verifyreject-only) |
 | **Add a document (upload)** | ✅ | P0-2, P0-9 | [G1](#g1--no-in-app-document-upload) |
 | **Bulk ingest a folder / source** | 🟡 | P0-2, P0-9 wizard | [G2](#g2--no-ingestion-setup-wizard-or-bulk-import-gui) |
-| **Edit / correct an entity** | ❌ | P0-1, P0-9 inline edit | [G4](#g4--no-inline-entity-editing) |
-| **Merge duplicates** | ❌ | P0-9 merge | [G3](#g3--curation-workbench-is-verifyreject-only) |
-| **Set tags / aliases on an item** | ❌ | P0-1, P0-9 | [G4](#g4--no-inline-entity-editing) |
-| **Mark superseded / deprecated** | ❌ | P0-1 lifecycle, P0-8 | [G5](#g5--no-gui-for-the-supersededdeprecated-lifecycle) |
-| **Set / confirm an item's ACL** | ❌ | P0-2, P0-9 curator | [G6](#g6--no-gui-for-aclpermission-curation) |
+| **Edit / correct an entity** | ✅ | P0-1, P0-9 inline edit | [G4](#g4--no-inline-entity-editing) |
+| **Merge duplicates** | ✅ | P0-9 merge | [G3](#g3--curation-workbench-is-verifyreject-only) |
+| **Set tags / aliases on an item** | ✅ | P0-1, P0-9 | [G4](#g4--no-inline-entity-editing) |
+| **Mark superseded / deprecated** | ✅ | P0-1 lifecycle, P0-8 | [G5](#g5--no-gui-for-the-supersededdeprecated-lifecycle) |
+| **Set / confirm an item's ACL** | ✅ | P0-2, P0-9 curator | [G6](#g6--no-gui-for-aclpermission-curation) |
 | Usage analytics (top / zero-result / cited) | ❌ | P1-4 | [G10](#g10--no-usage-analytics-dashboard-p1) |
 | Roles & SSO sign-in | ❌ | P0-9 roles, P0-7 | [G11](#g11--no-roles-or-sso-auth) |
 | Gateway / SSO / embeddings / tokens | ⚙️ CLI | Admin setup | *out of scope (allowed)* |
@@ -110,6 +125,11 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G3 · Curation workbench is verify/reject only
 
+- **Status: ✅ Shipped (2026-07-02)** — bulk verify/reject + pagination on the
+  workbench, soft-delete trash with restore, and merge with diff-free field
+  union + edge repointing via the new `deleteRelationship`/`mergeEntities`
+  store primitives. (A diff-style preview against the survivor remains a
+  nice-to-have.)
 - **PRD:** P0-9 *"Curation workbench: queue… with accept / **edit** / **reject** /
   **merge** actions, diff-style preview against existing entities, and bulk
   operations; median time to process an item < 2 minutes."*
@@ -129,6 +149,8 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G4 · No inline entity editing
 
+- **Status: ✅ Shipped (2026-07-02)** — *Curate this item* on the entity page
+  edits title, summary, tags, and aliases, and adds/removes relationships.
 - **PRD:** P0-1 *"Curators can create/edit/merge entities and relationships via the
   workspace app."* P0-9 entity pages *"inline editing for users with curator role."*
 - **Persona:** Curator.
@@ -145,6 +167,9 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G5 · No GUI for the superseded / deprecated lifecycle
 
+- **Status: ✅ Shipped (2026-07-02)** — lifecycle buttons (verify / back to
+  queue / deprecate) and *Superseded by…*, which flags the item and creates
+  the `supersedes` edge from the chosen replacement.
 - **PRD:** P0-1 review status `unverified`/`verified`/`superseded`/`deprecated`;
   P0-8 *"Items flagged superseded/deprecated are returned only with a prominent
   warning."*
@@ -164,6 +189,9 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G6 · No GUI for ACL / permission curation
 
+- **Status: ✅ Shipped (2026-07-02)** — the entity page shows access in the
+  Record table and the curate panel edits `allowedPrincipals`; source-mapped
+  defaults still arrive with G2's SharePoint sync.
 - **PRD:** P0-2 *"Source-system permissions… stored as item ACLs."* P0-9 curator
   role; P0-7 ACL enforcement.
 - **Persona:** Curator; overlaps IT/Security Admin (Dana).
@@ -247,10 +275,14 @@ most existing code:
 1. ~~**G1 + interim G2** — in-app upload running the existing `buildCandidate`
    pipeline. One change closes "can't add a document in a browser."~~ **✅ Done
    2026-06-23** (`/ingest` single + multi-file upload).
-2. **G4 + G5** — inline entity edit + supersede/deprecate controls (both mostly
-   `upsertEntity`/`upsertRelationship`; high trust value).
-3. **G3** — workbench edit + bulk + merge (merge needs the store extension).
-4. **G6, G9, G7** — ACL editor, capture type-ahead linking, search facets.
+2. ~~**G4 + G5** — inline entity edit + supersede/deprecate controls.~~ **✅
+   Done 2026-07-02** (entity-page curate panel).
+3. ~~**G3** — workbench edit + bulk + merge (merge needs the store
+   extension).~~ **✅ Done 2026-07-02** (bulk actions, trash + restore, merge
+   on `mergeEntities`).
+4. **G6, G9, G7** — ~~ACL editor~~ (✅ 2026-07-02), capture type-ahead linking
+   (🟡 project + author links shipped; standards linking pending), search
+   facets (🟡 review-status shipped; project/discipline/date pending).
 5. **G2 full wizard, G8, G10, G11** — SharePoint sync, graph scale, analytics, SSO
    (the larger platform builds).
 

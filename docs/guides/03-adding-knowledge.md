@@ -8,10 +8,11 @@ signs off (that's the next guide,
 | Way to add | Best for | Who |
 |---|---|---|
 | [Capture form](#1-the-capture-form) | A single lesson learned, detail, or note typed by hand | Any engineer; knowledge managers |
-| [Ingestion CLI](#2-the-ingestion-cli-bulk-folders) | A folder of existing documents (specs, sheets, RFIs) | Knowledge managers; admins |
-| [Ingest from your assistant](#3-ingest-from-your-assistant) | "Add this drawing to our knowledge base" while you work | Any engineer with the gateway connected |
+| [In-app upload](#1b-in-app-document-upload) | One or many PDF/MD/TXT files, from the browser (`/ingest`) | Any engineer; knowledge managers |
+| [Ingestion CLI](#2-the-ingestion-cli-bulk-folders) | A folder of existing documents, from a terminal (admin/dev) | Admins |
+| [From your assistant](#3-ingest-from-your-assistant) | "Add this drawing to our knowledge base" or "save this as a lesson learned" while you work | Any engineer with the gateway connected |
 
-All three converge on the same candidate model and the same review queue.
+All of them converge on the same candidate model and the same review queue.
 
 ## 1 · The capture form
 
@@ -26,7 +27,8 @@ Fields:
 | **Title** *(required)* | "What happened / what is it?" |
 | **Summary** | For lessons learned, write *what happened, the root cause, and the fix* — that's what makes it surface in future relevant queries. |
 | **Tags** | Comma-separated facets, e.g. `firestop, curtain-wall, fire-safety`. These power filtering and tag-scoped search everywhere. |
-| **Author** | Who knows this best. |
+| **Project** | Pick a project to create the `used-in` link at capture time, so the new knowledge shows up in that project's context immediately. |
+| **Author** | Who knows this best. If the name matches a known person in the graph, capture creates a real `authored-by` link — which is what lets `find_experts` credit them. |
 | **Source URL** | A link back to the source system, if any. |
 | **Sheet / Page** | For drawing- or page-specific items, so citations resolve to the right location. |
 
@@ -38,6 +40,16 @@ assistants until verified.
 > *fix* in the words a future engineer would search for. "Parapet flashing leak
 > at North Tower — termination bar was omitted at the reglet; require continuous
 > termination bar + sealant" will surface; "flashing issue" won't.
+
+## 1b · In-app document upload
+
+`/ingest` in the app (also reachable as **+ Add documents** from the
+workbench) accepts one or many PDF/MD/TXT files by drag-drop or file picker,
+with optional batch tags. Uploads run through the **same pipeline** as the CLI
+and the gateway — classification, text extraction, CAD-native vector parsing,
+chunking, cross-sheet reference edges — and land in the curation queue as
+`unverified`. This is the intended browser path for adding documents; the CLI
+below is for admins working at a terminal.
 
 ## 2 · The ingestion CLI (bulk folders)
 
@@ -166,7 +178,19 @@ re-enters the curation queue regardless of how well it grounded.
 > gateway. On a local stdio setup that's your machine, so a local path works. On
 > a [remote gateway](05-admin-guide.md), the file must be reachable by the
 > server — this tool is for documents already on (or mounted to) the gateway
-> host, not for uploading from a browser.
+> host, not for uploading from a browser (that's [`/ingest`](#1b-in-app-document-upload)).
+> Admins can confine the tool to one directory tree with `EKG_INGEST_ROOT`;
+> paths outside it are refused.
+
+### `propose_knowledge` — save a lesson from chat
+
+Knowledge that surfaces *in conversation* shouldn't die there. Tell your
+assistant *"save this as a lesson learned"* (or a design detail) and it calls
+`propose_knowledge` with a title, the substance in your words, tags, and
+optionally the project it belongs to — which links it `used-in` that project.
+Like everything else, the proposal lands in the curation queue as
+`unverified`; the assistant is instructed to say so rather than present it as
+firm knowledge (PRD P1-5).
 
 ## What happens next
 
