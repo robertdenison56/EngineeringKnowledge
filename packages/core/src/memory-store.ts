@@ -104,6 +104,46 @@ export class InMemoryGraphStore implements GraphStore {
     return out;
   }
 
+  async deleteRelationship(caller: Caller, id: string): Promise<boolean> {
+    const rel = this.relationships.get(id);
+    if (!rel || rel.tenantId !== caller.tenantId) return false;
+    const from = this.entities.get(rel.fromId);
+    const to = this.entities.get(rel.toId);
+    // Same visibility rule as listRelationships: both endpoints readable.
+    if (!from || !to || !canRead(caller, from) || !canRead(caller, to)) return false;
+    this.relationships.delete(id);
+    return true;
+  }
+
+  async mergeEntities(caller: Caller, survivorId: string, duplicateId: string): Promise<boolean> {
+    if (survivorId === duplicateId) return false;
+    const survivor = await this.getEntity(caller, survivorId);
+    const duplicate = await this.getEntity(caller, duplicateId);
+    if (!survivor || !duplicate) return false;
+
+    const existingEdges = new Set(
+      [...this.relationships.values()]
+        .filter((r) => r.fromId === survivorId || r.toId === survivorId)
+        .map((r) => `${r.type} ${r.fromId} ${r.toId}`),
+    );
+    for (const [relId, rel] of this.relationships) {
+      if (rel.fromId !== duplicateId && rel.toId !== duplicateId) continue;
+      const fromId = rel.fromId === duplicateId ? survivorId : rel.fromId;
+      const toId = rel.toId === duplicateId ? survivorId : rel.toId;
+      const key = `${rel.type} ${fromId} ${toId}`;
+      if (fromId === toId || existingEdges.has(key)) {
+        // Self-loop or already present on the survivor — drop, don't repoint.
+        this.relationships.delete(relId);
+        continue;
+      }
+      existingEdges.add(key);
+      this.relationships.set(relId, { ...rel, fromId, toId });
+    }
+    this.entities.delete(duplicateId);
+    this.chunks.delete(duplicateId);
+    return true;
+  }
+
   async deleteEntity(caller: Caller, id: string): Promise<boolean> {
     const entity = this.entities.get(id);
     if (!entity || !canRead(caller, entity)) return false;

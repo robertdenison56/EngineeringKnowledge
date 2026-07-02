@@ -205,6 +205,12 @@ export class SqliteGraphStore implements GraphStore {
   constructor(path: string, options: SqliteStoreOptions = {}) {
     this.db = new DatabaseSync(path);
     this.embeddings = options.embeddings;
+    // The workspace app, MCP gateway, and ingestion CLI share one database
+    // file. WAL lets readers proceed during a write, and busy_timeout makes a
+    // concurrent writer wait instead of failing with SQLITE_BUSY. Both are
+    // harmless no-ops for :memory: databases.
+    this.db.exec('PRAGMA journal_mode = WAL');
+    this.db.exec('PRAGMA busy_timeout = 5000');
     // Migrations for databases created before newer columns existed; must
     // run before SCHEMA so CREATE INDEX statements find current shape.
     const tables = this.db
@@ -234,6 +240,25 @@ export class SqliteGraphStore implements GraphStore {
 
   close(): void {
     this.db.close();
+  }
+
+  /**
+   * Run multi-statement writes atomically: the base row, its FTS mirror, and
+   * its chunks commit or roll back together, so a crash mid-write can never
+   * leave the FTS index disagreeing with the tables it shadows. BEGIN
+   * IMMEDIATE takes the write lock up front (with busy_timeout waiting on a
+   * concurrent writer) instead of failing at the first write.
+   */
+  private inTransaction<T>(fn: () => T): T {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const result = fn();
+      this.db.exec('COMMIT');
+      return result;
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   /** Used by app bootstrap to decide whether to seed a fresh database. */
@@ -282,41 +307,43 @@ export class SqliteGraphStore implements GraphStore {
       chunkVectors = await this.tryEmbed(chunks.map(chunkEmbeddingText));
     }
 
-    this.db
-      .prepare(
-        `INSERT INTO entities (id, tenant_id, type, title, summary, properties, tags, aliases, content, embedding, embedding_provider, provenance, acl)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           tenant_id = excluded.tenant_id, type = excluded.type, title = excluded.title,
-           summary = excluded.summary, properties = excluded.properties,
-           tags = excluded.tags, aliases = excluded.aliases, content = excluded.content,
-           embedding = COALESCE(excluded.embedding, entities.embedding),
-           embedding_provider = COALESCE(excluded.embedding_provider, entities.embedding_provider),
-           provenance = excluded.provenance, acl = excluded.acl`,
-      )
-      .run(
-        entity.id,
-        entity.tenantId,
-        entity.type,
-        entity.title,
-        entity.summary ?? null,
-        JSON.stringify(entity.properties),
-        entity.tags ? JSON.stringify(entity.tags) : null,
-        entity.aliases ? JSON.stringify(entity.aliases) : null,
-        entity.content ?? null,
-        embedding,
-        provider,
-        JSON.stringify(entity.provenance),
-        JSON.stringify(entity.acl),
-      );
-    this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(entity.id);
-    this.db
-      .prepare('INSERT INTO entities_fts (id, tenant_id, text) VALUES (?, ?, ?)')
-      .run(entity.id, entity.tenantId, ftsText(entity));
+    this.inTransaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO entities (id, tenant_id, type, title, summary, properties, tags, aliases, content, embedding, embedding_provider, provenance, acl)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(id) DO UPDATE SET
+             tenant_id = excluded.tenant_id, type = excluded.type, title = excluded.title,
+             summary = excluded.summary, properties = excluded.properties,
+             tags = excluded.tags, aliases = excluded.aliases, content = excluded.content,
+             embedding = COALESCE(excluded.embedding, entities.embedding),
+             embedding_provider = COALESCE(excluded.embedding_provider, entities.embedding_provider),
+             provenance = excluded.provenance, acl = excluded.acl`,
+        )
+        .run(
+          entity.id,
+          entity.tenantId,
+          entity.type,
+          entity.title,
+          entity.summary ?? null,
+          JSON.stringify(entity.properties),
+          entity.tags ? JSON.stringify(entity.tags) : null,
+          entity.aliases ? JSON.stringify(entity.aliases) : null,
+          entity.content ?? null,
+          embedding,
+          provider,
+          JSON.stringify(entity.provenance),
+          JSON.stringify(entity.acl),
+        );
+      this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(entity.id);
+      this.db
+        .prepare('INSERT INTO entities_fts (id, tenant_id, text) VALUES (?, ?, ?)')
+        .run(entity.id, entity.tenantId, ftsText(entity));
 
-    // Omitted chunks preserve the existing passages (ADR 0006); an explicit
-    // array (including []) replaces them wholesale.
-    if (chunks !== undefined) this.writeChunks(entity.id, chunks, chunkVectors);
+      // Omitted chunks preserve the existing passages (ADR 0006); an explicit
+      // array (including []) replaces them wholesale.
+      if (chunks !== undefined) this.writeChunks(entity.id, chunks, chunkVectors);
+    });
   }
 
   /** Replace all chunks for an entity, with their FTS rows and embeddings. */
@@ -569,11 +596,64 @@ export class SqliteGraphStore implements GraphStore {
   async deleteEntity(caller: Caller, id: string): Promise<boolean> {
     const entity = await this.getEntity(caller, id);
     if (!entity) return false;
-    this.db.prepare('DELETE FROM relationships WHERE from_id = ? OR to_id = ?').run(id, id);
-    this.db.prepare('DELETE FROM entities WHERE id = ?').run(id);
-    this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(id);
-    this.db.prepare('DELETE FROM chunks WHERE entity_id = ?').run(id);
-    this.db.prepare('DELETE FROM chunks_fts WHERE entity_id = ?').run(id);
+    this.inTransaction(() => {
+      this.db.prepare('DELETE FROM relationships WHERE from_id = ? OR to_id = ?').run(id, id);
+      this.db.prepare('DELETE FROM entities WHERE id = ?').run(id);
+      this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(id);
+      this.db.prepare('DELETE FROM chunks WHERE entity_id = ?').run(id);
+      this.db.prepare('DELETE FROM chunks_fts WHERE entity_id = ?').run(id);
+    });
+    return true;
+  }
+
+  async deleteRelationship(caller: Caller, id: string): Promise<boolean> {
+    const row = this.db.prepare('SELECT * FROM relationships WHERE id = ?').get(id) as
+      | RelationshipRow
+      | undefined;
+    if (!row || row.tenant_id !== caller.tenantId) return false;
+    const rel = rowToRelationship(row);
+    // Same visibility rule as listRelationships: both endpoints readable.
+    const from = await this.getEntity(caller, rel.fromId);
+    const to = await this.getEntity(caller, rel.toId);
+    if (!from || !to) return false;
+    this.db.prepare('DELETE FROM relationships WHERE id = ?').run(id);
+    return true;
+  }
+
+  async mergeEntities(caller: Caller, survivorId: string, duplicateId: string): Promise<boolean> {
+    if (survivorId === duplicateId) return false;
+    const survivor = await this.getEntity(caller, survivorId);
+    const duplicate = await this.getEntity(caller, duplicateId);
+    if (!survivor || !duplicate) return false;
+
+    const survivorEdges = this.db
+      .prepare('SELECT * FROM relationships WHERE from_id = ? OR to_id = ?')
+      .all(survivorId, survivorId) as unknown as RelationshipRow[];
+    const existing = new Set(survivorEdges.map((r) => `${r.type} ${r.from_id} ${r.to_id}`));
+    const duplicateEdges = this.db
+      .prepare('SELECT * FROM relationships WHERE from_id = ? OR to_id = ?')
+      .all(duplicateId, duplicateId) as unknown as RelationshipRow[];
+
+    this.inTransaction(() => {
+      for (const row of duplicateEdges) {
+        const fromId = row.from_id === duplicateId ? survivorId : row.from_id;
+        const toId = row.to_id === duplicateId ? survivorId : row.to_id;
+        const key = `${row.type} ${fromId} ${toId}`;
+        if (fromId === toId || existing.has(key)) {
+          // Self-loop or already present on the survivor — drop, don't repoint.
+          this.db.prepare('DELETE FROM relationships WHERE id = ?').run(row.id);
+          continue;
+        }
+        existing.add(key);
+        this.db
+          .prepare('UPDATE relationships SET from_id = ?, to_id = ? WHERE id = ?')
+          .run(fromId, toId, row.id);
+      }
+      this.db.prepare('DELETE FROM entities WHERE id = ?').run(duplicateId);
+      this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(duplicateId);
+      this.db.prepare('DELETE FROM chunks WHERE entity_id = ?').run(duplicateId);
+      this.db.prepare('DELETE FROM chunks_fts WHERE entity_id = ?').run(duplicateId);
+    });
     return true;
   }
 

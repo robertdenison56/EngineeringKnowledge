@@ -113,3 +113,64 @@ test('settings: round-trip, upsert in place, and tenant isolation', async () => 
   assert.equal(await store.getSetting(DEMO_TENANT, 'firm-name'), 'Acme Structural');
   assert.equal(await store.getSetting('other-firm', 'firm-name'), undefined, 'scoped per tenant');
 });
+
+test('deleteRelationship removes a visible edge and refuses hidden/cross-tenant ones', async () => {
+  const store = await seededStore();
+  const rels = await store.listRelationships(ENGINEER);
+  const authored = rels.find((r) => r.type === 'authored-by');
+  assert.ok(authored, 'seed carries an authored-by edge');
+
+  assert.equal(await store.deleteRelationship(OTHER_FIRM, authored.id), false, 'cross-tenant delete refused');
+  assert.equal(await store.deleteRelationship(ENGINEER, 'rel:no-such-edge'), false, 'missing edge reads false');
+  assert.equal(await store.deleteRelationship(ENGINEER, authored.id), true);
+  const after = await store.listRelationships(ENGINEER);
+  assert.ok(!after.some((r) => r.id === authored.id), 'edge is gone');
+});
+
+test('mergeEntities repoints the duplicate’s edges onto the survivor and removes it', async () => {
+  const store = await seededStore();
+  // A duplicate of the current firestop detail, with one edge of its own.
+  await store.upsertEntity({
+    id: 'detail:cw-firestop-02-dupe',
+    tenantId: DEMO_TENANT,
+    type: 'design-detail',
+    title: 'CW firestop detail (duplicate import)',
+    properties: {},
+    provenance: { createdAt: '2026-01-01', modifiedAt: '2026-01-01', reviewStatus: 'unverified' },
+    acl: { allowedPrincipals: ['*'] },
+  });
+  await store.upsertRelationship({
+    id: 'rel:dupe-lesson',
+    tenantId: DEMO_TENANT,
+    type: 'had-issue',
+    fromId: 'detail:cw-firestop-02-dupe',
+    toId: 'lesson:firestop-mockup-failure',
+  });
+  // An edge that duplicates one the survivor already has — must be dropped.
+  await store.upsertRelationship({
+    id: 'rel:dupe-used-in',
+    tenantId: DEMO_TENANT,
+    type: 'used-in',
+    fromId: 'detail:cw-firestop-02-dupe',
+    toId: 'project:riverside',
+  });
+
+  assert.equal(
+    await store.mergeEntities(OTHER_FIRM, 'detail:cw-firestop-02', 'detail:cw-firestop-02-dupe'),
+    false,
+    'cross-tenant merge refused',
+  );
+  assert.equal(
+    await store.mergeEntities(ENGINEER, 'detail:cw-firestop-02', 'detail:cw-firestop-02-dupe'),
+    true,
+  );
+  assert.equal(await store.getEntity(ENGINEER, 'detail:cw-firestop-02-dupe'), undefined, 'duplicate gone');
+
+  const neighbors = await store.neighbors(ENGINEER, 'detail:cw-firestop-02');
+  assert.ok(
+    neighbors.some((n) => n.relationship.id === 'rel:dupe-lesson'),
+    'duplicate’s unique edge repointed onto the survivor',
+  );
+  const usedIn = neighbors.filter((n) => n.relationship.type === 'used-in');
+  assert.equal(usedIn.length, 1, 'edge already on the survivor is dropped, not doubled');
+});
