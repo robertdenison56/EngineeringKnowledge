@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
-import { extname, isAbsolute, resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { extname, isAbsolute, relative, resolve } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ZodRawShapeCompat } from '@modelcontextprotocol/sdk/server/zod-compat.js';
@@ -129,10 +130,20 @@ export const DEV_CALLER: Caller = {
 /** Resolve the calling identity from the per-request auth, if any. */
 export type ResolveCaller = (authInfo?: AuthInfo) => Caller;
 
+/** Whether the demo corpus may be written into a persistent database. */
+export function demoSeedRequested(): boolean {
+  return ['1', 'true', 'yes'].includes((process.env.EKG_SEED_DEMO ?? '').toLowerCase());
+}
+
 /**
  * Build the graph store from the environment: the workspace app's curated
  * SQLite database when EKG_DB_PATH points at one, else a seeded in-memory
  * demo graph. Built once and shared across requests by the HTTP gateway.
+ *
+ * A persistent database is never seeded implicitly — an empty file stays
+ * empty unless EKG_SEED_DEMO is set, so pointing the gateway at a fresh
+ * production database cannot plant demo-firm entities in it. The ephemeral
+ * in-memory store is demo mode by definition and always seeds.
  */
 export async function createStore(): Promise<GraphStore> {
   if (process.env.EKG_DB_PATH && process.env.EKG_DB_PATH !== ':memory:') {
@@ -143,7 +154,7 @@ export async function createStore(): Promise<GraphStore> {
     const sqlite = new SqliteGraphStore(process.env.EKG_DB_PATH, {
       embeddings: providerFromEnv(),
     });
-    if (sqlite.countEntities(DEMO_TENANT) === 0) await seedDemo(sqlite);
+    if (sqlite.countEntities(DEMO_TENANT) === 0 && demoSeedRequested()) await seedDemo(sqlite);
     return sqlite;
   }
   const seeded = new InMemoryGraphStore();
@@ -212,8 +223,29 @@ function summarizeArgs(args: unknown): Record<string, unknown> | undefined {
   return out;
 }
 
+/** True when `child` is `root` or lives underneath it. */
+function isInsideRoot(child: string, root: string): boolean {
+  const rel = relative(root, child);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40);
+}
+
 export async function createServer(options: ServerOptions = {}): Promise<McpServer> {
   const store = options.store ?? (await createStore());
+  // ingest_document reads files from the gateway host. EKG_INGEST_ROOT
+  // confines it to one directory tree, so a remote caller cannot use the tool
+  // as an arbitrary file-read-into-graph primitive; unset means unconfined,
+  // which is only appropriate for single-user local stdio.
+  const ingestRoot = process.env.EKG_INGEST_ROOT
+    ? resolve(process.env.EKG_INGEST_ROOT)
+    : undefined;
   // stdio is single-user: every request resolves to the same fixed caller.
   // The HTTP gateway overrides this with token-derived identity (P0-3, P0-7).
   const resolveCaller: ResolveCaller =
@@ -629,6 +661,104 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
   );
 
   register(
+    'propose_knowledge',
+    {
+      title: 'Propose a lesson learned or design detail',
+      description:
+        'Save a lesson learned or design detail the user states in chat ("save this as a lesson ' +
+        'learned") into the firm knowledge graph as an UNVERIFIED candidate — it lands in the ' +
+        'curation queue and never enters the verified graph until a curator approves it (PRD P1-5). ' +
+        'Use when the user asks to save, capture, or record knowledge from the conversation. ' +
+        'Quote the user\'s substance faithfully; do not embellish it with general knowledge.',
+      inputSchema: {
+        title: z.string().min(1).describe('Short title, e.g. "Firestop mockup failed at deflection joint"'),
+        type: z
+          .enum(['lesson-learned', 'design-detail'])
+          .describe('What kind of knowledge this is'),
+        summary: z
+          .string()
+          .min(1)
+          .describe(
+            'The knowledge itself: what happened / what the detail is, root cause, and the fix — in the user\'s words',
+          ),
+        tags: z
+          .array(z.string())
+          .optional()
+          .describe('Topic tags, e.g. ["firestop", "curtain-wall"]'),
+        projectId: z
+          .string()
+          .optional()
+          .describe('Project entity id to link it to (from search/get_project_context results)'),
+        author: z
+          .string()
+          .optional()
+          .describe('Who holds this knowledge, if the user named someone'),
+      },
+    },
+    async ({ title, type, summary, tags, projectId, author }, extra) => {
+      const caller = resolveCaller(extra?.authInfo);
+
+      // Resolve the project first so a bad id fails the whole call instead of
+      // leaving an unlinked candidate behind.
+      let project: Entity | undefined;
+      if (projectId) {
+        project = await store.getEntity(caller, projectId);
+        if (!project) return asContent({ error: 'not_found', projectId });
+        if (project.type !== 'project') {
+          return asContent({ error: 'not_a_project', id: project.id, type: project.type });
+        }
+      }
+
+      const now = new Date().toISOString();
+      const entity: Entity = {
+        id: `${type}:${slugify(title)}-${randomUUID().slice(0, 8)}`,
+        tenantId: caller.tenantId,
+        type,
+        title,
+        summary,
+        properties: {
+          capturedVia: 'assistant-chat',
+          proposedBy: caller.principals[0] ?? 'unknown',
+        },
+        ...(tags && tags.length > 0
+          ? { tags: tags.map((t) => t.trim().toLowerCase().replace(/\s+/g, '-')).filter(Boolean) }
+          : {}),
+        provenance: {
+          createdAt: now,
+          modifiedAt: now,
+          reviewStatus: 'unverified',
+          ...(author ? { author } : {}),
+        },
+        acl: { allowedPrincipals: ['*'] },
+      };
+      await store.upsertEntity(entity);
+      if (project) {
+        await store.upsertRelationship({
+          id: `rel:used-in-${entity.id}`,
+          tenantId: caller.tenantId,
+          type: 'used-in',
+          fromId: entity.id,
+          toId: project.id,
+        });
+      }
+
+      return asContent({
+        status: 'queued_unverified',
+        id: entity.id,
+        title: entity.title,
+        type: entity.type,
+        tags: entity.tags,
+        ...(project ? { linkedProject: { id: project.id, title: project.title } } : {}),
+        url: appUrl(entity),
+        guidance:
+          'Saved as an unverified candidate in the curation queue — tell the user a curator must ' +
+          'verify it in the workspace app before it counts as firm knowledge, and do not present ' +
+          'it as verified in the meantime.',
+      });
+    },
+  );
+
+  register(
     'ingest_document',
     {
       title: 'Ingest a document into firm knowledge',
@@ -659,6 +789,12 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     async ({ path, page, describe }, extra) => {
       const caller = resolveCaller(extra?.authInfo);
       const filePath = isAbsolute(path) ? path : resolve(path);
+      if (ingestRoot && !isInsideRoot(filePath, ingestRoot)) {
+        return asContent({
+          error: 'outside_ingest_root',
+          message: `This gateway only ingests files under ${ingestRoot} (EKG_INGEST_ROOT). Move or copy the file there first.`,
+        });
+      }
       if (!existsSync(filePath)) {
         return asContent({ error: 'not_found', path: filePath });
       }
