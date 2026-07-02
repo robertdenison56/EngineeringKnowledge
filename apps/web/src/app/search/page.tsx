@@ -2,19 +2,22 @@ import { ENTITY_TYPES, type SearchHit } from '@ekg/core';
 import { DEV_CALLER, getStore } from '../../lib/store';
 import { EntityCard } from '../../components/ui';
 
+const REVIEW_FILTERS = ['verified', 'unverified', 'superseded', 'deprecated'] as const;
+
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; type?: string; tag?: string }>;
+  searchParams: Promise<{ q?: string; type?: string; tag?: string; status?: string }>;
 }) {
-  const { q = '', type = '', tag = '' } = await searchParams;
+  const { q = '', type = '', tag = '', status = '' } = await searchParams;
   const store = await getStore();
   const types = type ? [type] : undefined;
   const tags = tag ? [tag] : undefined;
 
-  const hits: SearchHit[] = q
+  let hits: SearchHit[] = q
     ? await store.search(DEV_CALLER, q, { types, tags, limit: 25 })
     : (await store.list(DEV_CALLER, { types, tags, limit: 50 })).map((entity) => ({ entity, score: 0 }));
+  if (status) hits = hits.filter((h) => h.entity.provenance.reviewStatus === status);
 
   return (
     <>
@@ -32,6 +35,14 @@ export default async function SearchPage({
           {ENTITY_TYPES.map((t) => (
             <option key={t} value={t}>
               {t}
+            </option>
+          ))}
+        </select>
+        <select name="status" defaultValue={status} aria-label="Review status filter">
+          <option value="">Any status</option>
+          {REVIEW_FILTERS.map((s) => (
+            <option key={s} value={s}>
+              {s}
             </option>
           ))}
         </select>

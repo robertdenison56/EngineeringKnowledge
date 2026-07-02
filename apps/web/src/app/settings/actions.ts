@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { DEV_CALLER, FIRM_NAME_KEY, getStore, isAdmin } from '../../lib/store';
+import { auditAction } from '../../lib/audit';
 
 /**
  * Settings mutations. Like the curation actions, these run as the dev caller;
@@ -37,6 +38,7 @@ export async function setFirmName(
 
   const store = await getStore();
   await store.setSetting(DEV_CALLER.tenantId, FIRM_NAME_KEY, firmName);
+  auditAction('set_firm_name', { args: { firmName } });
 
   // Refresh the header badge everywhere (it lives in the root layout) and the
   // settings view itself.

@@ -29,7 +29,13 @@ async function createStore(): Promise<GraphStore> {
   const dbPath = envPath ?? path.join(process.cwd(), '.data', 'ekg.db');
   mkdirSync(path.dirname(dbPath), { recursive: true });
   const store = new SqliteGraphStore(dbPath, { embeddings: providerFromEnv() });
-  if (store.countEntities(DEMO_TENANT) === 0) {
+  // The dev workspace seeds the demo corpus on first run so the app is
+  // explorable out of the box; EKG_SEED_DEMO=0 keeps a fresh database empty
+  // (a real firm's workspace should start from its own documents).
+  const seedDisabled = ['0', 'false', 'no'].includes(
+    (process.env.EKG_SEED_DEMO ?? '').toLowerCase(),
+  );
+  if (store.countEntities(DEMO_TENANT) === 0 && !seedDisabled) {
     await seedDemo(store);
   } else {
     // Backfill vectors for rows ingested before a provider was configured.
