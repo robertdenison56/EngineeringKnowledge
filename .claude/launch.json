@@ -15,6 +15,16 @@
       "env": { "EKG_DB_PATH": ":memory:", "PORT": "3100" }
     },
     {
+      "name": "ekg-web-test",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--workspace", "@ekg/web"],
+      "port": 3200,
+      "env": {
+        "EKG_DB_PATH": "/Volumes/RobertsExternalSSD/repos/EngineeringKnowledge/apps/web/.data/test-ekg.db",
+        "PORT": "3200"
+      }
+    },
+    {
       "name": "ekg-mcp-server",
       "runtimeExecutable": "node",
       "runtimeArgs": ["apps/mcp-server/dist/index.js"]
