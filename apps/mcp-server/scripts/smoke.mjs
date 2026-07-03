@@ -283,6 +283,52 @@ try {
     console.log('ok - fusion + collaboration checks skipped (pdftoppm not installed on this host)');
   }
 
+  // --- Capture-from-chat (PRD P1-5): propose_knowledge → curation queue ---
+  const proposed = await request(30, 'tools/call', {
+    name: 'propose_knowledge',
+    arguments: {
+      title: 'Backer rod sizing at wide joints',
+      type: 'lesson-learned',
+      summary: 'Backer rod one size up from joint width prevented sealant slump on wide joints.',
+      tags: ['sealants', 'Joint Design'],
+      projectId: 'project:riverside',
+      author: 'Priya Sharma',
+    },
+  });
+  const proposal = JSON.parse(proposed.content[0].text);
+  assert(proposal.status === 'queued_unverified', 'propose_knowledge queues candidate as unverified');
+  assert(proposal.linkedProject?.id === 'project:riverside', 'proposal links to the named project');
+  assert(
+    proposal.tags?.includes('joint-design'),
+    'proposal tags are normalized like the capture form',
+  );
+
+  const proposalFetched = await request(31, 'tools/call', {
+    name: 'fetch',
+    arguments: { id: proposal.id },
+  });
+  const proposalDoc = JSON.parse(proposalFetched.content[0].text);
+  assert(
+    proposalDoc.metadata.provenance.reviewStatus === 'unverified',
+    'proposed knowledge stays unverified until curated (P1-5)',
+  );
+  assert(
+    proposalDoc.metadata.related?.some((r) => r.relationship === 'used-in' && r.id === 'project:riverside'),
+    'proposed knowledge carries a used-in edge to the project',
+  );
+
+  const badProposal = await request(32, 'tools/call', {
+    name: 'propose_knowledge',
+    arguments: {
+      title: 'Dangling link test',
+      type: 'lesson-learned',
+      summary: 'Should fail whole, leaving no orphan candidate.',
+      projectId: 'project:no-such-project',
+    },
+  });
+  const badResult = JSON.parse(badProposal.content[0].text);
+  assert(badResult.error === 'not_found', 'bad project id fails the proposal instead of orphaning it');
+
   // --- Audit trail (PRD P0-7): every tool call left an immutable record ---
   // Audit writes are synchronous on the server before each response returns, so
   // by now the file holds an event for every call above.

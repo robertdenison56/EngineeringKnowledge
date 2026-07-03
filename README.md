@@ -16,8 +16,8 @@ How to set up, use, add to, and refine it: [Guides](docs/guides/) (start with
 |---|---|---|
 | `packages/core` | Ontology (entities, relationships, document chunks), `GraphStore` interface, shared retrieval semantics, in-memory dev store, demo seed | P0-1 |
 | `packages/store-sqlite` | Persistent `GraphStore` on SQLite (`node:sqlite`, no native deps) — entity + chunk-level FTS and embeddings, hybrid retrieval (ADR 0003, 0006) | OQ 1 reference |
-| `apps/mcp-server` | MCP gateway — `search` / `fetch` / `traverse` / `find_experts` / `get_project_context` plus `ingest_document` / `save_description`: users add documents from their assistant, and *their* model describes drawing sheets. Runs on stdio (single-user dev) or remote **Streamable HTTP** with per-request JWT identity, per-caller ACL/tenant trimming, and an audit trail (P0-7); set `EKG_DB_PATH` to serve the curated database | P0-2, P0-3…P0-6 |
-| `apps/web` | Knowledge workspace app — dashboard, search/browse, entity pages with graph view, curation workbench, capture form (`npm run dev --workspace @ekg/web`) | P0-9 |
+| `apps/mcp-server` | MCP gateway — `search` / `fetch` / `traverse` / `find_experts` / `get_project_context`, `ingest_document` / `save_description` (users add documents from their assistant, and *their* model describes drawing sheets), and `propose_knowledge` ("save this as a lesson learned" → curation queue, P1-5). Runs on stdio (single-user dev) or remote **Streamable HTTP** with per-request JWT identity, per-caller ACL/tenant trimming, and an audit trail (P0-7); `EKG_DB_PATH` serves the curated database, `EKG_INGEST_ROOT` confines ingestion, `EKG_SEED_DEMO` gates demo data | P0-2, P0-3…P0-6 |
+| `apps/web` | Knowledge workspace app — dashboard, search/browse, entity pages with graph view and inline curation (edit fields/ACL, supersede/deprecate, merge, relationships), curation workbench with bulk actions and a restorable trash, capture form with graph linking (`npm run dev --workspace @ekg/web`) | P0-9 |
 | `services/ingestion` | Ingestion CLI v0 — classify files, extract PDF text layers (scans flagged `needs-ocr`), CAD-native vector parsing of drawing sheets (title blocks, views, dimensions, schedules, callouts → cross-sheet `references` edges), queue candidates for curation | P0-2, P0-2a |
 | `docs/decisions` | Architecture decision records | — |
 
@@ -42,6 +42,10 @@ claude mcp add ekg -- node apps/mcp-server/dist/index.js
 Then ask: *"How have we detailed curtain-wall firestop conditions, and what
 went wrong at Riverside?"* — answers come from the seeded demo graph with
 citations, and the superseded rev. 1 detail comes back with a warning.
+
+To run the same thing from **Claude Desktop** — including the full scripted
+test tour (ingest → describe → curate → query → supersede) — follow
+[Guide 6: Testing with Claude Desktop](docs/guides/06-testing-with-claude-desktop.md).
 
 ## The full loop
 
@@ -91,6 +95,16 @@ per-request identity from a bearer JWT, so ACL trimming and tenant isolation
 follow the calling token (two tokens hit one server and see different
 knowledge), plus an append-only audit trail of every call (P0-7). The richer
 P0-3 tools `find_experts` and `get_project_context` round out the surface.
+The **curation loop is now fully GUI-operable** (gap report G3–G6): inline
+field and ACL editing, supersede/deprecate lifecycle controls, merge with
+edge repointing, relationship add/remove, bulk verify/reject with a
+restorable trash, and capture-time graph linking — with every app mutation
+audited into the same P0-7 trail as the gateway (transport `web` vs
+`stdio`/`http`). Capture-from-chat ships as the gateway's
+`propose_knowledge` tool (P1-5). The shared SQLite store runs in WAL mode
+with transactional writes so the app, gateway, and CLI can safely share one
+database — the setup [Guide 6](docs/guides/06-testing-with-claude-desktop.md)
+uses to test the whole loop from Claude Desktop.
 Open before Phase 2 exit: production graph engine (OQ 1), SharePoint sync,
 OCR for scanned sets, and OAuth 2.1 + Entra federation on the gateway — the
 JWT identity uses the same claim shape, so that work swaps only the token

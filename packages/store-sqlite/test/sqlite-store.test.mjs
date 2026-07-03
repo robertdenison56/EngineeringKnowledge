@@ -143,3 +143,79 @@ test('persistence: chunks survive reopening and stay searchable (ADR 0006)', asy
   assert.equal(hits[0].chunk?.anchor.page, 142, 'hit cites the deep page');
   second.close();
 });
+
+test('deleteRelationship + mergeEntities match the core contract, atomically', async () => {
+  const store = new SqliteGraphStore(freshDbPath());
+  await seedDemo(store);
+
+  // deleteRelationship: visibility-gated, single edge.
+  const rels = await store.listRelationships(ENGINEER);
+  const authored = rels.find((r) => r.type === 'authored-by');
+  assert.equal(await store.deleteRelationship(OTHER_FIRM, authored.id), false);
+  assert.equal(await store.deleteRelationship(ENGINEER, authored.id), true);
+  assert.ok(!(await store.listRelationships(ENGINEER)).some((r) => r.id === authored.id));
+
+  // mergeEntities: unique edges repoint, duplicates drop, entity+chunks go.
+  await store.upsertEntity(
+    {
+      id: 'detail:dupe',
+      tenantId: DEMO_TENANT,
+      type: 'design-detail',
+      title: 'Duplicate detail',
+      properties: {},
+      provenance: { createdAt: '2026-01-01T00:00:00Z', modifiedAt: '2026-01-01T00:00:00Z', reviewStatus: 'unverified' },
+      acl: { allowedPrincipals: ['*'] },
+    },
+    [
+      {
+        id: 'detail:dupe#0',
+        entityId: 'detail:dupe',
+        tenantId: DEMO_TENANT,
+        ordinal: 0,
+        anchor: { page: 1 },
+        text: 'duplicate-only chunk text zebra-marker',
+      },
+    ],
+  );
+  await store.upsertRelationship({
+    id: 'rel:dupe-issue',
+    tenantId: DEMO_TENANT,
+    type: 'had-issue',
+    fromId: 'detail:dupe',
+    toId: 'lesson:firestop-mockup-failure',
+  });
+  await store.upsertRelationship({
+    id: 'rel:dupe-used-in',
+    tenantId: DEMO_TENANT,
+    type: 'used-in',
+    fromId: 'detail:dupe',
+    toId: 'project:riverside',
+  });
+
+  assert.equal(await store.mergeEntities(OTHER_FIRM, 'detail:cw-firestop-02', 'detail:dupe'), false);
+  assert.equal(await store.mergeEntities(ENGINEER, 'detail:cw-firestop-02', 'detail:dupe'), true);
+  assert.equal(await store.getEntity(ENGINEER, 'detail:dupe'), undefined);
+  assert.equal((await store.search(ENGINEER, 'zebra-marker')).length, 0, 'duplicate chunks unindexed');
+
+  const neighbors = await store.neighbors(ENGINEER, 'detail:cw-firestop-02');
+  assert.ok(neighbors.some((n) => n.relationship.id === 'rel:dupe-issue'), 'unique edge repointed');
+  assert.equal(
+    neighbors.filter((n) => n.relationship.type === 'used-in').length,
+    1,
+    'survivor edge not doubled',
+  );
+  store.close();
+});
+
+test('WAL journal mode is active on file-backed databases', async () => {
+  const path = freshDbPath();
+  const store = new SqliteGraphStore(path);
+  await seedDemo(store);
+  // Second connection sees WAL persisted in the database header and can read
+  // while the first stays open — the shared-file scenario (app + gateway).
+  const second = new SqliteGraphStore(path);
+  const hits = await second.search(ENGINEER, 'curtain wall firestop');
+  assert.equal(hits[0]?.entity.id, 'detail:cw-firestop-02');
+  second.close();
+  store.close();
+});

@@ -81,6 +81,23 @@ export interface GraphStore {
    * Powers the workspace app's full-graph knowledge map (PRD P0-9).
    */
   listRelationships(caller: Caller): Promise<Relationship[]>;
+  /**
+   * Remove a single relationship (curation edge fix, PRD P0-1/P0-9). The
+   * caller must be able to read both endpoints — the same visibility rule as
+   * listRelationships, so an edge a caller cannot see cannot be deleted.
+   * Returns false if the relationship is missing or not visible.
+   */
+  deleteRelationship(caller: Caller, id: string): Promise<boolean>;
+  /**
+   * Merge `duplicateId` into `survivorId` (curation merge, PRD P0-9):
+   * every relationship touching the duplicate is repointed onto the survivor
+   * (self-loops and edges that would duplicate an existing survivor edge are
+   * dropped), then the duplicate entity and its chunks are removed. Field-
+   * level merging (tags, aliases, summary) is the caller's job before
+   * invoking. Returns false — changing nothing — unless both entities are
+   * visible to the caller and distinct.
+   */
+  mergeEntities(caller: Caller, survivorId: string, duplicateId: string): Promise<boolean>;
   /** Follow relationships from an entity (MCP `traverse` tool, PRD P0-3). */
   neighbors(caller: Caller, entityId: string, type?: RelationshipType): Promise<NeighborHit[]>;
   /**

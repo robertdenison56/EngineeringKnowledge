@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Entity, NeighborHit } from '@ekg/core';
 import { DEV_CALLER, getStore } from '../../../lib/store';
+import { removeRelationship } from '../../curation/actions';
+import { CurationPanel } from './CurationPanel';
 import {
   ProvenanceLine,
   REVIEW_WARNINGS,
@@ -70,10 +72,13 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
   const store = await getStore();
   const entity = await store.getEntity(DEV_CALLER, id);
   if (!entity) notFound();
-  const [neighbors, chunks] = await Promise.all([
+  const [neighbors, chunks, allEntities] = await Promise.all([
     store.neighbors(DEV_CALLER, id),
     store.getChunks(DEV_CALLER, id),
+    store.list(DEV_CALLER, { limit: 1000 }),
   ]);
+  const sameType = allEntities.filter((e) => e.type === entity.type && e.id !== entity.id);
+  const linkTargets = allEntities.filter((e) => e.id !== entity.id);
 
   const warning = REVIEW_WARNINGS[entity.provenance.reviewStatus];
   const supersededBy = neighbors.find(
@@ -180,6 +185,20 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
                     <td>
                       <ReviewBadge status={n.entity.provenance.reviewStatus} />
                     </td>
+                    <td>
+                      <form action={removeRelationship}>
+                        <input type="hidden" name="id" value={entity.id} />
+                        <input type="hidden" name="relId" value={n.relationship.id} />
+                        <button
+                          type="submit"
+                          className="btn-reject"
+                          title="Remove this relationship"
+                          aria-label={`Remove ${n.relationship.type} relationship to ${n.entity.title}`}
+                        >
+                          ✕
+                        </button>
+                      </form>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -203,6 +222,14 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
                 <tr>
                   <td>Review status</td>
                   <td>{entity.provenance.reviewStatus}</td>
+                </tr>
+                <tr>
+                  <td>Access</td>
+                  <td>
+                    {entity.acl.allowedPrincipals.includes('*')
+                      ? 'Whole firm'
+                      : entity.acl.allowedPrincipals.join(', ')}
+                  </td>
                 </tr>
                 {entity.provenance.author ? (
                   <tr>
@@ -228,6 +255,10 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
             </table>
           </div>
         </div>
+      </div>
+
+      <div style={{ marginTop: '1.2rem' }}>
+        <CurationPanel entity={entity} sameType={sameType} linkTargets={linkTargets} />
       </div>
     </>
   );

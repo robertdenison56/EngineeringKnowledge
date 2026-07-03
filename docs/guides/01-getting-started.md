@@ -71,6 +71,10 @@ With **Claude Code**:
 claude mcp add ekg -- node apps/mcp-server/dist/index.js
 ```
 
+With **Claude Desktop**, add the same command to `claude_desktop_config.json`
+— [Guide 6](06-testing-with-claude-desktop.md) has the exact config block plus
+a scripted end-to-end test tour.
+
 By default the gateway serves the **seeded in-memory demo graph**. To serve the
 **same curated database the app writes to** — so anything you capture or verify
 in the app is what the assistant answers from — point it at the app's database:

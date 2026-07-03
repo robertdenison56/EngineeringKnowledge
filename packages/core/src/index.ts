@@ -1,5 +1,6 @@
 export * from './ontology.js';
 export * from './graph-store.js';
+export * from './audit.js';
 export * from './matching.js';
 export * from './embeddings.js';
 export * from './memory-store.js';

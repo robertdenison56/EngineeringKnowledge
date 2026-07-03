@@ -12,6 +12,7 @@ import {
   type Candidate,
 } from '@ekg/ingestion';
 import { DEV_CALLER, getStore } from '../../lib/store';
+import { auditAction } from '../../lib/audit';
 
 /**
  * In-app document upload (PRD P0-2 manual ingestion; closes gaps G1 and the
@@ -179,6 +180,15 @@ export async function ingestUploads(
 
   const okCount = results.filter((r) => r.ok).length;
   const failCount = results.length - okCount;
+  auditAction('ingest_upload', {
+    args: {
+      files: results.map((r) => r.name),
+      failed: failCount,
+      referencesLinked,
+    },
+    resultIds: results.filter((r) => r.ok && r.id).map((r) => r.id!),
+    outcome: okCount > 0 ? 'ok' : 'error',
+  });
   return {
     ok: okCount > 0,
     files: results,
