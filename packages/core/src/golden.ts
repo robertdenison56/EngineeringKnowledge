@@ -58,6 +58,24 @@ export const GOLDEN_RETRIEVAL: GoldenCase[] = [
     k: 3,
   },
   {
+    name: 'masterformat section, compact form (07 84 00 → 078400)',
+    query: 'section 078400',
+    expect: 'spec:07-84-00',
+    k: 3,
+  },
+  {
+    name: 'masterformat section, dotted form',
+    query: '07.84.00 firestopping',
+    expect: 'spec:07-84-00',
+    k: 3,
+  },
+  {
+    name: 'honest no-results for a section the firm does not have',
+    query: 'section 09 91 00',
+    expect: null,
+    k: 5,
+  },
+  {
     name: 'honest no-results for absent knowledge',
     query: 'standard parapet coping detail',
     expect: null,

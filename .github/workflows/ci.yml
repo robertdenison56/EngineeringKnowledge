@@ -1,0 +1,40 @@
+name: CI
+
+# Build, test, and run the retrieval eval on every push to main and every PR.
+# The PRD names CI as the mitigation for platform-dependency risk; this is it.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref so a fast-moving PR doesn't queue.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 LTS: ships node:sqlite (the store backend) and supports native
+      # TypeScript type stripping for the web auth unit tests (--experimental-strip-types).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Build (all workspaces)
+        run: npm run build
+
+      - name: Test (core, store, ingestion, gateway smoke, web auth)
+        run: npm test
+
+      # Retrieval scorecard — recall@k / MRR / passage-citation rate over the
+      # seed golden set. Exits 1 on a recall regression, so it gates the merge.
+      - name: Retrieval eval
+        run: npm run eval

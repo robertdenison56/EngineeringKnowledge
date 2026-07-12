@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ekg": {
+      "command": "node",
+      "args": ["apps/mcp-server/dist/index.js"],
+      "env": {
+        "EKG_DB_PATH": "/Volumes/RobertsExternalSSD/repos/EngineeringKnowledge/apps/web/.data/ekg.db"
+      }
+    }
+  }
+}

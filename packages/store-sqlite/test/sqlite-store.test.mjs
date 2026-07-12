@@ -192,8 +192,13 @@ test('deleteRelationship + mergeEntities match the core contract, atomically', a
     toId: 'project:riverside',
   });
 
-  assert.equal(await store.mergeEntities(OTHER_FIRM, 'detail:cw-firestop-02', 'detail:dupe'), false);
-  assert.equal(await store.mergeEntities(ENGINEER, 'detail:cw-firestop-02', 'detail:dupe'), true);
+  assert.equal(
+    await store.mergeEntities(OTHER_FIRM, 'detail:cw-firestop-02', 'detail:dupe'),
+    undefined,
+    'cross-tenant merge refused',
+  );
+  const merged = await store.mergeEntities(ENGINEER, 'detail:cw-firestop-02', 'detail:dupe');
+  assert.equal(merged?.survivorId, 'detail:cw-firestop-02');
   assert.equal(await store.getEntity(ENGINEER, 'detail:dupe'), undefined);
   assert.equal((await store.search(ENGINEER, 'zebra-marker')).length, 0, 'duplicate chunks unindexed');
 

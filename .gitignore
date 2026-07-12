@@ -41,6 +41,7 @@ release/
 
 # Local databases
 .data/
+.data-backup*/
 
 # Misc
 .turbo/

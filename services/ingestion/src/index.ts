@@ -9,6 +9,23 @@ export {
   type SheetReference,
 } from './candidate.js';
 export { buildReferenceEdges, sheetIndex, type ReferenceEdgeResult } from './edges.js';
+export {
+  contentVersion,
+  planSync,
+  FolderConnector,
+  type SourceConnector,
+  type SourceItem,
+  type SourceMeta,
+  type SyncManifest,
+  type SyncPlan,
+} from './source.js';
+export {
+  parseProjectCsv,
+  buildProjectCandidates,
+  type ProjectRow,
+  type ProjectCsvParse,
+  type ProjectCandidate,
+} from './csv.js';
 export { extractSheetFacts, formatSheetFacts, type SheetFacts } from './describe.js';
 export {
   chunkDocument,
@@ -17,6 +34,18 @@ export {
   type PageText,
 } from './chunking.js';
 export { groundAnnotations, type GroundingReport } from './ground.js';
+export {
+  createPageOcr,
+  ocrAvailable,
+  ocrPdfPages,
+  OCR_CONFIDENCE_THRESHOLD,
+  type OcrEngineName,
+  type OcrMeta,
+  type OcrPage,
+  type OcrPagesResult,
+  type OcrResult,
+  type PageOcr,
+} from './ocr.js';
 export {
   analyzeSheet,
   detectCallouts,

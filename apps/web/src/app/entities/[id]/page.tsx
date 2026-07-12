@@ -1,18 +1,23 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import type { Entity, NeighborHit } from '@ekg/core';
-import { DEV_CALLER, getStore } from '../../../lib/store';
-import { removeRelationship } from '../../curation/actions';
-import { CurationPanel } from './CurationPanel';
+import { isPublicAcl, type Entity, type NeighborHit } from '@ekg/core';
+import type { SheetFacts } from '@ekg/ingestion';
+import { getCaller, getStore, isCurator } from '../../../lib/store';
+import { SheetStructure } from '../../../components/SheetStructure';
+import { LifecycleControls } from '../../../components/LifecycleControls';
+import { AccessAndLinksPanel } from './AccessAndLinksPanel';
 import {
+  AccessBadge,
   ProvenanceLine,
   REVIEW_WARNINGS,
   ReviewBadge,
   TagChips,
   TypeBadge,
   entityHref,
+  sourceLabel,
   typeColor,
 } from '../../../components/ui';
+import { EntityEditor, RemoveRelationshipButton, type MergeCandidate } from '../../../components/EntityEditor';
 
 function shortTitle(title: string, max = 20): string {
   return title.length > max ? `${title.slice(0, max - 1)}…` : title;
@@ -70,21 +75,41 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
   const { id: rawId } = await params;
   const id = decodeURIComponent(rawId);
   const store = await getStore();
-  const entity = await store.getEntity(DEV_CALLER, id);
+  const caller = await getCaller();
+  const entity = await store.getEntity(caller, id);
   if (!entity) notFound();
-  const [neighbors, chunks, allEntities] = await Promise.all([
-    store.neighbors(DEV_CALLER, id),
-    store.getChunks(DEV_CALLER, id),
-    store.list(DEV_CALLER, { limit: 1000 }),
+  const [neighbors, chunks] = await Promise.all([
+    store.neighbors(caller, id),
+    store.getChunks(caller, id),
   ]);
-  const sameType = allEntities.filter((e) => e.type === entity.type && e.id !== entity.id);
-  const linkTargets = allEntities.filter((e) => e.id !== entity.id);
+
+  const canCurate = isCurator(caller);
+  // Targets for the add-relationship picker (curators only — the list is a
+  // permission-trimmed read either way, this just skips the work for viewers).
+  const linkTargets = canCurate
+    ? (await store.list(caller, { limit: 1000 })).filter((e) => e.id !== entity.id)
+    : [];
+  // Merge candidates are the other entities of this type — duplicates are
+  // almost always same-type; keeping the picker scoped keeps it legible.
+  const mergeCandidates: MergeCandidate[] = canCurate
+    ? (await store.list(caller, { types: [entity.type], limit: 200 }))
+        .filter((e) => e.id !== entity.id)
+        .map((e) => ({
+          id: e.id,
+          title: e.title,
+          type: e.type,
+          reviewStatus: e.provenance.reviewStatus,
+        }))
+    : [];
 
   const warning = REVIEW_WARNINGS[entity.provenance.reviewStatus];
   const supersededBy = neighbors.find(
     (n) => n.relationship.type === 'supersedes' && n.direction === 'in',
   );
-  const properties = Object.entries(entity.properties);
+  // The deterministic CAD/spec parse is surfaced in its own panel below, so keep
+  // it out of the raw key/value dump (it renders cleanly, not as a JSON blob).
+  const parserFacts = entity.properties.parserFacts as SheetFacts | undefined;
+  const properties = Object.entries(entity.properties).filter(([k]) => k !== 'parserFacts');
 
   return (
     <>
@@ -96,6 +121,7 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
         <span className="badges">
           <TypeBadge type={entity.type} />
           <ReviewBadge status={entity.provenance.reviewStatus} />
+          <AccessBadge acl={entity.acl} />
         </span>
       </div>
       {warning ? (
@@ -113,6 +139,9 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
       {entity.summary ? <p className="summary">{entity.summary}</p> : null}
       <TagChips tags={entity.tags} />
       <ProvenanceLine entity={entity} />
+      <SheetStructure anchor={entity.provenance.anchor} facts={parserFacts} />
+      {canCurate ? <EntityEditor entity={entity} mergeCandidates={mergeCandidates} /> : null}
+      {canCurate ? <LifecycleControls entity={entity} mergeCandidates={mergeCandidates} /> : null}
       {entity.content ? (
         <details className="doc-panel">
           <summary>
@@ -185,20 +214,15 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
                     <td>
                       <ReviewBadge status={n.entity.provenance.reviewStatus} />
                     </td>
-                    <td>
-                      <form action={removeRelationship}>
-                        <input type="hidden" name="id" value={entity.id} />
-                        <input type="hidden" name="relId" value={n.relationship.id} />
-                        <button
-                          type="submit"
-                          className="btn-reject"
-                          title="Remove this relationship"
-                          aria-label={`Remove ${n.relationship.type} relationship to ${n.entity.title}`}
-                        >
-                          ✕
-                        </button>
-                      </form>
-                    </td>
+                    {canCurate ? (
+                      <td className="rel-remove-cell">
+                        <RemoveRelationshipButton
+                          relId={n.relationship.id}
+                          entityId={entity.id}
+                          label={`${n.relationship.type} · ${n.entity.title}`}
+                        />
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -226,11 +250,17 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
                 <tr>
                   <td>Access</td>
                   <td>
-                    {entity.acl.allowedPrincipals.includes('*')
-                      ? 'Whole firm'
-                      : entity.acl.allowedPrincipals.join(', ')}
+                    {isPublicAcl(entity.acl)
+                      ? 'Everyone in the workspace'
+                      : `Restricted — ${entity.acl.allowedPrincipals.join(', ')}`}
                   </td>
                 </tr>
+                {sourceLabel(entity.provenance.sourceSystem) ? (
+                  <tr>
+                    <td>Source system</td>
+                    <td>{sourceLabel(entity.provenance.sourceSystem)}</td>
+                  </tr>
+                ) : null}
                 {entity.provenance.author ? (
                   <tr>
                     <td>Author</td>
@@ -257,9 +287,11 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      <div style={{ marginTop: '1.2rem' }}>
-        <CurationPanel entity={entity} sameType={sameType} linkTargets={linkTargets} />
-      </div>
+      {canCurate ? (
+        <div style={{ marginTop: '1.2rem' }}>
+          <AccessAndLinksPanel entity={entity} linkTargets={linkTargets} />
+        </div>
+      ) : null}
     </>
   );
 }

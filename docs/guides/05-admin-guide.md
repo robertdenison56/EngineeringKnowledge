@@ -138,8 +138,11 @@ The dev-secret JWT deliberately uses **the same claim shape a federated Entra
 token will carry**. When OAuth 2.1 + Entra federation lands, **only the verifier
 changes** — `verifyToken` becomes a JWKS/OIDC check; `resolveCallerFromAuth` and
 every downstream consumer stay put. ACL and tenant enforcement are already in
-place and don't move. (See [`auth.ts`](../../apps/mcp-server/src/auth.ts) and the
-[gateway-remote-transport notes](../decisions/).)
+place and don't move. The verifier swap and the protected-resource metadata that
+makes the [claude.ai org connector](#admin-managed-claudeai-connector-organization-wide--oauth-on-the-roadmap)
+connectable are scoped in
+[ADR 0011](../decisions/0011-gateway-oauth-entra-federation.md) (see also
+[`auth.ts`](../../apps/mcp-server/src/auth.ts)).
 
 ## Audit logging
 
@@ -217,19 +220,147 @@ shared. `search` and `fetch` are named and shaped to meet the ChatGPT connector
 spec; `traverse`, `find_experts`, and `get_project_context` round out the
 graph-aware surface.
 
-- **Claude / Claude Code** — register the remote gateway URL (`/mcp`) as an MCP
-  server with the bearer token. (Locally, `claude mcp add` with the stdio binary,
-  per [Getting started](01-getting-started.md).)
-- **ChatGPT** — connect it as a custom connector pointing at the gateway URL;
-  `search`/`fetch` satisfy the connector contract.
+The gateway authenticates **every** request with a bearer JWT
+([identity](#identity-tenants-and-permissions)). So *how* you connect an assistant
+depends on what that client can carry — and the two paths are genuinely different
+in build status, so they're separated honestly below.
+
+### Works today — clients that send a static `Authorization` header
+
+These accept a token you mint (the [dev-token recipe](#minting-tokens-for-development))
+and work against the gateway exactly as built:
+
+- **Claude Code (remote)** — register the deployed gateway over HTTP with the
+  bearer header:
+
+  ```sh
+  claude mcp add ekg --transport http https://ekg.yourfirm.com/mcp \
+    --header "Authorization: Bearer <jwt>"
+  ```
+
+  (For local single-user dev, use the stdio binary instead, per
+  [Getting started](01-getting-started.md).)
+- **Claude API MCP connector** — pass the gateway as an `mcp_servers` entry with
+  an `authorization_token`; the API forwards it as the bearer header.
+- **ChatGPT custom connector / GPT actions** — point a custom connector at the
+  gateway URL and put the bearer token in its auth field; `search`/`fetch`
+  satisfy the connector contract.
+- **The MCP SDK / any client with a custom header** — same path. This is exactly
+  what the [end-to-end sign-off](#end-to-end-sign-off) and the `smoke-http.mjs`
+  test exercise.
+
+### Admin-managed claude.ai connector (organization-wide) — OAuth, on the roadmap
+
+claude.ai (Team/Enterprise) lets an **Owner** add a custom connector once, for the
+whole organization, which members then connect to individually:
+
+1. **Owner / Primary Owner:** *Organization settings → Connectors → Add →
+   Custom → Web*, enter the gateway URL (`https://ekg.yourfirm.com/mcp`) and, under
+   **Advanced settings**, the OAuth **Client ID / Client Secret**.
+2. **Each member:** open their own **Connectors** settings, find the connector
+   (labelled *Custom*), and click **Connect** to authenticate. Claude then sees
+   only the tools and data that member is allowed — which, for EKG, the gateway's
+   per-token ACL and tenant trimming already enforce.
+
+*(claude.ai UI labels follow Anthropic's Help Center and may change.)*
+
+> **Honest status — not connectable from claude.ai's web UI yet.** That flow is
+> **OAuth-based**: claude.ai runs an OAuth authorization handshake against the
+> server (the MCP authorization spec — `/.well-known/oauth-protected-resource`,
+> authorization-server metadata, and either Dynamic Client Registration or the
+> Client ID/Secret you paste). The gateway today authenticates with a **bearer
+> JWT and exposes no OAuth endpoints**, so claude.ai's connector cannot complete
+> its handshake. This is exactly the deferred **OAuth 2.1 + Entra federation**
+> work ([identity](#production-sso-designed-not-built)): when it lands, the gateway
+> advertises the OAuth metadata and verifies federated tokens, and this
+> admin-managed flow works unchanged. **Until then, use the static-header clients
+> above** (Claude Code remote, the API connector, ChatGPT).
+
 - **Microsoft 365 Copilot** — the intended path is deploying the connection from
   the M365 admin center with Entra SSO, so rollout is configuration, not
-  development (PRD user story 12). This depends on the Entra federation work noted
-  under [identity](#production-sso-designed-not-built).
+  development (PRD user story 12). Like the claude.ai org connector, this depends
+  on the same Entra federation work under
+  [identity](#production-sso-designed-not-built).
 
 Whichever assistant, the behavior is the same: results carry provenance and a
 link into the workspace app (`EKG_APP_URL`), stale items carry a warning, and an
 empty graph yields an explicit "no firm answer" rather than a generic guess.
+
+## End-to-end sign-off
+
+Before you point assistants at a deployment, prove the remote gateway is live and
+correct against the *running* server, not just in CI. `smoke-http.mjs` spawns its
+own in-memory demo server; the **sign-off** script
+([`scripts/signoff-remote.mjs`](../../apps/mcp-server/scripts/signoff-remote.mjs))
+drives a gateway you've **already deployed**, over the same Streamable HTTP +
+bearer path a real client uses.
+
+### Run it
+
+```sh
+EKG_SIGNOFF_URL=https://ekg.yourfirm.com \
+EKG_JWT_SECRET=<the gateway's secret> \
+npm run signoff --workspace @ekg/mcp-server
+```
+
+| Variable | Purpose |
+|---|---|
+| `EKG_SIGNOFF_URL` | Gateway base URL (a trailing `/mcp` is accepted). **Required.** |
+| `EKG_JWT_SECRET` | The secret the gateway verifies with — lets the script mint its own caller tokens. Required unless `EKG_SIGNOFF_TOKEN` is set. |
+| `EKG_SIGNOFF_TOKEN` | A pre-minted bearer JWT, used instead of minting (single-identity checks only). |
+| `EKG_SIGNOFF_TENANT` / `EKG_SIGNOFF_SUB` / `EKG_SIGNOFF_GROUPS` | Primary caller claims. Default `demo-firm` / `user:priya` / `group:engineering`. |
+| `EKG_SIGNOFF_QUERY` | Query for the generic search check. Default `firestop`. |
+| `EKG_SIGNOFF_DEMO=1` | Also run the seeded-graph ACL/tenant proofs — only on a deployment serving the demo graph, and needs `EKG_JWT_SECRET`. |
+
+### What it asserts
+
+On **any** deployment:
+
+- `GET /healthz` is live and unauthenticated.
+- An unauthenticated request **and** a bad token are both rejected `401`
+  (fail-closed) before any handler runs.
+- A valid token initializes a Streamable HTTP session and the gateway serves the
+  P0-3 tool surface (`search` / `fetch` / `traverse` / `find_experts` /
+  `get_project_context`).
+- `search` returns a well-formed envelope, and any results carry provenance + an
+  app URL (P0-8).
+
+With `EKG_SIGNOFF_DEMO=1` (seeded graph) it additionally proves identity drives
+retrieval: the engineer is ACL-trimmed from the privileged legal memo, a second
+token (counsel) **can** read it, and a cross-tenant token retrieves nothing.
+
+It exits non-zero on any failure (skipped checks are fine) and prints a block you
+can paste into your release record:
+
+```
+==================================================================
+  EKG REMOTE GATEWAY — END-TO-END SIGN-OFF
+==================================================================
+  URL:        https://ekg.yourfirm.com/mcp
+  Principal:  user:priya @ demo-firm
+  Checked at: 2026-…Z
+  Result:     PASS  (10 passed, 0 failed, 0 skipped)
+  Audit:      confirm these calls landed in EKG_AUDIT_LOG / your log
+              pipeline, attributed to user:priya with transport=http (P0-7).
+==================================================================
+```
+
+### Finish the loop by hand
+
+The script proves the transport, identity, and trimming; two things are
+operator-side because they live outside the gateway process:
+
+- **Audit landing.** Confirm the calls the script just made appear in your
+  `EKG_AUDIT_LOG` (or stderr log pipeline), attributed to the principal with
+  `transport=http` — that's the [P0-7 trail](#audit-logging).
+- **A real assistant round-trip.** Connect one of the [static-header
+  clients](#works-today--clients-that-send-a-static-authorization-header) (Claude
+  Code remote is quickest) and ask a grounded question; confirm the answer cites
+  the graph with a working app link, and that a superseded item comes back *with
+  its warning*.
+
+Record the result — URL, date, who signed off, and the PASS block — wherever you
+keep release approvals.
 
 ## Configuration reference
 

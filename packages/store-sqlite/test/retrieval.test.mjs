@@ -47,6 +47,37 @@ test('dense layer: embeddings stored, fused, and never break honesty', async () 
   assert.equal(none.length, 0, 'vectors must not admit lexically unmatched items (P0-8)');
 });
 
+test('graph-expansion: surfaces a 1-hop neighbor of a strong hit, below it, and stays honest', async () => {
+  const store = new SqliteGraphStore(':memory:');
+  await seedDemo(store);
+  const q = 'curtain wall to slab edge firestop detail';
+
+  // Strict (expansion off): only direct concept matches.
+  const strict = await store.search(ENGINEER, q, { limit: 25, expand: false });
+  assert.equal(strict[0].entity.id, 'detail:cw-firestop-02', 'direct hit ranks first');
+  const strictIds = new Set(strict.map((h) => h.entity.id));
+
+  // A neighbor of the top hit that does NOT match the query directly.
+  const neighbors = await store.neighbors(ENGINEER, 'detail:cw-firestop-02');
+  const offGraphNeighbor = neighbors.map((n) => n.entity.id).find((id) => !strictIds.has(id));
+  assert.ok(offGraphNeighbor, 'fixture has a neighbor that does not match the query directly');
+
+  // Expansion on (the default): the neighbor now appears, ranked below the
+  // direct match — the GraphRAG payoff without displacing precision.
+  const expanded = await store.search(ENGINEER, q, { limit: 25 });
+  const ids = expanded.map((h) => h.entity.id);
+  assert.equal(expanded[0].entity.id, 'detail:cw-firestop-02', 'direct hit still ranks first');
+  assert.ok(ids.includes(offGraphNeighbor), `expansion surfaced neighbor ${offGraphNeighbor}`);
+  assert.ok(
+    ids.indexOf('detail:cw-firestop-02') < ids.indexOf(offGraphNeighbor),
+    'the direct match outranks the expanded neighbor',
+  );
+
+  // Honesty preserved: a query nothing matches expands to nothing (P0-8).
+  assert.equal((await store.search(ENGINEER, 'zzz nonexistent topic zzz')).length, 0);
+  store.close();
+});
+
 test('reindexEmbeddings backfills rows missing vectors', async () => {
   const store = new SqliteGraphStore(':memory:');
   await seedDemo(store);

@@ -1,5 +1,6 @@
 import type { Caller } from './graph-store.js';
 import type { Chunk, Entity, ReviewStatus } from './ontology.js';
+import type { RetrievalRole } from './roles.js';
 
 /**
  * Shared retrieval semantics used by every GraphStore implementation, so the
@@ -25,15 +26,34 @@ export function canRead(caller: Caller, entity: Entity): boolean {
 }
 
 /**
- * Lowercase, strip diacritics and hyphens, so "Façade" matches "facade"
- * and "fire-stopping" matches "firestopping".
+ * MasterFormat section codes are the precision identifiers AEC search runs on
+ * (07 84 00, 09 91 23.13), but they get written with every separator —
+ * "07 84 00", "07.84.00", "07-84-00", "078400". Collapse the 2-2-2 (and the
+ * level-4 2-2-2-2) pattern to one atomic token so every spelling matches the
+ * same way. Without this they split into per-pair tokens that each have to
+ * AND-match, so the compact form "078400" missed the spaced form entirely and
+ * the spaced form only matched by accidental substring ("07" inside any number).
+ * Runs on already-lowercased text, before hyphen stripping, so the identical
+ * canonical token lands in both the query groups and the indexed haystack
+ * (ADR 0003 precision identifiers).
+ */
+const SECTION_CODE = /\b\d{2}[ .-]\d{2}[ .-]\d{2}(?:[ .-]\d{2})?\b/g;
+
+export function canonicalizeIdentifiers(text: string): string {
+  return text.replace(SECTION_CODE, (code) => code.replace(/[ .-]/g, ''));
+}
+
+/**
+ * Lowercase, strip diacritics and hyphens, and canonicalize section codes, so
+ * "Façade" matches "facade", "fire-stopping" matches "firestopping", and every
+ * spelling of "07 84 00" matches "078400".
  */
 export function normalizeText(text: string): string {
-  return text
+  const lowered = text
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-    .replace(/-/g, '');
+    .toLowerCase();
+  return canonicalizeIdentifiers(lowered).replace(/-/g, '');
 }
 
 const STOPWORDS = new Set([
@@ -100,6 +120,29 @@ export function scoreEntityMatch(entity: Entity, groups: string[][]): number {
   if (!groups.every((g) => g.some((v) => haystack.includes(v)))) return 0;
   const title = normalizeText(`${entity.title} ${(entity.aliases ?? []).join(' ')}`);
   return groups.length + groups.filter((g) => g.some((v) => title.includes(v))).length;
+}
+
+/**
+ * Whether a retrieval role favors this entity — it carries one of the role's
+ * boost tags, or is one of its boost types. Tag/type membership only; no text
+ * scan (P0-8 honesty lives in the admission gate, not here).
+ */
+export function entityMatchesRole(entity: Entity, role: RetrievalRole): boolean {
+  return (
+    role.boostTypes.includes(entity.type) ||
+    (entity.tags ?? []).some((t) => role.boostTags.includes(t))
+  );
+}
+
+/**
+ * Ranking multiplier a role applies to an entity — the role's `weight` when it
+ * favors the entity, else 1 (no role, or no match). Applied alongside the
+ * review-status multiplier in each store's fusion step: it only ever scales the
+ * score of an already-admitted candidate, so a role can neither admit an item
+ * no concept matched nor hide one that did (PRD P0-7/P0-8 unaffected).
+ */
+export function roleBoostFactor(entity: Entity, role?: RetrievalRole): number {
+  return role && entityMatchesRole(entity, role) ? role.weight : 1;
 }
 
 /** Heading + body of a chunk, normalized — the chunk-level haystack. */

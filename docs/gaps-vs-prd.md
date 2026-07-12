@@ -62,7 +62,7 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 | **Mark superseded / deprecated** | ✅ | P0-1 lifecycle, P0-8 | [G5](#g5--no-gui-for-the-supersededdeprecated-lifecycle) |
 | **Set / confirm an item's ACL** | ✅ | P0-2, P0-9 curator | [G6](#g6--no-gui-for-aclpermission-curation) |
 | Usage analytics (top / zero-result / cited) | ❌ | P1-4 | [G10](#g10--no-usage-analytics-dashboard-p1) |
-| Roles & SSO sign-in | ❌ | P0-9 roles, P0-7 | [G11](#g11--no-roles-or-sso-auth) |
+| Roles & SSO sign-in | 🟡 | P0-9 roles, P0-7 | [G11](#g11--no-roles-or-sso-auth) |
 | Gateway / SSO / embeddings / tokens | ⚙️ CLI | Admin setup | *out of scope (allowed)* |
 
 ---
@@ -98,11 +98,18 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G2 · No ingestion setup wizard or bulk-import GUI
 
-- **Status: 🟡 Interim shipped (2026-06-23)** — the `/ingest` page accepts
-  **multiple files at once** (Approach step 1 below) with optional batch tags, so
-  a knowledge manager can self-serve a bulk import without the CLI. Still pending:
-  step 2 (SharePoint/OneDrive OAuth connector + scheduled sync + sync-health
-  panel) and step 3 (CSV project-list import).
+- **Status: 🟡 Steps 1 + 3 shipped — step 2 (SharePoint sync) pending.** The
+  `/ingest` page accepts **multiple files at once** (step 1, 2026-06-23) and now
+  also **imports a project list from CSV** (step 3, 2026-06-24): paste or upload a
+  register, rows become `project` candidates keyed on project number, malformed
+  rows reported not guessed ([`csv.ts`](../services/ingestion/src/csv.ts), tabbed
+  UI in [`IngestTabs.tsx`](../apps/web/src/app/ingest/IngestTabs.tsx)). The
+  **source-connector seam** that step 2 plugs into also landed —
+  `SourceConnector` + `planSync` change detection + a `FolderConnector` reference
+  impl ([`source.ts`](../services/ingestion/src/source.ts)) — so the SharePoint
+  build is a new connector, not a new ingestion path. Still pending: step 2
+  proper (SharePoint/OneDrive OAuth connector + scheduled sync + sync-health
+  panel).
 - **PRD:** P0-9 *"Ingestion setup wizard: connect a source (SharePoint…), pick
   libraries/projects, confirm permission mapping, and monitor sync health —
   designed so Marcus can do it without IT after initial OAuth consent."* P0-2
@@ -126,10 +133,11 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 ### G3 · Curation workbench is verify/reject only
 
 - **Status: ✅ Shipped (2026-07-02)** — bulk verify/reject + pagination on the
-  workbench, soft-delete trash with restore, and merge with diff-free field
-  union + edge repointing via the new `deleteRelationship`/`mergeEntities`
-  store primitives. (A diff-style preview against the survivor remains a
-  nice-to-have.)
+  workbench, journaled undo of every operation (a mistaken reject restores
+  fields, passages, and edges from *Recent changes*), and merge with field
+  union + edge repointing via the `deleteRelationship`/`mergeEntities`
+  store primitives — all gated by a server-side `isCurator` check. (A
+  diff-style preview against the survivor remains a nice-to-have.)
 - **PRD:** P0-9 *"Curation workbench: queue… with accept / **edit** / **reject** /
   **merge** actions, diff-style preview against existing entities, and bulk
   operations; median time to process an item < 2 minutes."*
@@ -149,8 +157,15 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G4 · No inline entity editing
 
-- **Status: ✅ Shipped (2026-07-02)** — *Curate this item* on the entity page
-  edits title, summary, tags, and aliases, and adds/removes relationships.
+- **Status: ✅ Shipped (2026-06-24)** —
+  [`EntityEditor.tsx`](../apps/web/src/components/EntityEditor.tsx) +
+  [`entities/[id]/actions.ts`](../apps/web/src/app/entities/[id]/actions.ts). A
+  curator opens an inline editor on the entity page to correct title, type,
+  summary, **tags**, and **aliases**; edits go through `upsertEntity` with no
+  `chunks` argument so a field change never wipes a document's indexed passages
+  (ADR 0006). Relationships can be added and removed inline. The editor is
+  gated by a server-side `isCurator` check on the request's authenticated
+  caller ([`lib/auth.ts`](../apps/web/src/lib/auth.ts)).
 - **PRD:** P0-1 *"Curators can create/edit/merge entities and relationships via the
   workspace app."* P0-9 entity pages *"inline editing for users with curator role."*
 - **Persona:** Curator.
@@ -189,15 +204,18 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G6 · No GUI for ACL / permission curation
 
-- **Status: ✅ Shipped (2026-07-02)** — the entity page shows access in the
-  Record table and the curate panel edits `allowedPrincipals`; source-mapped
-  defaults still arrive with G2's SharePoint sync.
+- **Status: ✅ Shipped (2026-07-02)** — visibility is **captured at ingestion**
+  (the upload form and CSV importer carry a public / restricted-to-principals
+  control that becomes the item ACL), shown everywhere (`AccessBadge`, the
+  entity record's "Access" row), and **re-editable** from the entity page's
+  *Access & relationships* panel (`updateAcl`, curator-gated + journaled).
+  Source-mapped defaults still arrive with G2's SharePoint sync.
 - **PRD:** P0-2 *"Source-system permissions… stored as item ACLs."* P0-9 curator
   role; P0-7 ACL enforcement.
 - **Persona:** Curator; overlaps IT/Security Admin (Dana).
-- **Now:** ACL enforcement works (data layer), but `acl.allowedPrincipals` is only
-  set programmatically — capture defaults to tenant-public (`*`), ingestion sets it
-  in code. No GUI to view or change who can see an item.
+- **Now:** ACL enforcement works (data layer) and visibility is captured + shown
+  at ingestion (above); what's missing is **re-editing** an existing item's
+  `allowedPrincipals` from the GUI.
 - **Impact:** A curator can't confirm/restrict visibility of sensitive material
   (e.g. legal, client-confidential) before verifying — the review checklist in the
   [curation guide](guides/04-curating-knowledge.md#permissions-and-acls) asks them
@@ -254,16 +272,23 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G11 · No roles or SSO (auth)
 
+- **Status: 🟡 Identity substrate shipped (2026-06-28); Entra SSO end-to-end
+  pending.** Every page and server action now resolves a per-request caller via
+  [`lib/auth.ts`](../apps/web/src/lib/auth.ts) (`resolveCaller`): an
+  Entra/"Easy Auth" `x-ms-client-principal` header maps to principals, groups,
+  and admin/curator roles (`EKG_ADMIN_GROUP`/`EKG_CURATOR_GROUP`), and an
+  unauthenticated **production** request fails closed. `DEV_CALLER` survives
+  only as the local-dev fallback (`EKG_DEV_AUTH=1`/non-prod). Curator/admin
+  actions (G3–G6, settings) re-check the role server-side.
 - **PRD:** P0-9 *"viewer / contributor / curator / admin roles; sign-in via Entra
   ID SSO."* P0-7 per-request identity.
-- **Now:** The app runs as a fixed dev identity (`DEV_CALLER` in
-  [`lib/store.ts`](../apps/web/src/lib/store.ts)); the HTTP gateway already does
-  per-request JWT identity, but the app has no login and no role gating — so
-  curator-only actions (G3–G6) currently have nothing to gate against.
-- **Note:** SSO/token plumbing is **admin setup** (allowed CLI), but *role-gated
-  GUI actions* depend on it; it's listed here because G4–G6 need a role to attach
-  to. **Effort: L** (SSO is the deferred OAuth 2.1 + Entra phase; the verifier swap
-  is already scoped in [`auth.ts`](../apps/mcp-server/src/auth.ts)).
+- **Still open:** deploying behind real Entra ID SSO end-to-end (the identity
+  proxy that sets the header), plus the gateway's OAuth 2.1 federation
+  ([ADR 0011](decisions/0011-gateway-oauth-entra-federation.md)).
+- **Note:** SSO/token plumbing is **admin setup** (allowed CLI); the role-gated
+  GUI actions it feeds are live. **Effort: M** for the remaining SSO deployment
+  (the verifier swap is already scoped in
+  [`auth.ts`](../apps/mcp-server/src/auth.ts)).
 
 ---
 
@@ -276,9 +301,9 @@ most existing code:
    pipeline. One change closes "can't add a document in a browser."~~ **✅ Done
    2026-06-23** (`/ingest` single + multi-file upload).
 2. ~~**G4 + G5** — inline entity edit + supersede/deprecate controls.~~ **✅
-   Done 2026-07-02** (entity-page curate panel).
+   Done 2026-07-02** (EntityEditor + LifecycleControls, journaled + role-gated).
 3. ~~**G3** — workbench edit + bulk + merge (merge needs the store
-   extension).~~ **✅ Done 2026-07-02** (bulk actions, trash + restore, merge
+   extension).~~ **✅ Done 2026-07-02** (bulk actions, journaled undo, merge
    on `mergeEntities`).
 4. **G6, G9, G7** — ~~ACL editor~~ (✅ 2026-07-02), capture type-ahead linking
    (🟡 project + author links shipped; standards linking pending), search

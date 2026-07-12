@@ -157,13 +157,17 @@ test('mergeEntities repoints the duplicate’s edges onto the survivor and remov
 
   assert.equal(
     await store.mergeEntities(OTHER_FIRM, 'detail:cw-firestop-02', 'detail:cw-firestop-02-dupe'),
-    false,
+    undefined,
     'cross-tenant merge refused',
   );
-  assert.equal(
-    await store.mergeEntities(ENGINEER, 'detail:cw-firestop-02', 'detail:cw-firestop-02-dupe'),
-    true,
+  const merged = await store.mergeEntities(
+    ENGINEER,
+    'detail:cw-firestop-02',
+    'detail:cw-firestop-02-dupe',
   );
+  assert.equal(merged?.survivorId, 'detail:cw-firestop-02');
+  assert.equal(merged?.repointed, 1, 'unique edge repointed');
+  assert.equal(merged?.dropped, 1, 'edge the survivor already had is dropped');
   assert.equal(await store.getEntity(ENGINEER, 'detail:cw-firestop-02-dupe'), undefined, 'duplicate gone');
 
   const neighbors = await store.neighbors(ENGINEER, 'detail:cw-firestop-02');

@@ -108,3 +108,74 @@ test(
     assert.ok(v.capability.hasTextLayer);
   },
 );
+
+// --- Page geometry: non-zero view origin + /Rotate ------------------------
+// Real large-format AEC sheets often carry a non-zero CropBox/MediaBox origin
+// and a page /Rotate; both must be normalized or geometry-derived claims land
+// on the wrong axis/band. All committed fixtures are 0-origin/unrotated, so
+// these two build minimal PDFs inline to exercise the normalization.
+
+/** Assemble a valid PDF from 1-indexed object bodies, computing the xref. */
+function buildPdf(objects) {
+  const chunks = [Buffer.from('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n', 'latin1')];
+  let offset = chunks[0].length;
+  const offsets = [];
+  objects.forEach((body, i) => {
+    offsets.push(offset);
+    const obj = Buffer.concat([
+      Buffer.from(`${i + 1} 0 obj\n`, 'latin1'),
+      Buffer.isBuffer(body) ? body : Buffer.from(body, 'latin1'),
+      Buffer.from('\nendobj\n', 'latin1'),
+    ]);
+    chunks.push(obj);
+    offset += obj.length;
+  });
+  const xrefStart = offset;
+  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const o of offsets) xref += `${String(o).padStart(10, '0')} 00000 n \n`;
+  xref += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`;
+  chunks.push(Buffer.from(xref, 'latin1'));
+  return new Uint8Array(Buffer.concat(chunks));
+}
+function streamObj(body) {
+  const data = Buffer.from(body, 'latin1');
+  return Buffer.concat([
+    Buffer.from(`<< /Length ${data.length} >>\nstream\n`, 'latin1'),
+    data,
+    Buffer.from('\nendstream', 'latin1'),
+  ]);
+}
+function onePagePdf({ mediaBox, rotate, content }) {
+  return buildPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    `<< /Type /Page /Parent 2 0 R /MediaBox [${mediaBox}]${rotate ? ` /Rotate ${rotate}` : ''} /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    streamObj(content),
+  ]);
+}
+
+test('non-zero CropBox origin: text positions normalized into the view box', async () => {
+  // View origin (100,50); text drawn at PDF (110,70) sits at (10,20) in view space.
+  const pdf = onePagePdf({ mediaBox: '100 50 712 842', content: 'BT /F1 10 Tf 110 70 Td (TBLOCK) Tj ET' });
+  const page = (await extractVectorContent(pdf)).pages[0];
+  assert.equal(page.width, 612);
+  assert.equal(page.height, 792);
+  const t = page.texts.find((t) => t.str.includes('TBLOCK'));
+  assert.ok(t, 'text extracted');
+  assert.ok(Math.abs(t.x - 10) < 1, `x normalized to the view origin, got ${t.x} (would be 110 unfixed)`);
+  assert.ok(Math.abs(t.y - 20) < 1, `y normalized to the view origin, got ${t.y} (would be 70 unfixed)`);
+});
+
+test('page /Rotate 90: display dimensions swap and positions stay in the box', async () => {
+  const pdf = onePagePdf({ mediaBox: '0 0 612 792', rotate: 90, content: 'BT /F1 10 Tf 10 20 Td (ROT) Tj ET' });
+  const page = (await extractVectorContent(pdf)).pages[0];
+  assert.equal(page.width, 792, 'rotated display width = original height');
+  assert.equal(page.height, 612, 'rotated display height = original width');
+  const t = page.texts.find((t) => t.str.includes('ROT'));
+  assert.ok(t, 'text extracted');
+  assert.ok(
+    t.x >= 0 && t.x <= 792 && t.y >= 0 && t.y <= 612,
+    `position normalized into the rotated display box, got (${t.x}, ${t.y})`,
+  );
+});

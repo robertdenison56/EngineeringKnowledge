@@ -95,17 +95,26 @@ per-request identity from a bearer JWT, so ACL trimming and tenant isolation
 follow the calling token (two tokens hit one server and see different
 knowledge), plus an append-only audit trail of every call (P0-7). The richer
 P0-3 tools `find_experts` and `get_project_context` round out the surface.
+Clients that send a bearer header connect to it today — Claude Code
+(`--transport http --header`), the Claude API MCP connector, ChatGPT — while an
+admin-managed **claude.ai** organization connector needs the OAuth work below.
+`npm run signoff --workspace @ekg/mcp-server` validates a live deployment
+end-to-end (auth gate, served tool surface, ACL + tenant trimming) and prints a
+sign-off record; see the
+[Administration guide](docs/guides/05-admin-guide.md#connecting-assistants-org-wide).
 The **curation loop is now fully GUI-operable** (gap report G3–G6): inline
 field and ACL editing, supersede/deprecate lifecycle controls, merge with
-edge repointing, relationship add/remove, bulk verify/reject with a
-restorable trash, and capture-time graph linking — with every app mutation
-audited into the same P0-7 trail as the gateway (transport `web` vs
-`stdio`/`http`). Capture-from-chat ships as the gateway's
-`propose_knowledge` tool (P1-5). The shared SQLite store runs in WAL mode
-with transactional writes so the app, gateway, and CLI can safely share one
-database — the setup [Guide 6](docs/guides/06-testing-with-claude-desktop.md)
-uses to test the whole loop from Claude Desktop.
+edge repointing, relationship add/remove, bulk verify/reject, and
+capture-time graph linking — every mutation role-gated on the request's
+authenticated caller, journaled as one undoable operation, and audited into
+the same P0-7 trail as the gateway (transport `web` vs `stdio`/`http`).
+Capture-from-chat ships as the gateway's `propose_knowledge` tool (P1-5).
+The shared SQLite store runs in WAL mode with transactional writes so the
+app, gateway, and CLI can safely share one database — the setup
+[Guide 6](docs/guides/06-testing-with-claude-desktop.md) uses to test the
+whole loop from Claude Desktop.
 Open before Phase 2 exit: production graph engine (OQ 1), SharePoint sync,
-OCR for scanned sets, and OAuth 2.1 + Entra federation on the gateway — the
+and OAuth 2.1 + Entra federation on the gateway — the
 JWT identity uses the same claim shape, so that work swaps only the token
-verifier.
+verifier. Scanned sets now OCR with per-page confidence gating (P0-2a); the
+curation queue flags low-confidence text for close review.

@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { ENTITY_TYPES } from '@ekg/core';
-import { DEV_CALLER, getStore } from '../lib/store';
+import { getCaller, getStore } from '../lib/store';
 import { EntityCard, TypeBadge } from '../components/ui';
 
 export default async function Dashboard() {
   const store = await getStore();
-  const all = await store.list(DEV_CALLER, { limit: 500 });
+  const caller = await getCaller();
+  const all = await store.list(caller, { limit: 500 });
   const counts = new Map<string, number>();
   for (const e of all) counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
   const recent = [...all]

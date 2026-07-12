@@ -1,20 +1,29 @@
 :root {
-  --bg: #f6f7f9;
+  /* ── Brand (from the EK logo) ─────────────────────────────────────────────
+     Navy is the "E" + ENGINEERING wordmark; blue is the "K" + KNOWLEDGE.
+     These two are theme-constant so the app reads as EK in light or dark. */
+  --brand-navy: #002050;
+  --brand-navy-deep: #001838;
+  --brand-blue: #0070f8;
+  /* The branded header surface — used in both themes. */
+  --header-bg: linear-gradient(180deg, #00275f 0%, #001a40 100%);
+
+  --bg: #f3f6fb;
   --surface: #ffffff;
   /* Subtle inset panels (doc text, map canvas) — one step off --surface. */
-  --surface-2: #fcfdff;
-  --text: #0f172a;
-  --muted: #64748b;
-  --border: #e2e8f0;
-  --accent: #2563eb;
+  --surface-2: #f8fbff;
+  --text: #0b1f3a;
+  --muted: #5b6b87;
+  --border: #dce3ef;
+  --accent: #0070f8;
   --accent-contrast: #ffffff;
   --warning-bg: #fef3c7;
   --warning-fg: #92400e;
-  /* Tag / relationship chips. */
-  --chip-bg: #eef2ff;
-  --chip-fg: #3730a3;
-  --chip-border: #c7d2fe;
-  --chip-hover: #e0e7ff;
+  /* Tag / relationship chips — brand-blue family. */
+  --chip-bg: #e7f0ff;
+  --chip-fg: #0850c4;
+  --chip-border: #c2dbff;
+  --chip-hover: #d6e6ff;
   /* Density-driven spacing knobs (overridden by [data-density]). */
   --card-pad: 0.9rem 1.1rem;
   --card-gap: 0.9rem;
@@ -23,22 +32,24 @@
 
 /* Dark theme — set on <html data-theme="dark"> by the no-flash script in
    the layout, driven by the Settings → Appearance control. The app already
-   themes through these variables, so this is mostly a palette swap. */
+   themes through these variables, so this is mostly a palette swap. Surfaces
+   are navy-tinted to echo the brand. */
 html[data-theme='dark'] {
-  --bg: #0b1220;
-  --surface: #141d30;
-  --surface-2: #0f1828;
+  --header-bg: linear-gradient(180deg, #001f4d 0%, #00132f 100%);
+  --bg: #07101f;
+  --surface: #0f1c33;
+  --surface-2: #0b1729;
   --text: #e6edf6;
-  --muted: #94a3b8;
-  --border: #25324b;
-  --accent: #5b9bff;
-  --accent-contrast: #07101f;
+  --muted: #93a3bd;
+  --border: #233650;
+  --accent: #4d92ff;
+  --accent-contrast: #04122b;
   --warning-bg: #3a2f12;
   --warning-fg: #fcd34d;
-  --chip-bg: #1d2540;
-  --chip-fg: #c7d2fe;
-  --chip-border: #34406a;
-  --chip-hover: #273158;
+  --chip-bg: #122545;
+  --chip-fg: #bcd6ff;
+  --chip-border: #2c4570;
+  --chip-hover: #16305a;
   color-scheme: dark;
 }
 
@@ -78,37 +89,194 @@ a:hover {
 
 .site-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1.5rem;
-  padding: 0.75rem 1.5rem;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  gap: 0.55rem 1.5rem;
+  padding: 0.6rem 1.5rem;
+  /* Branded navy header (theme-constant), with the logo's blue underline. */
+  background: var(--header-bg);
+  border-bottom: none;
+  box-shadow: inset 0 -2px 0 var(--brand-blue), 0 1px 4px rgba(0, 12, 35, 0.25);
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
 .logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
   font-weight: 700;
-  font-size: 1.05rem;
-  color: var(--text);
+  font-size: 1.02rem;
+  color: #fff;
+  letter-spacing: 0.01em;
 }
-.logo span {
-  font-weight: 400;
-  color: var(--muted);
+.logo:hover {
+  text-decoration: none;
+}
+/* White rounded tile keeps the navy "E" legible on the navy header. */
+.logo-mark {
+  width: 34px;
+  height: 34px;
+  display: block;
+  border-radius: 9px;
+  background: #fff;
+  padding: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.logo-word {
+  line-height: 1;
+}
+.logo-word b {
+  font-weight: 700;
+}
+.logo-word span {
+  font-weight: 600;
+  color: #6db1ff;
 }
 
-.site-header nav {
+/* On wide screens the links take their own full-width row below the logo line
+   (logo + identity sit on the row above). The order/width force the wrap. */
+.site-nav {
+  order: 1;
+  width: 100%;
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-left: -0.55rem;
+}
+/* Clean text links on the navy header — legible but not boxed, with just a
+   soft highlight on hover. */
+.site-nav a {
+  color: #dce7fb;
+  font-size: 0.92rem;
+  font-weight: 500;
+  padding: 0.3rem 0.55rem;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.site-nav a:hover {
+  color: #fff;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Collapsed nav: hamburger + side drawer ──────────────────────────────────
+   Hidden on wide screens; the responsive block below swaps the inline links
+   for the hamburger and reveals the drawer. */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.nav-toggle:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.nav-toggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: #eaf1ff;
+}
+
+.nav-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 8, 20, 0.5);
+  border: none;
+  z-index: 40;
+  cursor: default;
+}
+
+.nav-drawer {
+  display: none;
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 50;
+  flex-direction: column;
+  width: min(82vw, 300px);
+  height: 100vh;
+  height: 100dvh;
+  background: var(--header-bg);
+  box-shadow: -10px 0 28px rgba(0, 8, 24, 0.4);
+  transform: translateX(100%);
+  transition: transform 0.22s ease;
+}
+.nav-drawer.open {
+  transform: translateX(0);
+}
+.nav-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.nav-drawer-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+}
+.nav-drawer-close {
+  font: inherit;
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 0 0.35rem;
+  color: #dce7fb;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.nav-drawer-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+.nav-drawer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem;
+}
+.nav-drawer-links a {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #eaf1ff;
+  padding: 0.7rem 0.8rem;
+  border-radius: 8px;
+}
+.nav-drawer-links a:hover {
+  color: #fff;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.12);
+}
+.nav-drawer-foot {
+  margin-top: auto;
+  padding: 0.9rem 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.78rem;
+  color: rgba(226, 236, 255, 0.75);
 }
 
 .identity {
   margin-left: auto;
   font-size: 0.8rem;
-  color: var(--muted);
-  background: var(--bg);
-  border: 1px solid var(--border);
+  color: rgba(226, 236, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 999px;
   padding: 0.2rem 0.7rem;
 }
@@ -755,19 +923,25 @@ h2 {
 }
 
 /* --- Responsive header ---------------------------------------------------- */
-@media (max-width: 640px) {
-  .site-header {
-    flex-wrap: wrap;
-    gap: 0.6rem 1rem;
+/* On wider screens the links live on their own row below the logo. Once the
+   window gets too small for that row, they collapse into the hamburger + side
+   drawer, and the identity chip moves into the drawer footer. */
+@media (max-width: 700px) {
+  .site-nav {
+    display: none;
   }
-  .site-header nav {
-    order: 3;
-    width: 100%;
-    flex-wrap: wrap;
-    gap: 0.5rem 1rem;
+  .nav-toggle {
+    display: inline-flex;
+    margin-left: auto;
+  }
+  .nav-drawer {
+    display: flex;
+  }
+  .nav-backdrop {
+    display: block;
   }
   .identity {
-    margin-left: 0;
+    display: none;
   }
 }
 
@@ -917,4 +1091,619 @@ html[data-theme='dark'] .res-fail {
 }
 .result-list.failed li {
   color: var(--muted);
+}
+
+/* ── Retrieval roles (focus lenses) ─────────────────────────────────────── */
+
+/* Active-role focus accent — amber, distinct from the blue --accent. */
+:root {
+  --focus: #d97706;
+  --focus-soft: #fef3c7;
+}
+html[data-theme='dark'] {
+  --focus: #fbbf24;
+  --focus-soft: #3a2f12;
+}
+
+/* "Focused" badge on a boosted search hit + the active-role note. */
+.focus-badge {
+  background: var(--focus-soft);
+  color: var(--focus);
+  border: 1px solid var(--focus);
+}
+.card.focused {
+  border-left-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus-soft);
+}
+.role-active-note {
+  color: var(--focus);
+}
+
+/* Map role picker + legend swatch. */
+.map-role-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--focus);
+}
+.map-role-picker select {
+  font: inherit;
+  padding: 0.12rem 0.4rem;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+.legend-focused {
+  background: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-soft);
+}
+
+/* Admin role manager. */
+.roles-admin {
+  display: grid;
+  gap: 1rem;
+}
+.role-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+.role-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  background: var(--surface-2);
+}
+.role-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.role-card-head strong {
+  font-size: 0.98rem;
+}
+.role-weight {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--focus);
+}
+.role-focus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+.role-type-chip,
+.role-tag-chip {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+.role-type-chip {
+  background: var(--surface);
+  color: var(--muted);
+}
+.role-tag-chip {
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  border-color: var(--chip-border);
+}
+.role-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.role-collapsed .role-card-actions {
+  margin-top: 0.6rem;
+}
+
+/* Role create/edit form. */
+.role-form {
+  display: grid;
+  gap: 0.7rem;
+}
+.role-form > label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.role-form input[type='text'],
+.role-form input:not([type]) {
+  font: inherit;
+  padding: 0.4rem 0.55rem;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+}
+.role-types,
+.role-strength {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  margin: 0;
+}
+.role-types legend,
+.role-strength legend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 0.3rem;
+}
+.role-type-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+}
+.role-type-option,
+.role-strength-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.role-strength-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+}
+.role-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.role-form-actions > button[type='submit'] {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.4rem 0.9rem;
+  border: none;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  cursor: pointer;
+}
+.role-form-actions > button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.role-msg {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.role-msg.ok {
+  color: var(--accent);
+}
+.role-msg.err {
+  color: #b91c1c;
+}
+.role-create h4,
+.role-create {
+  margin-top: 0;
+}
+.role-create h4 {
+  margin-bottom: 0.5rem;
+}
+.role-suggest {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.role-delete {
+  display: inline;
+}
+
+/* Ghost/secondary buttons used across the role manager. */
+.ghost-btn {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.ghost-btn.danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+html[data-theme='dark'] .ghost-btn.danger {
+  color: #f87171;
+  border-color: #7f1d1d;
+}
+
+/* ── Entity inline edit + merge (curator only, G3/G4) ─────────────────────── */
+.entity-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0.9rem 0 0.2rem;
+}
+.entity-editor {
+  margin: 0.9rem 0 0.4rem;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2);
+  padding: 0.9rem 1.1rem;
+}
+.entity-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.7rem;
+}
+.entity-edit-form {
+  display: grid;
+  gap: 0.7rem;
+}
+.entity-edit-form > label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.entity-edit-form input,
+.entity-edit-form textarea,
+.entity-edit-form select,
+.entity-merge-form input,
+.entity-merge-form select {
+  font: inherit;
+  padding: 0.4rem 0.55rem;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+}
+.entity-edit-form textarea {
+  resize: vertical;
+}
+.entity-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.entity-edit-actions > button[type='submit'] {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.4rem 0.9rem;
+  border: none;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  cursor: pointer;
+}
+.entity-edit-actions > button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.edit-msg {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.edit-msg.ok {
+  color: var(--accent);
+}
+.edit-msg.err {
+  color: #b91c1c;
+}
+html[data-theme='dark'] .edit-msg.err {
+  color: #f87171;
+}
+
+.entity-merge {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+.entity-merge h4 {
+  margin: 0 0 0.3rem;
+}
+.entity-merge-form {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 30rem;
+}
+.entity-merge-form .merge-select {
+  width: 100%;
+}
+.btn-merge {
+  border-color: #b45309 !important;
+}
+.btn-merge:not(:disabled) {
+  background: #b45309;
+  color: #fff;
+}
+
+/* Per-row "remove relationship" control. */
+.rel-remove-cell {
+  width: 1.6rem;
+  text-align: right;
+}
+.rel-remove-cell form {
+  display: inline;
+}
+.rel-remove {
+  font: inherit;
+  line-height: 1;
+  font-size: 1rem;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 0.1rem 0.35rem;
+  cursor: pointer;
+}
+.rel-remove:hover {
+  color: #b91c1c;
+  background: var(--warning-bg);
+}
+
+/* ── Add-knowledge tabs + CSV import + visibility (PRD P0-2) ─────────────── */
+
+.ingest-tabs {
+  display: grid;
+  gap: 0.9rem;
+}
+.tab-row {
+  display: flex;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.tab-intro {
+  max-width: 640px;
+  margin: 0;
+}
+
+/* Visibility / ACL capture control */
+.visibility {
+  display: grid;
+  gap: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.8rem 0.9rem;
+  margin: 0;
+}
+.visibility legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 0 0.35rem;
+}
+.vis-opt {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.vis-opt input {
+  margin-top: 0.2rem;
+}
+.vis-opt span {
+  display: grid;
+}
+.vis-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+.vis-principals {
+  margin-top: 0.2rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* CSV importer */
+.csv-paste,
+.csv-file {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.csv-paste textarea {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82rem;
+  font-weight: 400;
+  background: var(--surface);
+  color: var(--text);
+  resize: vertical;
+}
+.csv-file input[type='file'] {
+  font-weight: 400;
+}
+.csv-or {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.csv-or::before,
+.csv-or::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+.csv-or span {
+  padding: 0 0.7rem;
+}
+.csv-cols {
+  max-width: 640px;
+}
+.csv-cols code {
+  font-size: 0.78rem;
+}
+.link-button {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Restricted-visibility badge */
+.access-badge {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+html[data-theme='dark'] .access-badge {
+  background: #3a2f12;
+  color: #fbbf24;
+  border-color: #854d0e;
+}
+
+/* Drawing / spec structure — the deterministic CAD parse made visible (P0-2a) */
+.sheet-structure {
+  margin: 1rem 0;
+  padding: var(--card-pad);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+}
+.sheet-structure-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.sheet-structure-head h2 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.sheet-anchors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+.anchor-pill {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  border: 1px solid var(--chip-border);
+  white-space: nowrap;
+}
+.sheet-structure-title {
+  margin: 0.6rem 0 0;
+  font-weight: 600;
+  color: var(--text);
+}
+.fact-grid {
+  display: grid;
+  gap: 0.4rem 0.9rem;
+  margin-top: 0.7rem;
+}
+.fact-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+.fact-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+.fact-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.fact-chip {
+  font-size: 0.78rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+/* Lifecycle controls — supersede / deprecate / restore (gap G5) */
+.lifecycle-panel {
+  margin: 0.6rem 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.lifecycle-panel > summary {
+  cursor: pointer;
+  padding: 0.55rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.lifecycle-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.2rem 0.9rem 0.9rem;
+}
+.lifecycle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.lifecycle-row select {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
 }

@@ -56,9 +56,31 @@ export interface SourceAnchor {
   specSection?: string;
 }
 
+/**
+ * Origin system an item entered the graph through. Drives provenance display
+ * and, for synced sources, change detection (PRD P0-2). String-extensible so a
+ * tenant can add a connector without a code change, mirroring `EntityType`.
+ */
+export const SOURCE_SYSTEMS = [
+  'upload',
+  'folder',
+  'csv',
+  'manual',
+  'gateway',
+  'sharepoint',
+  'onedrive',
+  'procore',
+  'acc',
+] as const;
+
+export type BuiltInSourceSystem = (typeof SOURCE_SYSTEMS)[number];
+export type SourceSystem = BuiltInSourceSystem | (string & {});
+
 export interface Provenance {
   /** Deep link to the item in its source system (SharePoint, Procore, …). */
   sourceUrl?: string;
+  /** Which surface the item entered through (PRD P0-2). */
+  sourceSystem?: SourceSystem;
   author?: string;
   /** ISO 8601 timestamps. */
   createdAt: string;
@@ -67,12 +89,32 @@ export interface Provenance {
   anchor?: SourceAnchor;
 }
 
+/** `"*"` grants read to everyone in the tenant (PRD P0-7). */
+export const PUBLIC_PRINCIPAL = '*';
+
 /**
  * Principals (user/group identifiers, Entra object ids in production) allowed
  * to read an item. `"*"` means tenant-public (PRD P0-7).
  */
 export interface Acl {
   allowedPrincipals: string[];
+}
+
+/** True when the item is readable by everyone in the tenant. */
+export function isPublicAcl(acl: Acl | undefined): boolean {
+  return !acl || acl.allowedPrincipals.includes(PUBLIC_PRINCIPAL);
+}
+
+/**
+ * Build a clean ACL from a set of principal strings — trimmed, de-duped, blanks
+ * dropped. Falls back to tenant-public when nothing meaningful remains, so a
+ * mistyped restriction can never silently hide an item from everyone (including
+ * the curator who set it). Used to capture source-system permissions at
+ * ingestion and to edit visibility in the workspace app (PRD P0-2, P0-7).
+ */
+export function aclFromPrincipals(principals: readonly string[]): Acl {
+  const cleaned = [...new Set(principals.map((p) => p.trim()).filter(Boolean))];
+  return { allowedPrincipals: cleaned.length > 0 ? cleaned : [PUBLIC_PRINCIPAL] };
 }
 
 export interface Entity {

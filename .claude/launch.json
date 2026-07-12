@@ -8,9 +8,44 @@
       "port": 3000
     },
     {
+      "name": "ekg-web-ephemeral",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--workspace", "@ekg/web"],
+      "port": 3100,
+      "env": { "EKG_DB_PATH": ":memory:", "PORT": "3100" }
+    },
+    {
+      "name": "ekg-web-test",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--workspace", "@ekg/web"],
+      "port": 3200,
+      "env": {
+        "EKG_DB_PATH": "/Volumes/RobertsExternalSSD/repos/EngineeringKnowledge/apps/web/.data/test-ekg.db",
+        "PORT": "3200"
+      }
+    },
+    {
       "name": "ekg-mcp-server",
       "runtimeExecutable": "node",
       "runtimeArgs": ["apps/mcp-server/dist/index.js"]
+    },
+    {
+      "name": "ekg-web-tour",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/private/tmp/claude-501/-Volumes-RobertsExternalSSD-repos-EngineeringKnowledge/28ad865d-67f9-40b4-ba75-15fc74dafa71/scratchpad/ekg-main-tour",
+        "run",
+        "dev",
+        "--workspace",
+        "@ekg/web"
+      ],
+      "port": 3000,
+      "autoPort": true,
+      "env": {
+        "EKG_DB_PATH": "/Volumes/RobertsExternalSSD/repos/EngineeringKnowledge/apps/web/.data/ekg.db",
+        "EKG_AUDIT_LOG": "/Volumes/RobertsExternalSSD/repos/EngineeringKnowledge/apps/web/.data/audit.jsonl"
+      }
     }
   ]
 }

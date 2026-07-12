@@ -1,5 +1,5 @@
-import { ENTITY_TYPES, type SearchHit } from '@ekg/core';
-import { DEV_CALLER, getStore } from '../../lib/store';
+import { ENTITY_TYPES, entityMatchesRole, type SearchHit } from '@ekg/core';
+import { getCaller, getRole, getRoles, getStore } from '../../lib/store';
 import { EntityCard } from '../../components/ui';
 
 const REVIEW_FILTERS = ['verified', 'unverified', 'superseded', 'deprecated'] as const;
@@ -7,16 +7,34 @@ const REVIEW_FILTERS = ['verified', 'unverified', 'superseded', 'deprecated'] as
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; type?: string; tag?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; type?: string; tag?: string; status?: string; role?: string }>;
 }) {
-  const { q = '', type = '', tag = '', status = '' } = await searchParams;
+  const { q = '', type = '', tag = '', status = '', role = '' } = await searchParams;
   const store = await getStore();
+  const caller = await getCaller();
   const types = type ? [type] : undefined;
   const tags = tag ? [tag] : undefined;
 
-  let hits: SearchHit[] = q
-    ? await store.search(DEV_CALLER, q, { types, tags, limit: 25 })
-    : (await store.list(DEV_CALLER, { types, tags, limit: 50 })).map((entity) => ({ entity, score: 0 }));
+  const roles = await getRoles();
+  const activeRole = await getRole(role);
+
+  let hits: SearchHit[];
+  if (q) {
+    hits = await store.search(caller, q, { types, tags, limit: 25, boostRole: activeRole });
+  } else {
+    // Browse has no relevance score to boost, but a role still focuses the view:
+    // surface the items it favors first.
+    const listed = await store.list(caller, { types, tags, limit: 50 });
+    const ordered = activeRole
+      ? [
+          ...listed.filter((e) => entityMatchesRole(e, activeRole)),
+          ...listed.filter((e) => !entityMatchesRole(e, activeRole)),
+        ]
+      : listed;
+    hits = ordered.map((entity) => ({ entity, score: 0 }));
+  }
+  // Review-status facet (PRD P0-9 filters; gap G7) — a pure post-filter so the
+  // honest no-results gate and role boosting behave identically with it on.
   if (status) hits = hits.filter((h) => h.entity.provenance.reviewStatus === status);
 
   return (
@@ -46,12 +64,31 @@ export default async function SearchPage({
             </option>
           ))}
         </select>
+        <select name="role" defaultValue={role} aria-label="Retrieval role">
+          <option value="">No role</option>
+          {roles.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </select>
         {tag ? <input type="hidden" name="tag" value={tag} /> : null}
         <button type="submit">Search</button>
       </form>
       {tag ? (
         <p className="meta" style={{ marginBottom: '0.8rem' }}>
-          Filtering by tag <strong>#{tag}</strong> · <a href={`/search?q=${encodeURIComponent(q)}`}>clear</a>
+          Filtering by tag <strong>#{tag}</strong> ·{' '}
+          <a href={`/search?q=${encodeURIComponent(q)}${role ? `&role=${encodeURIComponent(role)}` : ''}`}>
+            clear
+          </a>
+        </p>
+      ) : null}
+      {activeRole ? (
+        <p className="meta role-active-note" style={{ marginBottom: '0.8rem' }}>
+          ◎ Focused by <strong>{activeRole.name}</strong> — items it favors rank higher.{' '}
+          <a href={`/search?q=${encodeURIComponent(q)}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}${type ? `&type=${encodeURIComponent(type)}` : ''}`}>
+            clear
+          </a>
         </p>
       ) : null}
 
@@ -75,6 +112,7 @@ export default async function SearchPage({
             <EntityCard
               key={h.entity.id}
               entity={h.entity}
+              focused={activeRole ? entityMatchesRole(h.entity, activeRole) : false}
               match={
                 h.chunk
                   ? { snippet: h.chunk.snippet, ...(h.chunk.heading ? { heading: h.chunk.heading } : {}) }

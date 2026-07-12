@@ -26,7 +26,9 @@ const MIN_CHARS_PER_PAGE = 24;
 export async function extractPdfText(data: Uint8Array): Promise<PdfExtraction> {
   // verbosity 0 silences pdf.js warnings about quirky real-world files;
   // genuine failures still reject the promise and are handled by callers.
-  const task = getDocument({ data, useSystemFonts: true, verbosity: 0 });
+  // Copy first: pdf.js detaches the buffer it is given (see vector.ts), and
+  // callers must be free to reuse their bytes.
+  const task = getDocument({ data: new Uint8Array(data), useSystemFonts: true, verbosity: 0 });
   try {
     const doc = await task.promise;
     const pages: string[] = [];

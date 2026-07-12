@@ -1,15 +1,16 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { auditSinkFromEnv, type AuditEvent, type AuditSink } from '@ekg/core';
-import { DEV_CALLER } from './store';
+import { auditSinkFromEnv, type AuditEvent, type AuditSink } from '@ekg/core/audit';
+import type { Caller } from '@ekg/core';
 
 /**
- * Workspace-app slice of the P0-7 audit trail. Every server action that
- * mutates the graph (verify, reject, edit, merge, ACL, lifecycle, capture,
- * upload) records one event with the same schema the MCP gateway writes, so
- * one trail covers every surface that can change firm knowledge. Defaults to
- * `.data/audit.jsonl` next to the database; EKG_AUDIT_LOG relocates it (and
- * can point at the same file the gateway uses).
+ * Workspace-app slice of the P0-7 audit trail. Every mutating operation the
+ * app runs ({@link runAsOperation} in lib/store.ts) records one event with the
+ * same schema the MCP gateway writes, so one trail covers every surface that
+ * can change firm knowledge — attributed to the request's authenticated
+ * caller, never a fixed identity. Defaults to `.data/audit.jsonl` next to the
+ * database; EKG_AUDIT_LOG relocates it (and can point at the same file the
+ * gateway uses).
  */
 const globalForAudit = globalThis as unknown as { __ekgAudit?: AuditSink };
 
@@ -23,6 +24,7 @@ function sink(): AuditSink {
 }
 
 export function auditAction(
+  caller: Caller,
   tool: string,
   options: {
     args?: Record<string, unknown>;
@@ -33,8 +35,8 @@ export function auditAction(
 ): void {
   sink().record({
     ts: new Date().toISOString(),
-    tenantId: DEV_CALLER.tenantId,
-    principal: DEV_CALLER.principals[0] ?? 'unknown',
+    tenantId: caller.tenantId,
+    principal: caller.principals[0] ?? 'unknown',
     transport: 'web',
     tool,
     ...(options.args ? { args: options.args } : {}),

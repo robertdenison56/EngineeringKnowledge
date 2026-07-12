@@ -17,7 +17,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && rm -rf dist && esbuild src/index.ts --bundle --platform=node --target=node20 --format=esm --external:@modelcontextprotocol/sdk --external:zod --external:pdfjs-dist --outfile=dist/index.js",
     "start": "node dist/index.js",
-    "test": "node scripts/smoke.mjs && node scripts/smoke-http.mjs"
+    "test": "node scripts/smoke.mjs && node scripts/smoke-http.mjs && node scripts/security.test.mjs",
+    "signoff": "node scripts/signoff-remote.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
