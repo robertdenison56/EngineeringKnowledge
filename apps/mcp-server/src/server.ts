@@ -6,7 +6,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ZodRawShapeCompat } from '@modelcontextprotocol/sdk/server/zod-compat.js';
 import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
-import { z } from 'zod';
+import { z, type ZodRawShape } from 'zod';
 import { auditSinkFromEnv, type AuditEvent, type AuditSink } from './audit.js';
 import {
   DEMO_TENANT,
@@ -390,12 +390,25 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
   // Register a tool with audit wrapped around it. The generic mirrors
   // server.registerTool, so each handler keeps its Zod-inferred argument types
   // and no tool can be registered outside the audit boundary.
+  //
+  // The shape is sealed with `.strict()` before registration, so an unknown
+  // argument is REJECTED instead of silently dropped. A plain `z.object` strips
+  // unrecognized keys, which made a wrong parameter name fail invisibly: calling
+  // propose_knowledge with `project`/`attribution` (instead of
+  // `projectId`/`author`) returned status "queued_unverified" and wrote an
+  // unlinked, unattributed candidate — the curator then reviews knowledge whose
+  // project link and author the model believed it had supplied. Silent argument
+  // loss is exactly the kind of quiet wrongness this gateway is supposed not to
+  // have (P0-8), and the audit trail recorded the stripped args as if they were
+  // the whole call (P0-7). Sealing here rather than per-tool keeps it impossible
+  // to register a tool that lacks the check.
   function register<InputArgs extends ZodRawShapeCompat>(
     name: string,
     config: { title: string; description: string; annotations?: ToolAnnotations; inputSchema: InputArgs },
     cb: ToolCallback<InputArgs>,
   ): void {
-    server.registerTool(name, config, (async (args, extra) => {
+    const sealed = { ...config, inputSchema: z.object(config.inputSchema as ZodRawShape).strict() };
+    server.registerTool(name, sealed as never, (async (args, extra) => {
       try {
         const result = await cb(args, extra);
         recordAudit(name, args, extra, result, false);
@@ -935,9 +948,33 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
       const caller = resolveCaller(extra?.authInfo);
       let filePath = isAbsolute(path) ? path : resolve(path);
       if (!existsSync(filePath)) {
-        // Don't echo the resolved server path — it leaks host filesystem layout
-        // to a remote caller.
-        return asContent({ error: 'not_found' });
+        // A bare not_found is unactionable and sent the documented tour down a
+        // dead end: a relative path resolves against the GATEWAY's working
+        // directory — "/" for a desktop-spawned server — not the user's home or
+        // the workspace, so `ingest_document("EKG-Inbox/C-102.pdf")` failed with
+        // nothing to suggest an absolute path would work.
+        //
+        // The resolved path and the upload root are still withheld from remote
+        // callers, which is why the original was bare: echoing them leaks host
+        // filesystem layout. On stdio the caller IS the local user who owns
+        // those paths, so there is nothing to leak and the cwd is the single
+        // most useful fact.
+        const relative = !isAbsolute(path);
+        if (transport !== 'stdio') {
+          return asContent({
+            error: 'not_found',
+            detail: relative
+              ? 'No readable file at that path. Relative paths are resolved on the gateway host; supply a path inside the configured upload directory.'
+              : 'No readable file at that path.',
+          });
+        }
+        return asContent({
+          error: 'not_found',
+          detail: relative
+            ? `Relative paths resolve against the gateway's working directory (${process.cwd()}), not your home directory. Retry with an absolute path.`
+            : 'No file exists at that path.',
+          ...(ingestRootReal ? { ingestRoot: ingestRootReal } : {}),
+        });
       }
       // Confine the read: a remote caller must not read arbitrary host files via
       // a supplied path (arbitrary-file-read / cross-tenant leak). With an

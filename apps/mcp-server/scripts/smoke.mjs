@@ -370,6 +370,46 @@ try {
   const badResult = JSON.parse(badProposal.content[0].text);
   assert(badResult.error === 'not_found', 'bad project id fails the proposal instead of orphaning it');
 
+  // Unknown arguments must be REJECTED, not silently stripped. A plain z.object
+  // drops unrecognized keys, so calling with `project`/`attribution` instead of
+  // `projectId`/`author` used to return queued_unverified and write an
+  // unlinked, unattributed candidate — the model believes it supplied a project
+  // and an author, and the curator never learns otherwise.
+  const wrongNames = await request(33, 'tools/call', {
+    name: 'propose_knowledge',
+    arguments: {
+      title: 'Wrong param names',
+      type: 'lesson-learned',
+      summary: 'Must not be silently accepted with dropped arguments.',
+      project: 'project:riverside',
+      attribution: 'James Okafor',
+    },
+  });
+  // Surfaced as an isError tool result (not a JSON-RPC error), so the model
+  // sees the message and can retry with the right names.
+  assert(wrongNames.isError === true, 'unknown arguments are rejected, not silently dropped');
+  const strictText = wrongNames.content[0].text;
+  assert(
+    /unrecognized_keys/.test(strictText) &&
+      /project/.test(strictText) &&
+      /attribution/.test(strictText),
+    'the rejection names the offending keys so the model can correct them',
+  );
+
+  // A relative path resolves against the GATEWAY's cwd, not the user's home.
+  // The bare not_found this used to return sent the documented tour down a dead
+  // end with nothing to suggest an absolute path.
+  const relIngest = await request(34, 'tools/call', {
+    name: 'ingest_document',
+    arguments: { path: 'EKG-Inbox/no-such-file.pdf' },
+  });
+  const relResult = JSON.parse(relIngest.content[0].text);
+  assert(relResult.error === 'not_found', 'a missing relative path still fails');
+  assert(
+    /absolute path/i.test(relResult.detail ?? ''),
+    'not_found explains that relative paths resolve against the gateway cwd (actionable)',
+  );
+
   // --- Audit trail (PRD P0-7): every tool call left an immutable record ---
   // Audit writes are synchronous on the server before each response returns, so
   // by now the file holds an event for every call above.
