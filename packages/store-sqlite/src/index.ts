@@ -10,6 +10,7 @@ import {
   normalizeText,
   relaxedScoreEntityMatch,
   roleBoostFactor,
+  scoreChunkMatch,
   scoreEntityMatch,
   snippetForGroups,
   warningFor,
@@ -749,15 +750,12 @@ export class SqliteGraphStore implements GraphStore {
       .slice(0, options.limit ?? 10);
 
     // Attach the matched passage for citation (ADR 0006): page/section anchor
-    // and a snippet, for entities admitted via a chunk.
+    // and a snippet. Preferred source is the chunk FTS pick; when that is
+    // absent we fall back to a lexical scan of the entity's own chunks (see
+    // `lexicalBestChunk`).
     return ranked.map((hit) => {
-      const chunkId = bestChunkId.get(hit.entity.id);
-      if (!chunkId) return hit;
-      const row = this.db.prepare('SELECT * FROM chunks WHERE id = ?').get(chunkId) as
-        | ChunkRow
-        | undefined;
-      if (!row) return hit;
-      const chunk = rowToChunk(row);
+      const chunk = this.citationChunk(hit.entity.id, bestChunkId.get(hit.entity.id), groups);
+      if (!chunk) return hit;
       const match: ChunkMatch = {
         anchor: chunk.anchor,
         ordinal: chunk.ordinal,
@@ -766,6 +764,48 @@ export class SqliteGraphStore implements GraphStore {
       };
       return { ...hit, chunk: match };
     });
+  }
+
+  /**
+   * The passage to cite for an already-admitted hit, or undefined when none
+   * of the entity's passages contains the query concepts.
+   *
+   * CITATION ONLY — this runs over `ranked`, after admission and scoring are
+   * settled, so it can never admit an entity, drop one, or reorder the list.
+   * That is what makes the lexical fallback safe: the honest-gate contract
+   * (P0-8) is enforced upstream and untouched here.
+   *
+   * The fallback exists because the two gates tokenize differently. Entity
+   * admission includes a substring pass, so "fire stopping spec" admits the
+   * firestopping spec ("firestopping" contains "stopping"); FTS5 is
+   * token-based, so chunk FTS matches neither, and the hit would be served
+   * with no page or section even though PART 2 plainly says it. Falling back
+   * to `scoreChunkMatch` — the same per-passage co-occurrence gate the
+   * in-memory store already applies, so the two stores now agree — recovers
+   * the citation. When no passage clears that gate we return undefined and
+   * the hit cites the file only, rather than pointing at an arbitrary page.
+   */
+  private citationChunk(
+    entityId: string,
+    ftsChunkId: string | undefined,
+    groups: string[][],
+  ): Chunk | undefined {
+    if (ftsChunkId) {
+      const row = this.db.prepare('SELECT * FROM chunks WHERE id = ?').get(ftsChunkId) as
+        | ChunkRow
+        | undefined;
+      if (row) return rowToChunk(row);
+    }
+    const rows = this.db
+      .prepare('SELECT * FROM chunks WHERE entity_id = ? ORDER BY ordinal')
+      .all(entityId) as unknown as ChunkRow[];
+    let best: { chunk: Chunk; score: number } | undefined;
+    for (const row of rows) {
+      const candidate = rowToChunk(row);
+      const score = scoreChunkMatch(candidate, groups);
+      if (score > 0 && (!best || score > best.score)) best = { chunk: candidate, score };
+    }
+    return best?.chunk;
   }
 
   /**

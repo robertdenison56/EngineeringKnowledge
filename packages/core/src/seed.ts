@@ -1,4 +1,4 @@
-import type { Entity, Relationship } from './ontology.js';
+import type { Chunk, Entity, Relationship, SourceAnchor } from './ontology.js';
 import type { GraphStore } from './graph-store.js';
 
 /**
@@ -29,6 +29,16 @@ function entity(partial: Omit<Entity, 'tenantId' | 'provenance'> & {
 
 function rel(id: string, type: Relationship['type'], fromId: string, toId: string): Relationship {
   return { id, tenantId: DEMO_TENANT, type, fromId, toId };
+}
+
+function chunk(
+  entityId: string,
+  ordinal: number,
+  anchor: SourceAnchor,
+  heading: string,
+  text: string,
+): Chunk {
+  return { id: `${entityId}#${ordinal}`, entityId, tenantId: DEMO_TENANT, ordinal, anchor, heading, text };
 }
 
 const PUBLIC = { allowedPrincipals: ['*'] };
@@ -143,6 +153,76 @@ export const DEMO_ENTITIES: Entity[] = [
   }),
 ];
 
+/**
+ * Passages for the demo corpus's long-form items (ADR 0006), keyed by parent
+ * entity id. Without these, a demo search on the spec book can only ever cite
+ * the file — never the page or section — so the provenance wedge (P0-2a: a hit
+ * resolves to a specific passage) is invisible in every surface the demo
+ * drives: the gateway tour, the workspace app, and the retrieval scorecard's
+ * passage-citation rate. Text is written as real spec-book prose so chunk FTS
+ * and chunk embeddings have something honest to match; the 25% compression
+ * requirement in PART 2 is deliberately the fix that
+ * `lesson:firestop-mockup-failure` says rev. 1 was missing, so the corpus tells
+ * one coherent story end to end.
+ *
+ * The legal memo is chunked too, and stays ACL-restricted: chunks inherit the
+ * parent's ACL and are never independently curated, so this exercises
+ * permission trimming at passage level, not just at entity level.
+ */
+export const DEMO_CHUNKS: Record<string, Chunk[]> = {
+  'spec:07-84-00': [
+    chunk(
+      'spec:07-84-00',
+      0,
+      { specSection: '07 84 00', page: 1 },
+      '07 84 00 · PART 1 — GENERAL',
+      'SECTION 07 84 00 — FIRESTOPPING. PART 1 GENERAL. 1.1 SUMMARY: This section covers ' +
+        'through-penetration firestop systems and perimeter fire barrier (safing) systems at ' +
+        'curtain wall slab edges. 1.2 REFERENCES: ASTM E814, ASTM E2307, ASTM E119. 1.3 ' +
+        'SUBMITTALS: submit manufacturer product data and a tested system listing for every ' +
+        'penetration and joint condition; submit shop drawings showing the slab-edge condition ' +
+        'at each curtain wall type. 1.4 RELATED REQUIREMENTS: curtain wall framing is specified ' +
+        'in Section 08 44 13; this specification governs the firestopping of the slab-edge joint ' +
+        'between them.',
+    ),
+    chunk(
+      'spec:07-84-00',
+      1,
+      { specSection: '07 84 00', page: 2 },
+      '07 84 00 · PART 2 — PRODUCTS',
+      'PART 2 PRODUCTS. 2.1 PERIMETER FIRE BARRIER: mineral wool safing insulation, 4 pcf ' +
+        'minimum density, installed at 25 percent compression in the direction of the joint ' +
+        'width. Compression shall be maintained through the full design deflection of the ' +
+        'floor edge. 2.2 SMOKE SEALANT: elastomeric spray-applied smoke sealant over ' +
+        'galvanized steel backer, thickness per the tested assembly. 2.3 SEALANTS: intumescent ' +
+        'firestop sealant for through-penetrations, listed for the rated assembly.',
+    ),
+    chunk(
+      'spec:07-84-00',
+      2,
+      { specSection: '07 84 00', page: 3 },
+      '07 84 00 · PART 3 — EXECUTION',
+      'PART 3 EXECUTION. 3.1 INSTALLATION: install perimeter fire barrier systems only in the ' +
+        'tested configuration; do not cut safing flush to the slab edge. Reinforce and pin the ' +
+        'safing at curtain wall mullions. 3.2 MOCKUP: build a slab-edge mockup and test to ' +
+        'ASTM E2307 including the hose-stream test before releasing production units. 3.3 ' +
+        'FIELD QUALITY CONTROL: a special inspector shall verify compression and continuity at ' +
+        'every floor line.',
+    ),
+  ],
+  'document:claims-memo-riverside': [
+    chunk(
+      'document:claims-memo-riverside',
+      0,
+      { page: 1 },
+      'Privileged & confidential',
+      'PRIVILEGED AND CONFIDENTIAL — ATTORNEY WORK PRODUCT. Memo re: Riverside Medical Center ' +
+        'firestop mockup failure and the resulting three-week schedule claim. Analysis of the ' +
+        'firm’s exposure and the contractor’s notice obligations under the general conditions.',
+    ),
+  ],
+};
+
 export const DEMO_RELATIONSHIPS: Relationship[] = [
   rel('rel:1', 'used-in', 'detail:cw-firestop-02', 'project:riverside'),
   rel('rel:2', 'supersedes', 'detail:cw-firestop-02', 'detail:cw-firestop-01'),
@@ -154,6 +234,6 @@ export const DEMO_RELATIONSHIPS: Relationship[] = [
 ];
 
 export async function seedDemo(store: GraphStore): Promise<void> {
-  for (const e of DEMO_ENTITIES) await store.upsertEntity(e);
+  for (const e of DEMO_ENTITIES) await store.upsertEntity(e, DEMO_CHUNKS[e.id]);
   for (const r of DEMO_RELATIONSHIPS) await store.upsertRelationship(r);
 }
