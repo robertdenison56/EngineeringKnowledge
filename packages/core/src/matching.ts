@@ -126,6 +126,55 @@ export function matchesTagFilter(entity: Entity, tags?: string[]): boolean {
   return tags.every((t) => own.includes(t));
 }
 
+/**
+ * Shortest variant allowed to match inside a token rather than at its start.
+ * Six is chosen from the two cases that pull in opposite directions: "stopping"
+ * (8) must match "firestopping", and "air" (3) must NOT match "stair"/"repair".
+ * Anything this long is a real trade term whose appearance inside a compound is
+ * almost certainly the same concept; anything shorter is a syllable.
+ */
+const COMPOUND_TAIL_MIN = 6;
+
+/**
+ * Whether a concept variant occurs in normalized text as a *word*, not an
+ * accident of spelling. Replaces the raw `includes()` the matcher used to do,
+ * which admitted any substring anywhere: a query for "air" matched "stair tread
+ * repair", and short tokens quietly turned concept groups into always-true
+ * clauses — a precision leak that lands directly on the honest-results contract
+ * (PRD P0-8), since a false concept match manufactures a hit where the firm has
+ * no answer.
+ *
+ * Pure token-boundary matching is NOT the fix, and the golden set proves it:
+ * `normalizeText` strips hyphens, so "fire-stopping" and "Firestopping" both
+ * normalize to the single token "firestopping" and the query concept "stopping"
+ * is a standalone token nowhere in the corpus. AEC vocabulary compounds
+ * constantly (firestop, curtainwall, waterproofing), so requiring token
+ * boundaries would drop real matches — including the spec-book passage citation
+ * the scorecard measures.
+ *
+ * So: a match starting at a token boundary always counts (that covers exact
+ * tokens and prefixes — "spec" in "specification", "firestop" in
+ * "firestopping"), and a match *inside* a token counts only when the variant is
+ * at least COMPOUND_TAIL_MIN long.
+ */
+export function variantMatches(haystack: string, variant: string): boolean {
+  if (!variant) return false;
+  for (let from = 0; ; ) {
+    const at = haystack.indexOf(variant, from);
+    if (at < 0) return false;
+    // Token start = string start, or preceded by a non-alphanumeric. Covers
+    // exact-token and prefix-of-token matches.
+    if (at === 0 || !/[a-z0-9]/.test(haystack[at - 1])) return true;
+    if (variant.length >= COMPOUND_TAIL_MIN) return true; // compound tail
+    from = at + 1; // keep looking; a later occurrence may sit at a boundary
+  }
+}
+
+/** Whether any of a concept group's variants matches — the OR within a group. */
+export function groupMatches(haystack: string, group: string[]): boolean {
+  return group.some((v) => variantMatches(haystack, v));
+}
+
 /** Everything searchable about an entity, normalized. */
 export function entityHaystack(entity: Entity): string {
   return normalizeText(
@@ -148,9 +197,9 @@ export function entityHaystack(entity: Entity): string {
 export function scoreEntityMatch(entity: Entity, groups: string[][]): number {
   if (groups.length === 0) return 0;
   const haystack = entityHaystack(entity);
-  if (!groups.every((g) => g.some((v) => haystack.includes(v)))) return 0;
+  if (!groups.every((g) => groupMatches(haystack, g))) return 0;
   const title = normalizeText(`${entity.title} ${(entity.aliases ?? []).join(' ')}`);
-  return groups.length + groups.filter((g) => g.some((v) => title.includes(v))).length;
+  return groups.length + groups.filter((g) => groupMatches(title, g)).length;
 }
 
 /**
@@ -187,13 +236,13 @@ export function relaxedScoreEntityMatch(
   const haystack = entityHaystack(entity);
   const matchedGroups: number[] = [];
   groups.forEach((g, i) => {
-    if (g.some((v) => haystack.includes(v))) matchedGroups.push(i);
+    if (groupMatches(haystack, g)) matchedGroups.push(i);
   });
   if (threshold === 0 || matchedGroups.length < threshold) {
     return { score: 0, matchedGroups };
   }
   const title = normalizeText(`${entity.title} ${(entity.aliases ?? []).join(' ')}`);
-  const titleHits = matchedGroups.filter((i) => groups[i].some((v) => title.includes(v))).length;
+  const titleHits = matchedGroups.filter((i) => groupMatches(title, groups[i])).length;
   return { score: matchedGroups.length + titleHits, matchedGroups };
 }
 
@@ -244,9 +293,9 @@ export function chunkHaystack(chunk: Chunk): string {
 export function scoreChunkMatch(chunk: Chunk, groups: string[][]): number {
   if (groups.length === 0) return 0;
   const haystack = chunkHaystack(chunk);
-  if (!groups.every((g) => g.some((v) => haystack.includes(v)))) return 0;
+  if (!groups.every((g) => groupMatches(haystack, g))) return 0;
   const heading = normalizeText(chunk.heading ?? '');
-  return groups.length + groups.filter((g) => g.some((v) => heading.includes(v))).length;
+  return groups.length + groups.filter((g) => groupMatches(heading, g)).length;
 }
 
 /**

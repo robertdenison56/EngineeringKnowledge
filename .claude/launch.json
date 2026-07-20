@@ -30,6 +30,24 @@
       "runtimeArgs": ["apps/mcp-server/dist/index.js"]
     },
     {
+      "name": "ekg-web-facets-worktree",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/Volumes/RobertsExternalSSD/repos/EngineeringKnowledge/.claude/worktrees/web-facets-map",
+        "run",
+        "dev",
+        "--workspace",
+        "@ekg/web"
+      ],
+      "port": 3300,
+      "autoPort": true,
+      "env": {
+        "EKG_DB_PATH": "/Volumes/RobertsExternalSSD/repos/EngineeringKnowledge/.claude/worktrees/web-facets-map/apps/web/.data/ekg.db",
+        "PORT": "3300"
+      }
+    },
+    {
       "name": "ekg-web-tour",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
