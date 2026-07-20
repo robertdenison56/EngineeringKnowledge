@@ -83,12 +83,17 @@ in the app is what the assistant answers from — point it at the app's database
 EKG_DB_PATH=$PWD/apps/web/.data/ekg.db node apps/mcp-server/dist/index.js
 ```
 
-Or, when registering it with Claude Code, pass the env var through:
+Or, when registering it with Claude Code, pass the env vars through:
 
 ```sh
 claude mcp add ekg --env EKG_DB_PATH=$PWD/apps/web/.data/ekg.db \
+  --env EKG_INGEST_ROOT=$HOME/EKG-Inbox \
   -- node apps/mcp-server/dist/index.js
 ```
+
+`EKG_INGEST_ROOT` is the folder `ingest_document` may read from — path
+ingestion is disabled without it (`ingest_root_not_configured`), and relative
+paths resolve against it. Skip it if you only want query tools.
 
 Now ask your assistant something like:
 
@@ -138,6 +143,7 @@ The ones worth knowing on day one:
 | `EKG_DB_PATH` | Path to the curated SQLite database. Set this so the app and gateway share one graph. `:memory:` gives an ephemeral seeded store. | `apps/web/.data/ekg.db` (app) / in-memory demo (gateway) |
 | `EKG_EMBEDDINGS_PROVIDER` | Turn on semantic (vector) retrieval: `voyage`, `openai`, or `ollama`. Unset = lexical + full-text search only. | unset |
 | `EKG_APP_URL` | Base URL the gateway puts in citation links. | `http://localhost:3000` |
+| `EKG_INGEST_ROOT` | Folder `ingest_document` is confined to (alias `EKG_UPLOAD_ROOT`); relative paths resolve against it. Unset = path ingestion disabled (fails closed). | unset (ingestion disabled) |
 
 The full table — including the remote gateway's `EKG_TRANSPORT`,
 `EKG_JWT_SECRET`, `EKG_PORT`, and `EKG_AUDIT_LOG` — is in the

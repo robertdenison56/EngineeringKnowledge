@@ -76,12 +76,14 @@ function getPageOcr(): Promise<PageOcr | null> {
 }
 
 /**
- * Root the remote gateway confines `ingest_document` reads to. A network caller
- * must never be able to read an arbitrary host file by supplying its path (an
- * arbitrary-file-read / cross-tenant leak): when this is set — EKG_UPLOAD_ROOT,
- * which the HTTP gateway should always set — a path may only be read if it
- * resolves (symlinks included) inside the root. stdio is a single local user
- * and reads local paths directly, so it leaves this unset.
+ * Root that `ingest_document` reads are confined to, on EVERY transport. A
+ * caller must never be able to read an arbitrary host file by supplying its
+ * path (an arbitrary-file-read / cross-tenant leak), and the earlier
+ * "unset = unconfined on stdio" default turned a missing env var in a stray
+ * `.mcp.json` into silent unconfined ingest — twice, in real test sessions.
+ * A path may only be read if it resolves (symlinks included) inside the root;
+ * with no root configured, path ingest fails closed with
+ * `ingest_root_not_configured`.
  */
 function resolveIngestRoot(root: string | undefined): string | undefined {
   if (!root) return undefined;
@@ -279,9 +281,10 @@ export interface ServerOptions {
   /** Transport label recorded in audit events ("stdio" | "http"). */
   transport?: string;
   /**
-   * Directory that `ingest_document` path reads are confined to. Defaults to
-   * `EKG_UPLOAD_ROOT`. The remote HTTP gateway should set this so a caller
-   * cannot read arbitrary host files by path; stdio leaves it unset.
+   * Directory that `ingest_document` path reads are confined to, required for
+   * path ingestion on every transport. Defaults to `EKG_UPLOAD_ROOT` (alias
+   * `EKG_INGEST_ROOT`). Relative tool paths resolve against it; unset,
+   * `ingest_document` fails closed with `ingest_root_not_configured`.
    */
   ingestRoot?: string;
 }
@@ -352,11 +355,14 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
   // ingest_document reads files from the gateway host, so confine it to one
   // directory tree (EKG_UPLOAD_ROOT; EKG_INGEST_ROOT is an accepted alias) —
   // a caller must not be able to use the tool as an arbitrary
-  // file-read-into-graph primitive. Unset means unconfined on stdio only;
-  // a remote transport with no root refuses path ingest (fail closed).
-  const ingestRootReal = resolveIngestRoot(
-    options.ingestRoot ?? process.env.EKG_UPLOAD_ROOT ?? process.env.EKG_INGEST_ROOT,
-  );
+  // file-read-into-graph primitive. The root is required on every transport:
+  // without one, path ingest fails closed (`ingest_root_not_configured`).
+  // The raw configured value is kept separately so a root that fails to
+  // resolve (typo, unmounted volume) reports as a broken config, not as a
+  // policy choice to disable ingestion.
+  const ingestRootConfigured =
+    options.ingestRoot ?? process.env.EKG_UPLOAD_ROOT ?? process.env.EKG_INGEST_ROOT;
+  const ingestRootReal = resolveIngestRoot(ingestRootConfigured);
 
   const server = new McpServer({ name: 'ekg-mcp', version: '0.1.0' });
 
@@ -912,8 +918,9 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         path: z
           .string()
           .describe(
-            'Path to the file to ingest. On the local (stdio) gateway, any path on your machine; ' +
-              'on the remote gateway, a path inside the configured upload directory (EKG_UPLOAD_ROOT).',
+            'Path to the file to ingest. Relative paths resolve against the gateway\'s configured ' +
+              'ingest root (EKG_INGEST_ROOT — the inbox folder documents are dropped into); an ' +
+              'absolute path must point inside that root.',
           ),
         page: z
           .number()
@@ -946,59 +953,76 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     },
     async ({ path, page, describe, visibility, principals }, extra) => {
       const caller = resolveCaller(extra?.authInfo);
-      let filePath = isAbsolute(path) ? path : resolve(path);
+      // No ingest root, no path ingest — on every transport. The old
+      // "unset = unconfined on stdio" default turned one missing env var into
+      // silent unconfined ingest (guide 06's `.mcp.json` shadowing trap). A
+      // configured-but-unresolvable root is reported as the config error it is,
+      // not as ingestion being disabled by choice.
+      if (!ingestRootReal) {
+        return asContent({
+          error: 'ingest_root_not_configured',
+          detail:
+            ingestRootConfigured !== undefined
+              ? 'The configured ingest root does not resolve to a real directory' +
+                (transport === 'stdio' ? ` (${ingestRootConfigured})` : '') +
+                '. Fix EKG_INGEST_ROOT, or upload through the workspace app.'
+              : 'No ingest root is configured on this gateway. Set EKG_INGEST_ROOT ' +
+                '(alias EKG_UPLOAD_ROOT) to the folder documents may be ingested from, ' +
+                'or upload through the workspace app.',
+        });
+      }
+      // Relative paths resolve against the ingest root — the inbox folder the
+      // user was told to drop files into — never the gateway's own working
+      // directory ("/" under a desktop-spawned server, where nothing useful
+      // lives; that dead end sent the documented tour astray).
+      let filePath = isAbsolute(path) ? resolve(path) : resolve(ingestRootReal, path);
       if (!existsSync(filePath)) {
-        // A bare not_found is unactionable and sent the documented tour down a
-        // dead end: a relative path resolves against the GATEWAY's working
-        // directory — "/" for a desktop-spawned server — not the user's home or
-        // the workspace, so `ingest_document("EKG-Inbox/C-102.pdf")` failed with
-        // nothing to suggest an absolute path would work.
-        //
-        // The resolved path and the upload root are still withheld from remote
-        // callers, which is why the original was bare: echoing them leaks host
-        // filesystem layout. On stdio the caller IS the local user who owns
-        // those paths, so there is nothing to leak and the cwd is the single
-        // most useful fact.
+        // A missing path inside the root is an honest not_found with the one
+        // fact that lets the caller self-correct. A missing path OUTSIDE the
+        // root answers exactly like an existing one — path_not_allowed —
+        // so a remote caller cannot use the error split as a host-filesystem
+        // existence oracle. (Lexical containment is enough here: this branch
+        // only picks which error a nonexistent file gets; real reads are
+        // gated by the realpath confinement below.)
+        const inRoot = filePath === ingestRootReal || filePath.startsWith(ingestRootReal + sep);
+        if (!inRoot) {
+          return asContent({
+            error: 'path_not_allowed',
+            detail: 'The file is outside the gateway upload directory.',
+          });
+        }
+        // The resolved path stays out of remote responses (it leaks host
+        // filesystem layout); on stdio the caller IS the local user who owns
+        // these paths, so naming the root is the most useful thing to do.
         const relative = !isAbsolute(path);
         if (transport !== 'stdio') {
           return asContent({
             error: 'not_found',
             detail: relative
-              ? 'No readable file at that path. Relative paths are resolved on the gateway host; supply a path inside the configured upload directory.'
+              ? 'No such file under the gateway upload directory (relative paths resolve against it). Check the filename.'
               : 'No readable file at that path.',
           });
         }
         return asContent({
           error: 'not_found',
           detail: relative
-            ? `Relative paths resolve against the gateway's working directory (${process.cwd()}), not your home directory. Retry with an absolute path.`
+            ? `Relative paths resolve against the ingest root (${ingestRootReal}) and no such file is there. Check the filename, or pass an absolute path inside the root.`
             : 'No file exists at that path.',
-          ...(ingestRootReal ? { ingestRoot: ingestRootReal } : {}),
+          ingestRoot: ingestRootReal,
         });
       }
-      // Confine the read: a remote caller must not read arbitrary host files via
-      // a supplied path (arbitrary-file-read / cross-tenant leak). With an
-      // ingest root configured (the HTTP gateway sets EKG_UPLOAD_ROOT), the file
-      // must resolve inside it (symlinks included); without one, any non-stdio
-      // transport refuses path ingest outright — fail closed. stdio is a single
-      // local user and reads local paths directly.
-      if (ingestRootReal) {
-        const confined = confineToRoot(filePath, ingestRootReal);
-        if (!confined) {
-          return asContent({
-            error: 'path_not_allowed',
-            detail: 'The file is outside the gateway upload directory.',
-          });
-        }
-        filePath = confined;
-      } else if (transport !== 'stdio') {
+      // Confine the read (symlinks included): a caller must not read arbitrary
+      // host files via a supplied path (arbitrary-file-read / cross-tenant
+      // leak) — this realpath check, not the lexical one above, is the gate an
+      // actual read must pass.
+      const confined = confineToRoot(filePath, ingestRootReal);
+      if (!confined) {
         return asContent({
-          error: 'path_ingest_unavailable',
-          detail:
-            'Ingest-by-path is disabled on the remote gateway. Set EKG_UPLOAD_ROOT to a managed ' +
-            'upload directory, or upload through the workspace app.',
+          error: 'path_not_allowed',
+          detail: 'The file is outside the gateway upload directory.',
         });
       }
+      filePath = confined;
       if (!KNOWN_EXTENSIONS.has(extname(filePath).toLowerCase())) {
         return asContent({
           error: 'unsupported_extension',

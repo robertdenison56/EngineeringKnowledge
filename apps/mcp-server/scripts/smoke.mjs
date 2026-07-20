@@ -7,15 +7,18 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 // Audit to a temp file so we can assert the P0-7 trail was written (cleaned up
 // on exit).
 const auditPath = join(tmpdir(), `ekg-audit-smoke-${process.pid}.jsonl`);
+// The samples folder doubles as the ingest root: path ingestion requires one
+// on every transport, and relative paths resolve against it.
+const samples = join(root, '../../services/ingestion/samples');
 const child = spawn(process.execPath, [join(root, 'dist/index.js')], {
-  env: { ...process.env, EKG_AUDIT_LOG: auditPath },
+  env: { ...process.env, EKG_AUDIT_LOG: auditPath, EKG_INGEST_ROOT: samples, EKG_UPLOAD_ROOT: undefined },
   stdio: ['pipe', 'pipe', 'inherit'],
 });
 
@@ -196,14 +199,17 @@ try {
   );
 
   // --- Gateway ingestion + client-model description flow (ADR 0005) ---
-  const samples = join(root, '../../services/ingestion/samples');
-
+  // A bare relative filename resolves against the ingest root (the guide-06
+  // tour's "add C-102 from the inbox" flow) — no cwd involved.
   const ingested = await request(6, 'tools/call', {
     name: 'ingest_document',
-    arguments: { path: join(samples, '07 92 00 - Joint Sealants Spec (excerpt).pdf') },
+    arguments: { path: '07 92 00 - Joint Sealants Spec (excerpt).pdf' },
   });
   const spec = JSON.parse(ingested.content[0].text);
-  assert(spec.status === 'queued_unverified', 'ingest queues candidate as unverified');
+  assert(
+    spec.status === 'queued_unverified',
+    'ingest queues candidate as unverified (relative path resolved against the ingest root)',
+  );
   assert(spec.parseStatus === 'extracted', 'ingest extracts the PDF text layer (ADR 0004)');
 
   const described = await request(7, 'tools/call', {
@@ -396,9 +402,9 @@ try {
     'the rejection names the offending keys so the model can correct them',
   );
 
-  // A relative path resolves against the GATEWAY's cwd, not the user's home.
-  // The bare not_found this used to return sent the documented tour down a dead
-  // end with nothing to suggest an absolute path.
+  // A relative path resolves against the ingest root, not the gateway cwd —
+  // and a miss must say so, naming the root, so the caller can self-correct
+  // (the guide-06 tour's `EKG-Inbox/…` prefix mistake).
   const relIngest = await request(34, 'tools/call', {
     name: 'ingest_document',
     arguments: { path: 'EKG-Inbox/no-such-file.pdf' },
@@ -406,8 +412,21 @@ try {
   const relResult = JSON.parse(relIngest.content[0].text);
   assert(relResult.error === 'not_found', 'a missing relative path still fails');
   assert(
-    /absolute path/i.test(relResult.detail ?? ''),
-    'not_found explains that relative paths resolve against the gateway cwd (actionable)',
+    /ingest root/i.test(relResult.detail ?? '') && relResult.ingestRoot === realpathSync(samples),
+    'not_found explains that relative paths resolve against the ingest root, and names it (stdio)',
+  );
+
+  // A nonexistent path OUTSIDE the root answers path_not_allowed exactly like
+  // an existing one — the error split must not hand a caller a host-filesystem
+  // existence oracle.
+  const outsideMiss = await request(35, 'tools/call', {
+    name: 'ingest_document',
+    arguments: { path: '/definitely/not/under/the/root/file.pdf' },
+  });
+  const outsideMissResult = JSON.parse(outsideMiss.content[0].text);
+  assert(
+    outsideMissResult.error === 'path_not_allowed',
+    'a nonexistent path outside the root is refused, not reported missing (no existence oracle)',
   );
 
   // --- Audit trail (PRD P0-7): every tool call left an immutable record ---
@@ -442,6 +461,74 @@ try {
     auditEvents.some((e) => e.tool === 'get_project_context'),
     'every tool is wrapped by the audit boundary',
   );
+
+  // --- No ingest root: path ingest fails CLOSED, stdio included -------------
+  // The old "unset = unconfined" default turned one missing env var in a stray
+  // .mcp.json into silent unconfined ingest (guide 06's shadowing trap — hit
+  // twice in real sessions). A server with no root must refuse even a readable
+  // file, and say which variable to set.
+  const bareAudit = join(tmpdir(), `ekg-audit-smoke-bare-${process.pid}.jsonl`);
+  const bare = spawn(process.execPath, [join(root, 'dist/index.js')], {
+    env: {
+      ...process.env,
+      EKG_INGEST_ROOT: undefined,
+      EKG_UPLOAD_ROOT: undefined,
+      EKG_AUDIT_LOG: bareAudit,
+    },
+    stdio: ['pipe', 'pipe', 'inherit'],
+  });
+  try {
+    const barePending = new Map();
+    let bareBuffer = '';
+    bare.stdout.on('data', (chunk) => {
+      bareBuffer += chunk.toString();
+      let nl;
+      while ((nl = bareBuffer.indexOf('\n')) >= 0) {
+        const line = bareBuffer.slice(0, nl).trim();
+        bareBuffer = bareBuffer.slice(nl + 1);
+        if (!line) continue;
+        const msg = JSON.parse(line);
+        if (msg.id !== undefined && barePending.has(msg.id)) {
+          barePending.get(msg.id)(msg);
+          barePending.delete(msg.id);
+        }
+      }
+    });
+    const bareRequest = (id, method, params) =>
+      new Promise((res, rej) => {
+        const timer = setTimeout(
+          () => rej(new Error(`timeout waiting for ${method} (no-root server)`)),
+          10_000,
+        );
+        barePending.set(id, (msg) => {
+          clearTimeout(timer);
+          msg.error ? rej(new Error(`${method}: ${JSON.stringify(msg.error)}`)) : res(msg.result);
+        });
+        bare.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+      });
+    await bareRequest(1, 'initialize', {
+      protocolVersion: '2025-03-26',
+      capabilities: {},
+      clientInfo: { name: 'smoke-bare', version: '0.0.0' },
+    });
+    bare.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
+    const noRoot = await bareRequest(2, 'tools/call', {
+      name: 'ingest_document',
+      arguments: { path: join(samples, '07 92 00 - Joint Sealants Spec (excerpt).pdf') },
+    });
+    const noRootResult = JSON.parse(noRoot.content[0].text);
+    assert(
+      noRootResult.error === 'ingest_root_not_configured',
+      'without an ingest root, path ingest fails closed on stdio (no unconfined default)',
+    );
+    assert(
+      /EKG_INGEST_ROOT/.test(noRootResult.detail ?? ''),
+      'the refusal names the variable to set',
+    );
+  } finally {
+    bare.kill();
+    rmSync(bareAudit, { force: true });
+  }
 
   console.log('smoke: all checks passed');
   rmSync(auditPath, { force: true });
