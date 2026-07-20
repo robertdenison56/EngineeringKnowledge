@@ -90,6 +90,47 @@ try {
   });
   const empty = JSON.parse(noHits.content[0].text);
   assert(empty.no_results === true && empty.guidance, 'explicit no_results state (P0-8)');
+  assert(
+    !empty.results?.length && /retry ONCE/.test(empty.guidance),
+    'no_results guidance prompts one narrower retry before declaring absence',
+  );
+
+  // Passage citation (ADR 0006 / P0-2a): a spec hit resolves to the section,
+  // not just the file, and the anchor survives serialization to the client.
+  const deep = await request(30, 'tools/call', {
+    name: 'search',
+    arguments: { query: '25 percent compression mineral wool' },
+  });
+  const deepPayload = JSON.parse(deep.content[0].text);
+  const specHit = deepPayload.results?.find((r) => r.id === 'spec:07-84-00');
+  assert(specHit, 'deep-content query reaches the spec book through its passages');
+  assert(
+    /PART 2/.test(specHit.matchedSection ?? ''),
+    'spec hit names the passage that answers it, not page 1 (P0-2a)',
+  );
+  assert(
+    specHit.provenance?.anchor?.specSection === '07 84 00' &&
+      specHit.provenance.anchor.page === 2,
+    'passage anchor merges into the citation the client sees (ADR 0006)',
+  );
+  assert(
+    /25 percent compression/.test(specHit.snippet ?? ''),
+    'snippet quotes the matched passage, not the file-level summary',
+  );
+
+  // Relaxed pass (P0-8): concepts split across entities return partial hits
+  // that name what matched AND what did not — never served as full answers.
+  const split = await request(31, 'tools/call', {
+    name: 'search',
+    arguments: { query: 'curtain wall firestop riverside camber' },
+  });
+  const splitPayload = JSON.parse(split.content[0].text);
+  const partial = splitPayload.results?.find((r) => r.partial);
+  assert(partial, 'concepts split across entities yield partial hits, not a false no_results');
+  assert(
+    partial.partial.matchedConcepts?.length > 0 && partial.partial.missingConcepts?.includes('camber'),
+    'partial hit discloses both matched and missing concepts (P0-8)',
+  );
 
   const traverse = await request(5, 'tools/call', {
     name: 'traverse',

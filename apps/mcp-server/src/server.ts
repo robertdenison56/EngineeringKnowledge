@@ -177,9 +177,23 @@ function relatedRef(entity: Entity) {
   };
 }
 
+/**
+ * What the model should do on a true miss. The search store already tried a
+ * relaxed most-concepts pass before returning nothing, so zero results here
+ * means not even a partial concept match exists — a strong signal, not a
+ * tokenization artifact. The retry hint still matters: the remaining
+ * false-negative mode is an over-specified query (a whole sentence, or several
+ * unrelated concepts ANDed together), where one narrower retry finds the item
+ * and giving up immediately reports absent knowledge that the firm does hold.
+ * The P0-8 rule is unchanged and unconditional: never fill the gap with
+ * general knowledge.
+ */
 const NO_RESULTS_GUIDANCE =
-  'The firm knowledge graph has no entries matching this query. Tell the user the firm graph ' +
-  'has no answer — do NOT substitute general knowledge as if it were firm precedent (PRD P0-8).';
+  'The firm knowledge graph has no entries matching this query — not even a partial concept match. ' +
+  'If the query was a full sentence or combined several distinct concepts, retry ONCE with the two or ' +
+  'three most distinctive keywords (identifiers, section numbers, and trade terms work best) before ' +
+  'concluding. If that also returns nothing, tell the user the firm graph has no answer — do NOT ' +
+  'substitute general knowledge as if it were firm precedent (PRD P0-8).';
 
 function asContent(payload: unknown) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] };
@@ -403,6 +417,9 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         'lessons learned, experts). Results include provenance and a workspace-app URL — always cite them. ' +
         'Results carrying a "warning" field are superseded/deprecated and the warning must be relayed to the user. ' +
         'If the response has no_results=true, say the firm graph has no answer; never substitute general knowledge. ' +
+        'A result carrying a "partial" field matched only SOME of the query\'s concepts: it lists matchedConcepts ' +
+        'and missingConcepts. Present these as partial matches and name what is missing ("the firm has a curtain ' +
+        'wall firestop detail, but nothing tying it to Riverside") — never report a partial hit as a full answer. ' +
         'Pass `role` (a focus lens the firm admin defined, by name or id) to pivot ranking toward the knowledge ' +
         'that kind of work cares about — it only re-ranks, never hides results.',
       inputSchema: {
