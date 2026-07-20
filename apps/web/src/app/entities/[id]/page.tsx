@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 import { isPublicAcl, type Entity, type NeighborHit } from '@ekg/core';
 import type { SheetFacts } from '@ekg/ingestion';
 import { getCaller, getStore, isCurator } from '../../../lib/store';
+import { readAuditTrail } from '../../../lib/analytics-source';
+import { citationCounts } from '../../../lib/analytics';
 import { SheetStructure } from '../../../components/SheetStructure';
 import { LifecycleControls } from '../../../components/LifecycleControls';
 import { AccessAndLinksPanel } from './AccessAndLinksPanel';
@@ -102,6 +104,11 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
         }))
     : [];
 
+  // "Cited in answers" (P0-9): how many assistant tool results surfaced this
+  // item, straight from the P0-7 audit trail. Curation reads in this app
+  // don't count — the number means "reached an assistant user".
+  const citedInAnswers = citationCounts(readAuditTrail().events, caller.tenantId).get(id) ?? 0;
+
   const warning = REVIEW_WARNINGS[entity.provenance.reviewStatus];
   const supersededBy = neighbors.find(
     (n) => n.relationship.type === 'supersedes' && n.direction === 'in',
@@ -139,6 +146,17 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
       {entity.summary ? <p className="summary">{entity.summary}</p> : null}
       <TagChips tags={entity.tags} />
       <ProvenanceLine entity={entity} />
+      <p className="meta">
+        Cited in {citedInAnswers.toLocaleString()} assistant answer
+        {citedInAnswers === 1 ? '' : 's'} so far
+        {citedInAnswers > 0 ? (
+          <>
+            {' '}
+            — <Link href="/analytics">usage analytics</Link>
+          </>
+        ) : null}
+        .
+      </p>
       <SheetStructure anchor={entity.provenance.anchor} facts={parserFacts} />
       {canCurate ? <EntityEditor entity={entity} mergeCandidates={mergeCandidates} /> : null}
       {canCurate ? <LifecycleControls entity={entity} mergeCandidates={mergeCandidates} /> : null}

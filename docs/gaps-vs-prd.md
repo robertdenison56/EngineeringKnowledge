@@ -52,6 +52,14 @@ not yet meet it. Several core curation actions remain GUI-absent.
 > whole-graph loading at scale; entity pages deep-link into it. Still open:
 > G2 (SharePoint wizard), G10 (analytics dashboard), G11 (Entra SSO E2E).
 
+> **Update 2026-07-19 (later) — G10 closed; G11's gateway half closed.** The
+> app gains a curator-gated **usage-analytics dashboard** at `/analytics`
+> (adoption by surface, zero-result queries, top queries, most-cited items,
+> tool usage — aggregated from the P0-7 audit trail) and entity pages show
+> the P0-9 **"cited in N assistant answers"** count. The gateway gains
+> **OAuth 2.1 resource-server mode** (ADR 0011). Still open: G2 (SharePoint
+> wizard) and G11's deployment half (Entra app registration + app SSO).
+
 ## Coverage matrix
 
 Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / assistant only)
@@ -70,7 +78,7 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 | **Set tags / aliases on an item** | ✅ | P0-1, P0-9 | [G4](#g4--no-inline-entity-editing) |
 | **Mark superseded / deprecated** | ✅ | P0-1 lifecycle, P0-8 | [G5](#g5--no-gui-for-the-supersededdeprecated-lifecycle) |
 | **Set / confirm an item's ACL** | ✅ | P0-2, P0-9 curator | [G6](#g6--no-gui-for-aclpermission-curation) |
-| Usage analytics (top / zero-result / cited) | ❌ | P1-4 | [G10](#g10--no-usage-analytics-dashboard-p1) |
+| Usage analytics (top / zero-result / cited) | ✅ | P1-4 | [G10](#g10--no-usage-analytics-dashboard-p1) |
 | Roles & SSO sign-in | 🟡 | P0-9 roles, P0-7 | [G11](#g11--no-roles-or-sso-auth) |
 | Gateway / SSO / embeddings / tokens | ⚙️ CLI | Admin setup | *out of scope (allowed)* |
 
@@ -295,14 +303,25 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 ### G10 · No usage-analytics dashboard (P1)
 
+- **Status: ✅ Shipped (2026-07-19)** — curator-gated
+  [`/analytics`](../apps/web/src/app/analytics/page.tsx): per-surface adoption
+  (calls + distinct users per transport), **zero-result queries** (the
+  capture-next signal), top query themes (exact normalized grouping —
+  deterministic, nothing modeled), **most-cited knowledge** (read-tool results
+  on assistant surfaces only; ACL-trimmed titles), and per-tool call/error
+  counts. Entity pages now show the P0-9 **"cited in N assistant answers"**
+  count from the same source. Aggregation is a pure, unit-tested module
+  ([`analytics.ts`](../apps/web/src/lib/analytics.ts),
+  [`analytics.test.mjs`](../apps/web/test/analytics.test.mjs)) over the P0-7
+  audit JSONL — same trail the gateways and app already write; the page
+  discloses the file read, the window covered, and tail-truncation on large
+  trails. No separate analytics store until scale demands one.
 - **PRD:** P1-4 *"query themes, zero-result queries, citation counts, per-gateway
   adoption"* (user story 11).
-- **Now:** The data exists in the gateway audit JSONL
-  ([`audit.ts`](../apps/mcp-server/src/audit.ts)), but reading it is an admin/CLI
-  task — there's no in-app view. Also blocks the "entity pages show 'cited in
-  answers' usage count" item in P0-9.
-- **Approach:** Ingest audit events into a queryable store and surface a dashboard;
-  derive per-entity citation counts. **Effort: L.**
+- **Was:** The data existed in the gateway audit JSONL
+  ([`audit.ts`](../apps/mcp-server/src/audit.ts)), but reading it was an
+  admin/CLI task — no in-app view, which also blocked the P0-9 "cited in
+  answers" count on entity pages.
 
 ### G11 · No roles or SSO (auth)
 
@@ -349,8 +368,9 @@ most existing code:
 4. **G6, G9, G7** — ~~ACL editor~~ (✅ 2026-07-02), capture type-ahead linking
    (🟡 project + author links shipped; standards linking pending), search
    facets (🟡 review-status shipped; project/discipline/date pending).
-5. **G2 full wizard, G8, G10, G11** — SharePoint sync, graph scale, analytics, SSO
-   (the larger platform builds).
+5. **G2 full wizard, ~~G8~~, ~~G10~~, G11** — SharePoint sync remains; graph
+   scale ✅ 2026-07-19, analytics ✅ 2026-07-19, SSO: gateway OAuth half ✅
+   2026-07-19 (Entra registration + app SSO deploy pending).
 
 ## Documentation follow-ups
 

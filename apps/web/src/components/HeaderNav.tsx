@@ -10,6 +10,7 @@ const LINKS = [
   { href: '/ingest', label: 'Add documents' },
   { href: '/curation', label: 'Curate' },
   { href: '/capture', label: 'Capture' },
+  { href: '/analytics', label: 'Analytics' },
   { href: '/settings', label: 'Settings' },
 ];
 

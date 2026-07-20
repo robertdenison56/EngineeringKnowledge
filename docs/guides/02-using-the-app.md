@@ -54,6 +54,9 @@ Click any result to open its record — this is where you **verify** an answer.
   [below](#review-status-trust-at-a-glance).)
 - **Summary and tags.**
 - **Provenance line** — author, date, review status, source.
+- **"Cited in N assistant answers"** — how many times this item was surfaced
+  through a connected assistant, straight from the audit trail (P0-9); links to
+  [Analytics](#analytics-analytics).
 - **Source document text** — a collapsible panel with the extracted text, so you
   can check the answer against the *exact* source wording.
 - **Document sections** — for long documents, the list of indexed passages, each
@@ -73,6 +76,25 @@ neighborhood, click a node to open it, and toggle entity types and tags to
 focus. It's how a QA reviewer **spots gaps, stale items, and undocumented
 connections** that a search box would never reveal — e.g. a project with no
 lessons learned attached, or a detail nothing references.
+
+### Analytics (`/analytics`)
+
+Usage analytics for curators and admins (PRD P1-4, user story 11), aggregated
+from the same P0-7 audit trail the gateways and the app write — every number is
+a recorded call, nothing sampled or modeled. The page shows:
+
+- **Adoption by surface** — calls and distinct users per transport (`stdio`,
+  `http`, `web`), so you can see which assistant gateways are actually used.
+- **Zero-result queries** — what people asked that the graph had no answer for.
+  This is the capture-next list: an honest "no firm answer" is the system
+  working (P0-8); the same question landing here repeatedly is a gap to fill.
+- **Top queries** — most-asked themes, grouped on exact normalized text.
+- **Most-cited knowledge** — the items assistant answers actually surfaced
+  (the app's own curation reads are not counted). Items your permissions don't
+  cover appear as ids only.
+- **Tool usage** — calls and errors per gateway tool and app action.
+
+The page discloses which audit file it read and the time window it covers.
 
 ### Settings (`/settings`)
 
