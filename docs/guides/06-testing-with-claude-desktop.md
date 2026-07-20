@@ -128,8 +128,10 @@ Mint tokens for different users/tenants with the snippet in the
 drive the server with any Streamable-HTTP MCP client (e.g. MCP Inspector, or
 the project's own `apps/mcp-server/scripts/smoke-http.mjs` as a reference
 client). Claude Desktop's remote **custom connectors** require OAuth on the
-server side, which is the deferred identity phase — until that lands, remote
-testing uses token-bearing clients, and Claude Desktop uses stdio.
+server side — the gateway now has that
+([OAuth resource-server mode](05-admin-guide.md#production-sso-oauth-21--entra)),
+but it needs an Entra tenant behind it, so single-user testing stays on stdio
+and token-bearing clients cover the multi-user HTTP path.
 
 ---
 

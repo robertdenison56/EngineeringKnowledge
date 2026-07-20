@@ -6,11 +6,15 @@ audit and semantic retrieval, and connecting the assistants the firm licenses.
 It assumes you've read [Getting started](01-getting-started.md).
 
 > **Honesty about build status.** This is the Phase 1 / early Phase 2 build. The
-> remote gateway, per-request identity, tenant isolation, ACL trimming, and the
-> audit trail are **implemented and tested**. Single sign-on (OAuth 2.1 + Entra
-> federation), source-system sync (SharePoint/Procore), OCR for scans, and the
-> production graph engine are **designed but not yet built** — they're called out
-> where relevant. Nothing below implies a capability that isn't in the code.
+> remote gateway, per-request identity, tenant isolation, ACL trimming, the
+> audit trail, OCR for scans (when a local engine is installed), and the
+> gateway's **OAuth 2.1 resource-server mode** (Entra-federated token
+> verification, [ADR 0011](../decisions/0011-gateway-oauth-entra-federation.md))
+> are **implemented and tested**. The Entra app registration + real-tenant
+> validation, the workspace app's own SSO sign-in, source-system sync
+> (SharePoint/Procore), and the production graph engine are **designed but not
+> yet built** — they're called out where relevant. Nothing below implies a
+> capability that isn't in the code.
 
 ## Deployment topology
 
@@ -55,8 +59,10 @@ node apps/mcp-server/dist/index.js
 ```
 
 - Listens on **`http://localhost:8787/mcp`** by default (`EKG_PORT` to change).
-- **`EKG_JWT_SECRET` is required** for the HTTP transport — the server refuses to
-  start without it.
+- **Identity config is required** for the HTTP transport — either `EKG_JWT_SECRET`
+  (dev tokens, shown here) or the OIDC pair `EKG_OIDC_ISSUER` +
+  `EKG_OIDC_AUDIENCE` ([production SSO](#production-sso-oauth-21--entra)). The
+  server refuses to start with neither.
 - **`GET /healthz`** is an unauthenticated liveness probe for load balancers and
   deploy checks; it returns `{ "status": "ok", … }`. Every other path requires a
   valid token.
@@ -132,17 +138,56 @@ console.log(`${header}.${payload}.${sig}`);
 Then call the gateway with `Authorization: Bearer <output>`. Change `tid`, `sub`,
 and `groups` to test tenant isolation and ACL trimming.
 
-### Production SSO (designed, not built)
+### Production SSO (OAuth 2.1 + Entra)
 
 The dev-secret JWT deliberately uses **the same claim shape a federated Entra
-token will carry**. When OAuth 2.1 + Entra federation lands, **only the verifier
-changes** — `verifyToken` becomes a JWKS/OIDC check; `resolveCallerFromAuth` and
-every downstream consumer stay put. ACL and tenant enforcement are already in
-place and don't move. The verifier swap and the protected-resource metadata that
-makes the [claude.ai org connector](#admin-managed-claudeai-connector-organization-wide--oauth-on-the-roadmap)
-connectable are scoped in
-[ADR 0011](../decisions/0011-gateway-oauth-entra-federation.md) (see also
-[`auth.ts`](../../apps/mcp-server/src/auth.ts)).
+token carries**, so production SSO is a verifier swap, and that swap is now
+**built** ([ADR 0011](../decisions/0011-gateway-oauth-entra-federation.md),
+[`oidc.ts`](../../apps/mcp-server/src/oidc.ts)). Setting both of these switches
+the HTTP gateway into **OAuth 2.1 resource-server mode**:
+
+| Variable | Meaning |
+|---|---|
+| `EKG_OIDC_ISSUER` | The Entra tenant's issuer URL, e.g. `https://login.microsoftonline.com/<tenant-id>/v2.0`. Token `iss` must match it exactly. |
+| `EKG_OIDC_AUDIENCE` | The gateway's resource identifier — the Entra app registration's **Application ID URI** (e.g. `api://ekg-gateway`). Token `aud` must carry it. |
+| `EKG_OIDC_JWKS_URI` | Optional. Explicit JWKS URL; otherwise discovered from `<issuer>/.well-known/openid-configuration`. |
+
+In this mode the gateway is a resource server only — it **never mints tokens**
+(Entra owns `/authorize`, `/token`, consent, and key rotation), and it:
+
+- serves `GET /.well-known/oauth-protected-resource` (RFC 9728) advertising the
+  resource identifier and the authorization server, and points every `401` at it
+  via `WWW-Authenticate: Bearer resource_metadata="…"` — which is how an
+  OAuth-capable client (the claude.ai org connector) discovers where to send
+  users with no out-of-band config;
+- verifies **RS256** signatures against the issuer's published JWKS —
+  discovered, cached, and refetched when a token names an unseen key (rotation),
+  throttled by `EKG_OIDC_JWKS_MIN_REFRESH_MS` (default 60s);
+- checks `iss`, `aud`, and `exp`/`nbf` (±300 s skew), then maps claims onto the
+  dev shape: tenant ← `tid`, caller ← `oid` (the **stable object id** — Entra's
+  `sub` is pairwise per app), groups ← the group object ids.
+  `resolveCallerFromAuth`, ACL trimming, tenant isolation, and audit are
+  byte-for-byte unchanged;
+- **ignores `EKG_JWT_SECRET`** — the dev verifier is never live alongside OIDC,
+  and a half-set OIDC config (issuer without audience, or vice versa) refuses to
+  start rather than silently downgrading to dev auth.
+
+Write item ACLs against the principals production tokens will actually carry
+(Entra object ids), or map groups to your own principal names at ingestion.
+
+**Known limit — group-claim overage:** past ~200 groups Entra omits `groups`
+and returns a Microsoft Graph pointer instead. Such a user resolves with only
+their own id: they see their items and tenant-public (`*`) ones. Fails
+*closed*, not open.
+
+**What remains is deployment, not code:** one Entra **app registration** for
+the gateway-as-API — expose a scope (e.g. `mcp.invoke`), set the Application ID
+URI (= `EKG_OIDC_AUDIENCE`), and configure the **groups claim** — then a
+real-tenant end-to-end run. The verifier itself is proven against a spec-shaped
+mock IdP in [`oauth.test.mjs`](../../apps/mcp-server/scripts/oauth.test.mjs):
+metadata + challenge discovery, JWKS discovery and key rotation, `oid` mapping
+into the audit trail, and nine rejection shapes (wrong audience/issuer,
+expiry, `alg:none`, HS256-in-OIDC-mode, unknown or mismatched keys).
 
 ## Audit logging
 
@@ -252,7 +297,7 @@ and work against the gateway exactly as built:
   what the [end-to-end sign-off](#end-to-end-sign-off) and the `smoke-http.mjs`
   test exercise.
 
-### Admin-managed claude.ai connector (organization-wide) — OAuth, on the roadmap
+### Admin-managed claude.ai connector (organization-wide)
 
 claude.ai (Team/Enterprise) lets an **Owner** add a custom connector once, for the
 whole organization, which members then connect to individually:
@@ -267,23 +312,26 @@ whole organization, which members then connect to individually:
 
 *(claude.ai UI labels follow Anthropic's Help Center and may change.)*
 
-> **Honest status — not connectable from claude.ai's web UI yet.** That flow is
-> **OAuth-based**: claude.ai runs an OAuth authorization handshake against the
-> server (the MCP authorization spec — `/.well-known/oauth-protected-resource`,
-> authorization-server metadata, and either Dynamic Client Registration or the
-> Client ID/Secret you paste). The gateway today authenticates with a **bearer
-> JWT and exposes no OAuth endpoints**, so claude.ai's connector cannot complete
-> its handshake. This is exactly the deferred **OAuth 2.1 + Entra federation**
-> work ([identity](#production-sso-designed-not-built)): when it lands, the gateway
-> advertises the OAuth metadata and verifies federated tokens, and this
-> admin-managed flow works unchanged. **Until then, use the static-header clients
-> above** (Claude Code remote, the API connector, ChatGPT).
+> **Honest status — server side ready; needs an Entra app registration and a
+> real-tenant run.** That flow is **OAuth-based**: claude.ai runs an OAuth
+> authorization handshake against the server (the MCP authorization spec —
+> `/.well-known/oauth-protected-resource`, authorization-server metadata, and
+> either Dynamic Client Registration or the Client ID/Secret you paste). The
+> gateway **now speaks its side** when
+> [OIDC mode](#production-sso-oauth-21--entra) is configured: it serves the
+> protected-resource metadata, points every 401 at it, and verifies
+> Entra-issued RS256 tokens. What has **not** happened yet is a run against a
+> real Entra tenant and claude.ai's production handshake — the implementation
+> is proven against a spec-shaped mock IdP
+> ([`oauth.test.mjs`](../../apps/mcp-server/scripts/oauth.test.mjs)). Until
+> your deployment has the Entra registration wired, the static-header clients
+> above (Claude Code remote, the API connector, ChatGPT) work with dev tokens.
 
 - **Microsoft 365 Copilot** — the intended path is deploying the connection from
   the M365 admin center with Entra SSO, so rollout is configuration, not
-  development (PRD user story 12). Like the claude.ai org connector, this depends
-  on the same Entra federation work under
-  [identity](#production-sso-designed-not-built).
+  development (PRD user story 12). Like the claude.ai org connector, this rides
+  the same Entra registration under
+  [identity](#production-sso-oauth-21--entra).
 
 Whichever assistant, the behavior is the same: results carry provenance and a
 link into the workspace app (`EKG_APP_URL`), stale items carry a warning, and an
@@ -373,7 +421,11 @@ Every setting is an environment variable — no config file.
 |---|---|---|---|
 | `EKG_DB_PATH` | app, gateway, ingestion | Curated SQLite database path. `:memory:` = ephemeral seeded. | app: `apps/web/.data/ekg.db`; gateway: in-memory demo |
 | `EKG_TRANSPORT` | gateway | `stdio` (single-user) or `http` (remote, multi-user). | `stdio` |
-| `EKG_JWT_SECRET` | gateway (http) | HS256 secret for verifying bearer tokens. **Required for http.** | — |
+| `EKG_JWT_SECRET` | gateway (http) | HS256 secret for verifying dev bearer tokens. **Required for http unless OIDC mode is configured** (then ignored). | — |
+| `EKG_OIDC_ISSUER` | gateway (http) | OAuth resource-server mode: expected token `iss` (the Entra tenant issuer URL). Set together with `EKG_OIDC_AUDIENCE` — half-set refuses to start. | unset (dev-secret mode) |
+| `EKG_OIDC_AUDIENCE` | gateway (http) | OAuth resource-server mode: expected token `aud` — the gateway's resource identifier (Entra Application ID URI). | unset |
+| `EKG_OIDC_JWKS_URI` | gateway (http) | Optional explicit JWKS URL; default discovers it from `<issuer>/.well-known/openid-configuration`. | discovery |
+| `EKG_OIDC_JWKS_MIN_REFRESH_MS` | gateway (http) | Throttle on JWKS refetches triggered by unknown key ids (rotation). | `60000` |
 | `EKG_PORT` | gateway (http) | Port for the HTTP transport. | `8787` |
 | `EKG_AUDIT_LOG` | app, gateway | Append-only JSONL audit file. Unset with `EKG_DB_PATH` set → gateway defaults to `audit.jsonl` next to the database (the stdio trail is never silently lost); unset with no database → stderr. App writes `.data/audit.jsonl`. Setting it explicitly always overrides. | `audit.jsonl` beside `EKG_DB_PATH`, else stderr |
 | `EKG_APP_URL` | gateway | Base URL for citation deep links. | `http://localhost:3000` |
@@ -394,10 +446,15 @@ Every setting is an environment variable — no config file.
 - **You must provide:** TLS termination / reverse proxy, secret management for
   `EKG_JWT_SECRET` and any embedding API keys, log retention for the audit trail,
   and backups of the SQLite database.
-- **Not yet built (roadmap):** OAuth 2.1 + Entra SSO (the verifier swap is
-  scoped), SharePoint/OneDrive/Procore ACL-mapped sync, OCR for scanned sets, and
-  the production graph engine. Until SSO lands, the dev-secret JWT is the identity
-  mechanism — treat `EKG_JWT_SECRET` as a real secret and keep token lifetimes
+- **Enforced today (continued):** the gateway's OAuth 2.1 resource-server mode —
+  RS256/JWKS verification of Entra-federated tokens with RFC 9728 discovery
+  ([production SSO](#production-sso-oauth-21--entra)) — validated against a mock
+  IdP; a real Entra tenant run is still pending.
+- **Not yet built (roadmap):** the Entra app registration + real-tenant
+  end-to-end validation, the workspace app's own SSO sign-in, an OAuth mode for
+  the sign-off script, SharePoint/OneDrive/Procore ACL-mapped sync, and the
+  production graph engine. Wherever the dev-secret JWT is still the identity
+  mechanism, treat `EKG_JWT_SECRET` as a real secret and keep token lifetimes
   short.
 
 ---

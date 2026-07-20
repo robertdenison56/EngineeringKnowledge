@@ -1,6 +1,9 @@
 # ADR 0011: OAuth 2.1 + Entra federation on the gateway
 
-Date: 2026-06-24 · Status: Proposed
+Date: 2026-06-24 · Status: **Accepted — implemented 2026-07-19** (`oidc.ts`
+verifier + RFC 9728 metadata route in `http.ts`, proven against a mock IdP in
+`scripts/oauth.test.mjs`; the Entra app registration and a real-tenant
+end-to-end run remain as deploy steps)
 
 ## Context
 

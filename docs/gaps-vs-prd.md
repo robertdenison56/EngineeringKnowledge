@@ -316,13 +316,20 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
   actions (G3–G6, settings) re-check the role server-side.
 - **PRD:** P0-9 *"viewer / contributor / curator / admin roles; sign-in via Entra
   ID SSO."* P0-7 per-request identity.
-- **Still open:** deploying behind real Entra ID SSO end-to-end (the identity
-  proxy that sets the header), plus the gateway's OAuth 2.1 federation
-  ([ADR 0011](decisions/0011-gateway-oauth-entra-federation.md)).
+- **Update 2026-07-19 — the gateway's OAuth 2.1 half is built.**
+  [ADR 0011](decisions/0011-gateway-oauth-entra-federation.md) is implemented:
+  `EKG_OIDC_ISSUER`/`EKG_OIDC_AUDIENCE` switch the HTTP gateway into OAuth 2.1
+  resource-server mode — RS256/JWKS verification of Entra-federated tokens
+  (rotation-aware, `oid`-mapped identity) plus RFC 9728 protected-resource
+  metadata with 401 challenge discovery, proven against a mock IdP in
+  [`oauth.test.mjs`](../apps/mcp-server/scripts/oauth.test.mjs).
+- **Still open:** the Entra **app registration** + real-tenant end-to-end run
+  (this is what actually connects the claude.ai org connector and Copilot), and
+  deploying the workspace app behind real Entra ID SSO (the identity proxy that
+  sets the `x-ms-client-principal` header).
 - **Note:** SSO/token plumbing is **admin setup** (allowed CLI); the role-gated
-  GUI actions it feeds are live. **Effort: M** for the remaining SSO deployment
-  (the verifier swap is already scoped in
-  [`auth.ts`](../apps/mcp-server/src/auth.ts)).
+  GUI actions it feeds are live. **Effort: S–M** for the remaining Entra
+  registration + deployment validation.
 
 ---
 
