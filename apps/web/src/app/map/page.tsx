@@ -111,23 +111,23 @@ export default async function MapPage({
   }
 
   // Section summaries for chunked documents (ADR 0006), so the map can unfold
-  // a large file into its passages. Only file-derived entities (`content` set)
-  // can carry chunks; single-chunk docs stay plain nodes.
+  // a large file into its passages. Ask the store for every node's chunks —
+  // chunk presence is the source of truth (seeded corpora attach passages to
+  // entities that carry no `content` preview), and both load paths above cap
+  // the entity count. Single-chunk docs stay plain nodes.
   const sectionsById = new Map<string, { sections: MapSection[]; count: number }>();
   await Promise.all(
-    entities
-      .filter((e) => e.content)
-      .map(async (e) => {
-        const chunks = await store.getChunks(caller, e.id);
-        if (chunks.length < 2) return;
-        sectionsById.set(e.id, {
-          count: chunks.length,
-          sections: chunks.slice(0, MAX_MAP_SECTIONS).map((c) => ({
-            label: sectionLabel(c),
-            description: excerpt(c.text),
-          })),
-        });
-      }),
+    entities.map(async (e) => {
+      const chunks = await store.getChunks(caller, e.id);
+      if (chunks.length < 2) return;
+      sectionsById.set(e.id, {
+        count: chunks.length,
+        sections: chunks.slice(0, MAX_MAP_SECTIONS).map((c) => ({
+          label: sectionLabel(c),
+          description: excerpt(c.text),
+        })),
+      });
+    }),
   );
 
   const nodes = entities.map((e) => {

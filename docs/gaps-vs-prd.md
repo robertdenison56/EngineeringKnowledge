@@ -256,6 +256,14 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
   P0-8 honest no-results gate and role boosting are untouched — and when facets
   hide everything, the empty state says *"N matches — all hidden by your
   filters"* with a clear-filters link, never a false *"no answer."*
+- **Section-facet semantics (deliberate):** a multi-section document carries a
+  section per *passage*, so the facet is per-hit — it accepts the entity's own
+  anchor/`masterformat` **or the anchor of the passage the hit matched on**.
+  Searching with a section facet therefore follows the real section breakdown
+  of chunked spec books. In query-less *browse* mode there is no matched
+  passage, so only entity-level sections apply (one bucket per file); true
+  passage-level browse faceting would need a chunk-aware `list()` in the store
+  and is deferred until a real corpus demands it.
 
 ### G8 · Graph explorer filters & scale
 
