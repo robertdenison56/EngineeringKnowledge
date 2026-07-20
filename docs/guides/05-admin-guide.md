@@ -157,8 +157,11 @@ knowledge (PRD P0-7). Set a destination:
 EKG_AUDIT_LOG=/var/log/ekg/audit.jsonl
 ```
 
-Without it, events go to **stderr** (so your host log pipeline still captures
-them — they're never silently dropped). Each event is one JSON line:
+Without it, the gateway defaults to **`audit.jsonl` next to the database** when
+`EKG_DB_PATH` is set (so the stdio trail is never silently lost); with no
+database configured either, events go to **stderr** (so your host log pipeline
+still captures them — they're never silently dropped). An explicit
+`EKG_AUDIT_LOG` always wins. Each event is one JSON line:
 
 | Field | Meaning |
 |---|---|
@@ -372,9 +375,9 @@ Every setting is an environment variable — no config file.
 | `EKG_TRANSPORT` | gateway | `stdio` (single-user) or `http` (remote, multi-user). | `stdio` |
 | `EKG_JWT_SECRET` | gateway (http) | HS256 secret for verifying bearer tokens. **Required for http.** | — |
 | `EKG_PORT` | gateway (http) | Port for the HTTP transport. | `8787` |
-| `EKG_AUDIT_LOG` | app, gateway | Append-only JSONL audit file. Unset → gateway logs to stderr; app writes `.data/audit.jsonl`. | see purpose |
+| `EKG_AUDIT_LOG` | app, gateway | Append-only JSONL audit file. Unset with `EKG_DB_PATH` set → gateway defaults to `audit.jsonl` next to the database (the stdio trail is never silently lost); unset with no database → stderr. App writes `.data/audit.jsonl`. Setting it explicitly always overrides. | `audit.jsonl` beside `EKG_DB_PATH`, else stderr |
 | `EKG_APP_URL` | gateway | Base URL for citation deep links. | `http://localhost:3000` |
-| `EKG_INGEST_ROOT` | gateway | Confine `ingest_document` to one directory tree; paths outside it are refused. Unset → unconfined (local stdio only). | unset |
+| `EKG_INGEST_ROOT` | gateway | **Required for path ingestion** (alias `EKG_UPLOAD_ROOT`). Confines `ingest_document` to one directory tree; relative paths resolve against it, and paths outside it (including via symlinks or `..`) are refused with `path_not_allowed`. Unset → `ingest_document` fails closed on every transport with `ingest_root_not_configured`. | unset (ingestion disabled) |
 | `EKG_SEED_DEMO` | app, gateway | App: `0` keeps a fresh database unseeded. Gateway: `1` seeds a fresh persistent DB (never seeds one implicitly). | app seeds, gateway doesn't |
 | `EKG_UPLOAD_DIR` | app | Where `/ingest` uploads are stored. | `.data/uploads` |
 | `EKG_TRASH_DIR` | app | Where rejected candidates are kept for restore. | `.data/trash` |

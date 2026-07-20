@@ -11,7 +11,10 @@ import type {
 import {
   buildQueryGroups,
   canRead,
+  groupConcept,
   matchesTagFilter,
+  relaxationThreshold,
+  relaxedScoreEntityMatch,
   roleBoostFactor,
   scoreChunkMatch,
   scoreEntityMatch,
@@ -156,6 +159,36 @@ export class InMemoryGraphStore implements GraphStore {
         warning: warningFor(entity.provenance.reviewStatus),
         ...(match ? { chunk: match } : {}),
       });
+    }
+    // Relaxed fallback (most concepts match, disclosed as partial): runs ONLY
+    // when the strict pipeline admitted nothing, the query is long enough to
+    // relax (three-plus concepts), and the caller did not opt out. Strict and
+    // relaxed results never mix, relaxed hits never feed graph-expansion, and
+    // every relaxed hit carries `partial` naming what matched and what is
+    // missing — that explicit disclosure is what keeps the fallback inside
+    // the honest no_results contract (PRD P0-8). Entity-level only: no chunk
+    // relaxation, so no `chunk` citation is attached to a partial hit.
+    if (hits.length === 0 && options.relax !== false && relaxationThreshold(groups.length) > 0) {
+      for (const entity of this.entities.values()) {
+        if (!canRead(caller, entity)) continue;
+        if (options.types && !options.types.includes(entity.type)) continue;
+        if (!matchesTagFilter(entity, options.tags)) continue;
+
+        const { score, matchedGroups } = relaxedScoreEntityMatch(entity, groups);
+        if (score <= 0) continue;
+        const matched = new Set(matchedGroups);
+        hits.push({
+          entity,
+          // Same re-rank as the strict pass: the role lens scales admitted
+          // candidates only, it never admits or hides one.
+          score: score * roleBoostFactor(entity, options.boostRole),
+          warning: warningFor(entity.provenance.reviewStatus),
+          partial: {
+            matchedConcepts: matchedGroups.map((i) => groupConcept(groups[i])),
+            missingConcepts: groups.filter((_, i) => !matched.has(i)).map(groupConcept),
+          },
+        });
+      }
     }
     hits.sort((a, b) => b.score - a.score);
     return hits.slice(0, options.limit ?? 10);

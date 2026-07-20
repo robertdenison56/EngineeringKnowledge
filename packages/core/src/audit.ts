@@ -1,4 +1,5 @@
 import { appendFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 /**
  * Immutable audit trail (PRD P0-7): who did what, through which surface, and
@@ -55,13 +56,26 @@ class StderrAuditSink implements AuditSink {
 }
 
 /**
- * Build the audit sink from the environment. EKG_AUDIT_LOG points at an
- * append-only JSONL file (the immutable audit trail); without it, events go to
- * stderr so they are captured by the host's log pipeline and never silently
- * dropped. `fallbackPath` lets a surface pick its own default file (the
- * workspace app audits next to its database) while still honoring the env var.
+ * Build the audit sink from the environment. Precedence:
+ *
+ *   1. EKG_AUDIT_LOG — an explicit append-only JSONL file always wins.
+ *   2. `fallbackPath` — a surface's own default file (the workspace app passes
+ *      `.data/audit.jsonl` next to its default database). Because an explicit
+ *      fallback outranks the DB-derived default below, a consumer that already
+ *      picks its own file keeps exactly its current behavior and can never be
+ *      double-pointed at two files.
+ *   3. Derived from EKG_DB_PATH — when the graph lives in a real database file
+ *      (set, not ':memory:'), audit defaults to `audit.jsonl` in the same
+ *      directory. This keeps the MCP gateway's trail durable next to the data
+ *      it covers instead of silently vanishing to stderr when EKG_AUDIT_LOG is
+ *      forgotten (P0-7).
+ *   4. stderr — in-memory/unset-DB dev runs, captured by the host's log
+ *      pipeline and never silently dropped.
  */
 export function auditSinkFromEnv(fallbackPath?: string): AuditSink {
-  const path = process.env.EKG_AUDIT_LOG ?? fallbackPath;
+  const dbPath = process.env.EKG_DB_PATH;
+  const dbDerived =
+    dbPath && dbPath !== ':memory:' ? join(dirname(resolve(dbPath)), 'audit.jsonl') : undefined;
+  const path = process.env.EKG_AUDIT_LOG ?? fallbackPath ?? dbDerived;
   return path ? new FileAuditSink(path) : new StderrAuditSink();
 }

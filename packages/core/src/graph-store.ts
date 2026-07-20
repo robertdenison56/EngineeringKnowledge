@@ -29,12 +29,21 @@ export interface SearchHit {
   entity: Entity;
   score: number;
   /**
-   * Present when the item is superseded/deprecated. Gateways must surface
-   * this prominently — flagged items are never served clean (PRD P0-8).
+   * Present when the item is flagged (superseded/deprecated/unverified).
+   * Gateways must surface this prominently — flagged items are never served
+   * clean (PRD P0-8).
    */
   warning?: string;
   /** Best-matching passage when the hit came from a chunk (ADR 0006). */
   chunk?: ChunkMatch;
+  /**
+   * Present ONLY on hits admitted by the relaxed pass (see
+   * `SearchOptions.relax`): which query concepts this item matched and which
+   * it did not. Gateways must disclose partial hits as partial — the explicit
+   * matched/missing breakdown is what keeps a most-concepts fallback honest
+   * (PRD P0-8). Absent on every strict hit.
+   */
+  partial?: { matchedConcepts: string[]; missingConcepts: string[] };
 }
 
 export interface SearchOptions {
@@ -56,6 +65,17 @@ export interface SearchOptions {
    * no_results stays no_results and a neighbor never outranks a real match (P0-8).
    */
   expand?: boolean;
+  /**
+   * Most-concepts-match fallback (default on; undefined means true). When the
+   * strict AND pipeline admits nothing and the query carries at least three
+   * concepts, the store runs one relaxed entity-level pass
+   * (`relaxedScoreEntityMatch`) and returns items matching most concepts,
+   * each tagged with `SearchHit.partial`. Honesty (PRD P0-8) holds because
+   * the fallback never mixes with strict results, never feeds
+   * graph-expansion, and every hit discloses exactly what matched and what
+   * is missing. Set false to keep the hard no_results behavior.
+   */
+  relax?: boolean;
 }
 
 export interface NeighborHit {

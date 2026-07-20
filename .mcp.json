@@ -4,7 +4,10 @@
       "command": "node",
       "args": ["apps/mcp-server/dist/index.js"],
       "env": {
-        "EKG_DB_PATH": "/Volumes/RobertsExternalSSD/repos/EngineeringKnowledge/apps/web/.data/ekg.db"
+        "EKG_DB_PATH": "/Volumes/RobertsExternalSSD/repos/EngineeringKnowledge/apps/web/.data/ekg.db",
+        "EKG_APP_URL": "http://localhost:3000",
+        "EKG_INGEST_ROOT": "/Users/robertdenison/EKG-Inbox",
+        "EKG_AUDIT_LOG": "/Volumes/RobertsExternalSSD/repos/EngineeringKnowledge/apps/web/.data/audit.jsonl"
       }
     }
   }

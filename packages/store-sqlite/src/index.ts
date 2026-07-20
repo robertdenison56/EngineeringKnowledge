@@ -5,8 +5,10 @@ import {
   chunkEmbeddingText,
   cosineSimilarity,
   embeddingText,
+  groupConcept,
   matchesTagFilter,
   normalizeText,
+  relaxedScoreEntityMatch,
   roleBoostFactor,
   scoreEntityMatch,
   snippetForGroups,
@@ -245,16 +247,56 @@ export class SqliteGraphStore implements GraphStore {
       }
     }
     this.db.exec(SCHEMA);
-    // Backfill the FTS index for databases that predate it.
-    const ftsCount = (this.db.prepare('SELECT COUNT(*) AS n FROM entities_fts').get() as { n: number }).n;
-    const entCount = (this.db.prepare('SELECT COUNT(*) AS n FROM entities').get() as { n: number }).n;
-    if (ftsCount === 0 && entCount > 0) {
-      const rows = this.db.prepare('SELECT * FROM entities').all() as unknown as EntityRow[];
+    this.reconcileFts();
+  }
+
+  /**
+   * Restore the FTS invariant on open: exactly one entities_fts row per
+   * entities row (and one chunks_fts row per chunk). Live databases carry
+   * residue from before writes were transactional (pre WAL/busy_timeout, a
+   * SQLITE_BUSY or crash between `DELETE FROM entities` and `DELETE FROM
+   * entities_fts` stranded the FTS row), and the previous count-based
+   * backfill (`ftsCount === 0`) could neither heal an orphan, nor complete an
+   * interrupted backfill, nor survive two processes racing the count check
+   * without double-inserting. Set-based reconciliation is idempotent, and the
+   * single IMMEDIATE transaction serializes concurrent openers (app +
+   * gateway), so the second sees a consistent index and does nothing. Full
+   * scans of the id sets are fine at this store's dev-grade scale.
+   */
+  private reconcileFts(): void {
+    this.tx(() => {
+      // Orphans: FTS rows whose source row is gone.
+      this.db.exec('DELETE FROM entities_fts WHERE id NOT IN (SELECT id FROM entities)');
+      this.db.exec('DELETE FROM chunks_fts WHERE id NOT IN (SELECT id FROM chunks)');
+      // Duplicates (e.g. two pre-fix processes racing the old count-based
+      // backfill): drop every copy; the re-insert below restores one.
+      const dupEntity = this.db
+        .prepare('SELECT id FROM entities_fts GROUP BY id HAVING COUNT(*) > 1')
+        .all() as unknown as { id: string }[];
+      for (const { id } of dupEntity) this.db.prepare('DELETE FROM entities_fts WHERE id = ?').run(id);
+      const dupChunk = this.db
+        .prepare('SELECT id FROM chunks_fts GROUP BY id HAVING COUNT(*) > 1')
+        .all() as unknown as { id: string }[];
+      for (const { id } of dupChunk) this.db.prepare('DELETE FROM chunks_fts WHERE id = ?').run(id);
+      // Missing: databases that predate the FTS tables (the old backfill's
+      // job), interrupted backfills, and the duplicate re-inserts above.
+      const missing = this.db
+        .prepare('SELECT * FROM entities WHERE id NOT IN (SELECT id FROM entities_fts)')
+        .all() as unknown as EntityRow[];
       const insert = this.db.prepare(
         'INSERT INTO entities_fts (id, tenant_id, text) VALUES (?, ?, ?)',
       );
-      for (const row of rows) insert.run(row.id, row.tenant_id, ftsText(rowToEntity(row)));
-    }
+      for (const row of missing) insert.run(row.id, row.tenant_id, ftsText(rowToEntity(row)));
+      const missingChunks = this.db
+        .prepare('SELECT * FROM chunks WHERE id NOT IN (SELECT id FROM chunks_fts)')
+        .all() as unknown as ChunkRow[];
+      const insertChunk = this.db.prepare(
+        'INSERT INTO chunks_fts (id, entity_id, tenant_id, text) VALUES (?, ?, ?, ?)',
+      );
+      for (const row of missingChunks) {
+        insertChunk.run(row.id, row.entity_id, row.tenant_id, chunkFtsText(rowToChunk(row)));
+      }
+    });
   }
 
   close(): void {
@@ -628,7 +670,7 @@ export class SqliteGraphStore implements GraphStore {
     // Candidate set: admitted by any honest gate. Vectors re-rank; they never
     // admit items no concept matched (keeps no_results honest, P0-8).
     const admitted = new Set([...lexical, ...fts, ...chunkFts]);
-    if (admitted.size === 0) return [];
+    if (admitted.size === 0) return this.relaxedPass(visible, groups, options);
 
     // List 3 — dense similarity over admitted candidates: best of the
     // entity-level vector and the entity's chunk vectors.
@@ -724,6 +766,51 @@ export class SqliteGraphStore implements GraphStore {
       };
       return { ...hit, chunk: match };
     });
+  }
+
+  /**
+   * Most-concepts-match fallback (SearchOptions.relax, default on): runs ONLY
+   * when the strict pipeline admitted zero entities, and only for queries of
+   * three or more concept groups. Entity-level only — no chunk pass, so
+   * relaxed hits never carry a passage citation — and it never seeds
+   * graph-expansion. Every hit is disclosed as partial via
+   * `SearchHit.partial`, and the same review-status and role multipliers the
+   * strict fusion applies scale the relaxed score, so honesty (P0-8) and the
+   * focus-lens contract hold. Capped at the store's normal limit.
+   */
+  private relaxedPass(
+    visible: Entity[],
+    groups: string[][],
+    options: SearchOptions,
+  ): SearchHit[] {
+    if (options.relax === false || groups.length < 3) return [];
+    return visible
+      .map((entity) => ({ entity, match: relaxedScoreEntityMatch(entity, groups) }))
+      .filter(({ match }) => match.score > 0)
+      .map(({ entity, match }) => {
+        const status = entity.provenance.reviewStatus;
+        // SAME multipliers as the strict fusion path above.
+        const score =
+          match.score *
+          (status === 'superseded' || status === 'deprecated' ? 0.85 : 1) *
+          (status === 'unverified' ? 0.95 : 1) *
+          roleBoostFactor(entity, options.boostRole);
+        const matched = new Set(match.matchedGroups);
+        return {
+          entity,
+          score,
+          warning: warningFor(status),
+          partial: {
+            matchedConcepts: match.matchedGroups.map((i) => groupConcept(groups[i])),
+            missingConcepts: groups
+              .map((_, i) => i)
+              .filter((i) => !matched.has(i))
+              .map((i) => groupConcept(groups[i])),
+          },
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, options.limit ?? 10);
   }
 
   async list(caller: Caller, options: SearchOptions = {}): Promise<Entity[]> {

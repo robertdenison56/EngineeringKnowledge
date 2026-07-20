@@ -179,8 +179,12 @@ re-enters the curation queue regardless of how well it grounded.
 > a [remote gateway](05-admin-guide.md), the file must be reachable by the
 > server — this tool is for documents already on (or mounted to) the gateway
 > host, not for uploading from a browser (that's [`/ingest`](#1b-in-app-document-upload)).
-> Admins can confine the tool to one directory tree with `EKG_INGEST_ROOT`;
-> paths outside it are refused.
+> The admin **must** confine the tool to one directory tree with
+> `EKG_INGEST_ROOT` (alias `EKG_UPLOAD_ROOT`) — without it the tool fails closed
+> on every transport with `ingest_root_not_configured`. Relative paths resolve
+> against that root; paths outside it (including via symlinks) are refused with
+> `path_not_allowed`, missing files under it with `not_found`, and disallowed
+> file types with `unsupported_extension`.
 
 ### `propose_knowledge` — save a lesson from chat
 

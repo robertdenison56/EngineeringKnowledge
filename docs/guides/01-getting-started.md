@@ -101,8 +101,9 @@ a warning**, not as a clean result. That round trip — assistant → gateway �
 curated graph → cited answer → verify in the app — is the whole product.
 
 What the gateway exposes (`search`, `fetch`, `traverse`, `find_experts`,
-`get_project_context`, plus `ingest_document` / `save_description`) is described
-in [Using EKG](02-using-the-app.md) and [Adding knowledge](03-adding-knowledge.md).
+`get_project_context`, plus `propose_knowledge` / `ingest_document` /
+`save_description`) is described in [Using EKG](02-using-the-app.md) and
+[Adding knowledge](03-adding-knowledge.md).
 
 ## The full loop in one place
 

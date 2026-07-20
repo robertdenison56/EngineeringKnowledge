@@ -4,6 +4,7 @@ import { extname, isAbsolute, resolve, sep } from 'node:path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ZodRawShapeCompat } from '@modelcontextprotocol/sdk/server/zod-compat.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import { z } from 'zod';
 import { auditSinkFromEnv, type AuditEvent, type AuditSink } from './audit.js';
@@ -152,6 +153,9 @@ function searchResult(hit: SearchHit) {
     tags: hit.entity.tags,
     provenance,
     ...(hit.warning ? { warning: hit.warning } : {}),
+    // Relaxed-pass disclosure (PRD P0-8): which query concepts this hit
+    // matched and which it did not. Present only on partial hits.
+    ...(hit.partial ? { partial: hit.partial } : {}),
   };
 }
 
@@ -374,7 +378,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
   // and no tool can be registered outside the audit boundary.
   function register<InputArgs extends ZodRawShapeCompat>(
     name: string,
-    config: { title: string; description: string; inputSchema: InputArgs },
+    config: { title: string; description: string; annotations?: ToolAnnotations; inputSchema: InputArgs },
     cb: ToolCallback<InputArgs>,
   ): void {
     server.registerTool(name, config, (async (args, extra) => {
@@ -393,6 +397,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     'search',
     {
       title: 'Search firm engineering knowledge',
+      annotations: { readOnlyHint: true, openWorldHint: false },
       description:
         "Search the firm's engineering knowledge graph (projects, design details, specs, standards, " +
         'lessons learned, experts). Results include provenance and a workspace-app URL — always cite them. ' +
@@ -438,6 +443,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     'fetch',
     {
       title: 'Fetch a knowledge item',
+      annotations: { readOnlyHint: true, openWorldHint: false },
       description:
         'Fetch the full record for a knowledge-graph entity by id (ids come from search/traverse results). ' +
         'Returns properties, provenance, related entities, and the document section index. Long documents ' +
@@ -509,6 +515,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     'traverse',
     {
       title: 'Traverse graph relationships',
+      annotations: { readOnlyHint: true, openWorldHint: false },
       description:
         'Follow relationships from an entity (e.g. which projects used a detail, who authored it, ' +
         'what supersedes it). Use after search to explore context around a result.',
@@ -546,6 +553,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     'find_experts',
     {
       title: 'Find firm experts on a topic',
+      annotations: { readOnlyHint: true, openWorldHint: false },
       description:
         'Find the people in the firm who hold knowledge on a topic or discipline, each with the ' +
         'evidence for it — the details, specs, and lessons they authored that match the query. ' +
@@ -647,6 +655,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     'get_project_context',
     {
       title: 'Get the full context of a project',
+      annotations: { readOnlyHint: true, openWorldHint: false },
       description:
         'Assemble a structured briefing for one project in a single call: the details and documents ' +
         'used on it, the specifications that apply, the issues and lessons learned, the standards its ' +
@@ -764,6 +773,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     'propose_knowledge',
     {
       title: 'Propose a lesson learned or design detail',
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
       description:
         'Save a lesson learned or design detail the user states in chat ("save this as a lesson ' +
         'learned") into the firm knowledge graph as an UNVERIFIED candidate — it lands in the ' +
@@ -862,6 +872,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     'ingest_document',
     {
       title: 'Ingest a document into firm knowledge',
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
       description:
         'Add a document (.pdf, .md, .txt) to the firm knowledge graph as an UNVERIFIED candidate — ' +
         'a curator must verify it in the workspace app before it counts as firm knowledge. ' +
@@ -1078,6 +1089,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     'save_description',
     {
       title: 'Save an AI-generated sheet description',
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
       description:
         'Store your description of an ingested drawing sheet. Quoted annotations are mechanically ' +
         'checked against the document text layer; ungrounded ones are flagged for curator review. ' +

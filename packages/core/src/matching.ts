@@ -12,6 +12,8 @@ export const REVIEW_WARNINGS: Partial<Record<ReviewStatus, string>> = {
   superseded:
     'This item has been superseded. Consult the replacement (see "supersedes" relationships) before relying on it.',
   deprecated: 'This item is deprecated and must not be used on new work.',
+  unverified:
+    'This item is an unverified candidate awaiting curator review — do not present it as established firm knowledge.',
 };
 
 export function warningFor(status: ReviewStatus): string | undefined {
@@ -57,9 +59,12 @@ export function normalizeText(text: string): string {
 }
 
 const STOPWORDS = new Set([
-  'a', 'an', 'and', 'are', 'at', 'did', 'do', 'for', 'from', 'how', 'in',
-  'is', 'of', 'on', 'or', 'our', 'the', 'to', 'was', 'we', 'went', 'what',
-  'when', 'where', 'which', 'who', 'with', 'wrong',
+  'a', 'about', 'an', 'and', 'any', 'anyone', 'are', 'at', 'been', 'brief',
+  'can', 'could', 'did', 'do', 'does', 'for', 'from', 'had', 'has', 'have',
+  'how', 'in', 'is', 'it', 'its', 'know', 'knows', 'me', 'my', 'of', 'on',
+  'or', 'our', 'say', 'says', 'should', 'tell', 'the', 'their', 'there',
+  'they', 'this', 'to', 'us', 'was', 'we', 'went', 'what', 'when', 'where',
+  'which', 'who', 'would', 'with', 'wrong', 'your',
 ]);
 
 /**
@@ -79,13 +84,39 @@ export const AEC_SYNONYMS: Record<string, string[]> = {
   facade: ['envelope'],
 };
 
-/** One group per query concept: [token, ...synonyms]. Stopwords dropped. */
+/**
+ * Singular-candidate variants for a plural-looking token, so "firestops"
+ * matches a corpus that says "firestop" (the reverse direction — singular
+ * query, plural corpus — already works by substring). Deliberately dumb
+ * English suffix stripping: "ies" → "y", "es" → drop "es" and drop "s",
+ * trailing "s" (but not "ss" — "glass" is not a plural) → drop "s".
+ * Nonsense candidates ("serie") are harmless — they simply never match —
+ * but candidates shorter than 3 characters are dropped: a 1–2 character
+ * variant substring-matches almost any haystack and would quietly turn a
+ * concept group into an always-true clause (P0-8).
+ */
+function singularCandidates(token: string): string[] {
+  const out: string[] = [];
+  if (token.endsWith('ies')) out.push(`${token.slice(0, -3)}y`);
+  else if (token.endsWith('es') && !token.endsWith('ss')) {
+    out.push(token.slice(0, -2), token.slice(0, -1));
+  } else if (token.endsWith('s') && !token.endsWith('ss')) {
+    out.push(token.slice(0, -1));
+  }
+  return out.filter((v) => v.length >= 3);
+}
+
+/**
+ * One group per query concept: [token, ...synonyms, ...singular candidates].
+ * Stopwords dropped. Variants within a group OR together, so plural folding
+ * (like synonyms) widens wording without weakening the cross-group AND.
+ */
 export function buildQueryGroups(query: string): string[][] {
   return normalizeText(query)
     .split(/[^a-z0-9]+/)
     .filter(Boolean)
     .filter((t) => !STOPWORDS.has(t))
-    .map((t) => [t, ...(AEC_SYNONYMS[t] ?? [])]);
+    .map((t) => [...new Set([t, ...(AEC_SYNONYMS[t] ?? []), ...singularCandidates(t)])]);
 }
 
 /** Tag filter: entity must carry every requested tag (SearchOptions.tags). */
@@ -120,6 +151,59 @@ export function scoreEntityMatch(entity: Entity, groups: string[][]): number {
   if (!groups.every((g) => g.some((v) => haystack.includes(v)))) return 0;
   const title = normalizeText(`${entity.title} ${(entity.aliases ?? []).join(' ')}`);
   return groups.length + groups.filter((g) => g.some((v) => title.includes(v))).length;
+}
+
+/**
+ * Minimum number of concept groups a relaxed match must still satisfy, or 0
+ * when the query is too short to relax at all. Queries under three concepts
+ * never relax — with one or two concepts, "most concepts matched" is
+ * indistinguishable from "one word happened to appear", and the honest
+ * no_results state (PRD P0-8) must win. From three concepts up, a majority
+ * (never fewer than two) must match.
+ */
+export function relaxationThreshold(groupCount: number): number {
+  if (groupCount < 3) return 0;
+  return Math.max(2, Math.floor(groupCount / 2));
+}
+
+/**
+ * Most-concepts-match fallback for queries whose full AND finds nothing —
+ * the "curtain wall firestop detail Riverside" case, where the concepts are
+ * real but split across entities. Same haystack and normalization as
+ * `scoreEntityMatch`; a group counts as matched when any of its variants
+ * appears. Score is 0 below `relaxationThreshold` (including queries too
+ * short to relax); otherwise it is the matched-group count plus a boost per
+ * matched group that also hits the title/aliases, mirroring the strict
+ * scorer. Honesty (PRD P0-8) is preserved by how stores use this, not by the
+ * scorer itself: the relaxed pass runs only after the strict pipeline
+ * admitted nothing, and every hit it admits is disclosed as partial via
+ * `SearchHit.partial` — a relaxed match is never served as a full match.
+ */
+export function relaxedScoreEntityMatch(
+  entity: Entity,
+  groups: string[][],
+): { score: number; matchedGroups: number[] } {
+  const threshold = relaxationThreshold(groups.length);
+  const haystack = entityHaystack(entity);
+  const matchedGroups: number[] = [];
+  groups.forEach((g, i) => {
+    if (g.some((v) => haystack.includes(v))) matchedGroups.push(i);
+  });
+  if (threshold === 0 || matchedGroups.length < threshold) {
+    return { score: 0, matchedGroups };
+  }
+  const title = normalizeText(`${entity.title} ${(entity.aliases ?? []).join(' ')}`);
+  const titleHits = matchedGroups.filter((i) => groups[i].some((v) => title.includes(v))).length;
+  return { score: matchedGroups.length + titleHits, matchedGroups };
+}
+
+/**
+ * The reportable name of a concept group — its original query token (variants
+ * are synonyms/foldings of it). Used to populate `SearchHit.partial`'s
+ * matched/missing concept lists so partial disclosure speaks the user's words.
+ */
+export function groupConcept(group: string[]): string {
+  return group[0];
 }
 
 /**
