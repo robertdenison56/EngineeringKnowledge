@@ -29,6 +29,8 @@ export interface MapNode {
   type: string;
   reviewStatus: string;
   tags: string[];
+  /** Declared discipline (`properties.discipline`), when the entity has one. */
+  discipline?: string;
   /** Present for multi-passage documents (ADR 0006) — clicking the node unfolds these. */
   sections?: MapSection[];
   /** Total indexed passages; `sections` is capped, the rest fold into "+N more". */
@@ -58,6 +60,9 @@ interface SimNode extends SimulationNodeDatum, MapNode {
 const W = 920;
 const H = 600;
 
+/** Display order for the review-status filter chips (lifecycle order). */
+const REVIEW_ORDER = ['verified', 'unverified', 'superseded', 'deprecated'];
+
 function shortTitle(title: string, max = 22): string {
   return title.length > max ? `${title.slice(0, max - 1)}…` : title;
 }
@@ -84,13 +89,14 @@ function wrapText(s: string, width: number, maxLines: number): string[] {
 }
 
 /**
- * Interactive full-graph "mind map" (PRD P0-9 graph explorer): force-directed
- * layout, pan/zoom, hover-highlighting of neighborhoods, type and tag
- * filters, click-through to entity pages. Chunked documents (ADR 0006) carry a
- * §-count badge and unfold on click into a radial fan of their sections, each
- * with a short description. Layout is computed synchronously —
- * fine at firm-demo scale; progressive loading is the documented P0-9
- * requirement for 100k+ graphs.
+ * Interactive graph "mind map" (PRD P0-9 graph explorer): force-directed
+ * layout, pan/zoom, hover-highlighting of neighborhoods, filters for entity
+ * type, relationship type, review status, and tags, click-through to entity
+ * pages. Chunked documents (ADR 0006) carry a §-count badge and unfold on
+ * click into a radial fan of their sections, each with a short description.
+ * Layout is computed synchronously over whatever the server hands it — the
+ * page keeps that bounded (overview cap, or focus-mode neighborhood), which
+ * is how the P0-9 100k+ scale requirement is met.
  */
 export default function GraphMap({
   nodes,
@@ -102,7 +108,10 @@ export default function GraphMap({
   roles?: RetrievalRole[];
 }) {
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set());
+  const [hiddenRelTypes, setHiddenRelTypes] = useState<Set<string>>(new Set());
+  const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set());
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+  const [activeDisciplines, setActiveDisciplines] = useState<Set<string>>(new Set());
   const [activeRoleId, setActiveRoleId] = useState<string>('');
   const [hoverId, setHoverId] = useState<string | null>(null);
   // Document node currently unfolded into its sections (one at a time keeps
@@ -114,9 +123,24 @@ export default function GraphMap({
   const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
 
   const allTypes = useMemo(() => [...new Set(nodes.map((n) => n.type))].sort(), [nodes]);
+  const allRelTypes = useMemo(() => [...new Set(links.map((l) => l.type))].sort(), [links]);
+  const allStatuses = useMemo(() => {
+    const present = new Set(nodes.map((n) => n.reviewStatus));
+    return [
+      ...REVIEW_ORDER.filter((s) => present.has(s)),
+      ...[...present].filter((s) => !REVIEW_ORDER.includes(s)).sort(),
+    ];
+  }, [nodes]);
   const allTags = useMemo(() => {
     const counts = new Map<string, number>();
     for (const n of nodes) for (const t of n.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [nodes]);
+  const allDisciplines = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const n of nodes) {
+      if (n.discipline) counts.set(n.discipline, (counts.get(n.discipline) ?? 0) + 1);
+    }
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
   }, [nodes]);
 
@@ -124,10 +148,14 @@ export default function GraphMap({
     const visible = nodes.filter(
       (n) =>
         !hiddenTypes.has(n.type) &&
-        (activeTags.size === 0 || n.tags.some((t) => activeTags.has(t))),
+        !hiddenStatuses.has(n.reviewStatus) &&
+        (activeTags.size === 0 || n.tags.some((t) => activeTags.has(t))) &&
+        (activeDisciplines.size === 0 || (n.discipline !== undefined && activeDisciplines.has(n.discipline))),
     );
     const ids = new Set(visible.map((n) => n.id));
-    const visibleLinks = links.filter((l) => ids.has(l.source) && ids.has(l.target));
+    const visibleLinks = links.filter(
+      (l) => ids.has(l.source) && ids.has(l.target) && !hiddenRelTypes.has(l.type),
+    );
 
     const degree = new Map<string, number>();
     for (const l of visibleLinks) {
@@ -175,7 +203,7 @@ export default function GraphMap({
       adj.get(t)!.add(s);
     }
     return { placedNodes: simNodes, placedLinks: simLinks, adjacency: adj };
-  }, [nodes, links, hiddenTypes, activeTags]);
+  }, [nodes, links, hiddenTypes, hiddenRelTypes, hiddenStatuses, activeTags, activeDisciplines]);
 
   // React registers wheel as passive; zooming needs preventDefault, so
   // attach a native non-passive listener.
@@ -240,6 +268,67 @@ export default function GraphMap({
             ● {t}
           </button>
         ))}
+        <span className="toolbar-sep" />
+        {allRelTypes.map((t) => (
+          <button
+            key={t}
+            type="button"
+            className={`chip-btn${hiddenRelTypes.has(t) ? ' off' : ''}`}
+            title={`Toggle ${t} relationships`}
+            onClick={() =>
+              setHiddenRelTypes((prev) => {
+                const next = new Set(prev);
+                if (next.has(t)) next.delete(t);
+                else next.add(t);
+                return next;
+              })
+            }
+          >
+            ⇢ {t}
+          </button>
+        ))}
+        <span className="toolbar-sep" />
+        {allStatuses.map((s) => (
+          <button
+            key={s}
+            type="button"
+            className={`chip-btn${hiddenStatuses.has(s) ? ' off' : ''}`}
+            title={`Toggle ${s} items`}
+            onClick={() =>
+              setHiddenStatuses((prev) => {
+                const next = new Set(prev);
+                if (next.has(s)) next.delete(s);
+                else next.add(s);
+                return next;
+              })
+            }
+          >
+            ◆ {s}
+          </button>
+        ))}
+        {allDisciplines.length > 0 ? (
+          <>
+            <span className="toolbar-sep" />
+            {allDisciplines.map(([d, count]) => (
+              <button
+                key={d}
+                type="button"
+                className={`chip-btn tag${activeDisciplines.has(d) ? ' active' : ''}`}
+                title={`Show only ${d} knowledge`}
+                onClick={() =>
+                  setActiveDisciplines((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(d)) next.delete(d);
+                    else next.add(d);
+                    return next;
+                  })
+                }
+              >
+                ◈ {d} <span className="chip-count">{count}</span>
+              </button>
+            ))}
+          </>
+        ) : null}
         <span className="toolbar-sep" />
         {allTags.map(([t, count]) => (
           <button

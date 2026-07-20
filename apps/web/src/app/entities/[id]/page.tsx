@@ -189,6 +189,11 @@ export default async function EntityPage({ params }: { params: Promise<{ id: str
           {neighbors.length > 0 ? (
             <div className="graph-card">
               <NeighborhoodGraph entity={entity} neighbors={neighbors} />
+              <p className="meta" style={{ margin: '0.4rem 0 0' }}>
+                <Link href={`/map?focus=${encodeURIComponent(entity.id)}`}>
+                  Explore this neighborhood in the knowledge map →
+                </Link>
+              </p>
             </div>
           ) : (
             <div className="empty">No relationships yet.</div>

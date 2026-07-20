@@ -43,14 +43,23 @@ not yet meet it. Several core curation actions remain GUI-absent.
 > gateway, with snapshots on destructive actions. Still open: G2 (SharePoint
 > wizard), G7/G8 depth, G10 (analytics dashboard), G11 (roles/SSO).
 
+> **Update 2026-07-19 — G7 and G8 closed.** Search gains the full PRD facet
+> set (project / discipline / MasterFormat section / date range on top of
+> type / tag / review status), all pure post-filters so P0-8 honesty is
+> unchanged. The knowledge map gains relationship-type, review-status, and
+> discipline filters plus a progressively-loaded **focus mode**
+> (`/map?focus=<id>&depth=1|2`, BFS over `neighbors`, capped) that replaces
+> whole-graph loading at scale; entity pages deep-link into it. Still open:
+> G2 (SharePoint wizard), G10 (analytics dashboard), G11 (Entra SSO E2E).
+
 ## Coverage matrix
 
 Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / assistant only)
 
 | User interaction | State | PRD ref | Gap ID |
 |---|:--:|---|---|
-| Search / browse | 🟡 | P0-9 faceted search | [G7](#g7--thin-search-facets) |
-| Explore graph (map + neighborhood) | 🟡 | P0-9 graph explorer | [G8](#g8--graph-explorer-filters--scale) |
+| Search / browse | ✅ | P0-9 faceted search | [G7](#g7--thin-search-facets) |
+| Explore graph (map + neighborhood) | ✅ | P0-9 graph explorer | [G8](#g8--graph-explorer-filters--scale) |
 | View entity + provenance | ✅ | P0-9 entity pages | — |
 | Capture lesson / detail by hand | 🟡 | P0-9 guided capture | [G9](#g9--guided-capture-without-type-ahead-linking) |
 | Verify / reject a candidate | ✅ | P0-9 workbench | [G3](#g3--curation-workbench-is-verifyreject-only) |
@@ -233,20 +242,37 @@ Legend: ✅ GUI exists · 🟡 GUI partial · ❌ no GUI (CLI / data-layer / ass
 
 - **PRD:** P0-9 *"filters (project, discipline, MasterFormat section, review
   status, date range)."*
-- **Now:** [`search/page.tsx`](../apps/web/src/app/search/page.tsx) filters by
-  **type** and **tag** only.
-- **Approach:** Add review-status, date-range, discipline, and spec-section facets
-  (data already on entities/anchors). **Effort: S–M.**
+- **Status: ✅ shipped (2026-07-19).** `/search` now carries the full PRD facet
+  set on top of type/tag: **review status**, **project** (the project plus its
+  1-hop graph neighborhood via `GraphStore.neighbors` — used-in details,
+  had-issue lessons, applies-to specs, either direction), **discipline**
+  (`properties.discipline`; dropdown options derive from the live result set so
+  it only ever offers refinements that exist), **MasterFormat section** (prefix
+  match on canonicalized codes — "07", "07 84", "07-84-00", and "078400" all
+  hit the same anchors, whether on the entity or on the matched passage), and
+  **date range** (inclusive bounds over `provenance.modifiedAt`).
+- Every facet is a pure post-filter ([`facets.ts`](../apps/web/src/lib/facets.ts),
+  unit-tested in [`facets.test.mjs`](../apps/web/test/facets.test.mjs)), so the
+  P0-8 honest no-results gate and role boosting are untouched — and when facets
+  hide everything, the empty state says *"N matches — all hidden by your
+  filters"* with a clear-filters link, never a false *"no answer."*
 
 ### G8 · Graph explorer filters & scale
 
 - **PRD:** P0-9 *"filter by entity type, relationship type, discipline, project,
   and review status… usable on 100k+ entities… progressive loading, not a hairball."*
-- **Now:** [`map/page.tsx`](../apps/web/src/app/map/page.tsx) loads up to 1,000
-  entities and toggles types/tags only — no relationship-type or review-status
-  filter, no progressive loading.
-- **Approach:** Add the missing filters; server-side neighborhood expansion instead
-  of loading the whole graph. **Effort: M–L.**
+- **Status: ✅ shipped (2026-07-19).** [`GraphMap.tsx`](../apps/web/src/components/GraphMap.tsx)
+  now filters by entity type, **relationship type**, **review status**,
+  **discipline**, and tag; the project axis is served by focus mode (focus on
+  the project entity). For scale, [`/map?focus=<id>&depth=1|2`](../apps/web/src/app/map/page.tsx)
+  renders a **progressively-loaded neighborhood** — breadth-first over the same
+  `GraphStore.neighbors` primitive the MCP traverse tool uses, capped at the
+  150 nearest nodes, ring-internal edges included — so cost scales with the
+  neighborhood, not the corpus. The overview keeps its 1,000-entity window and
+  now says so when truncated; entity pages deep-link into focus mode
+  (*"Explore this neighborhood in the knowledge map"*).
+- Remaining beyond demo scale: a store-side batched neighborhood query if
+  per-node `neighbors` round-trips ever bite at true 100k+ corpora.
 
 ### G9 · Guided capture without type-ahead linking
 
