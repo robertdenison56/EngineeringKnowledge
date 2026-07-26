@@ -14,10 +14,15 @@
     "@ekg/core": "*",
     "@ekg/ingestion": "*",
     "@ekg/store-sqlite": "*",
+    "@types/three": "^0.185.1",
     "d3-force": "^3.0.0",
+    "d3-force-3d": "^3.0.6",
     "next": "^15.3.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-force-graph-3d": "^1.29.1",
+    "three": "^0.185.1",
+    "three-spritetext": "^1.10.0"
   },
   "devDependencies": {
     "@types/d3-force": "^3.0.10",

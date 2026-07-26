@@ -646,6 +646,46 @@ h2 {
   background: var(--border);
   margin: 0 0.3rem;
 }
+/* View switch — a segmented control, visually distinct from the filter chips
+   so the 2D/3D choice never reads as one more filter. */
+.map-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.15rem;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.map-view-label {
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 0 0.35rem 0 0.45rem;
+}
+.map-view-btn {
+  font-size: 0.74rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.map-view-btn:hover {
+  color: var(--text);
+}
+.map-view-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+.map-view-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
 .chip-btn {
   font-size: 0.74rem;
   font-weight: 600;
@@ -692,6 +732,122 @@ h2 {
 .legend-unverified {
   background: #94a3b8;
   opacity: 0.55;
+}
+
+/* 3D map view (GraphMap's WebGL renderer) */
+.map-3d {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.map-3d-loading {
+  height: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.map-3d-hint {
+  position: absolute;
+  left: 0.8rem;
+  bottom: 0.45rem;
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  pointer-events: none;
+}
+/* Floating controls over the 3D canvas (top-right). */
+.map-3d-controls {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.map-3d-ctrl {
+  font-size: 0.74rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.3rem 0.6rem;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(2, 8, 23, 0.18);
+}
+.map-3d-ctrl:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.map-3d-ctrl:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.map-3d-panel {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  width: min(320px, 80%);
+  max-height: calc(100% - 1.6rem);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  box-shadow: 0 10px 30px rgba(2, 8, 23, 0.25);
+}
+.map-3d-panel h4 {
+  margin: 0 1.4rem 0.1rem 0;
+  font-size: 0.95rem;
+}
+.map-3d-panel ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+.map-3d-panel li {
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--border);
+}
+.map-3d-panel .sec-label {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+.map-3d-panel .sec-desc {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.map-3d-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.55rem;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.15rem;
+}
+.map-3d-close:hover {
+  color: var(--text);
+}
+/* Hover tooltip injected by the 3D library (div.scene-tooltip > our markup). */
+.map-3d-tip {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  box-shadow: 0 6px 18px rgba(2, 8, 23, 0.25);
 }
 
 .doc-panel {

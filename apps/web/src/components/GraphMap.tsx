@@ -1,126 +1,70 @@
 'use client';
 
-import { useMemo, useRef, useState, useEffect } from 'react';
-import {
-  forceCenter,
-  forceCollide,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  forceX,
-  forceY,
-  type SimulationLinkDatum,
-  type SimulationNodeDatum,
-} from 'd3-force';
+import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import type { RetrievalRole } from '@ekg/core';
-import { TYPE_COLORS, entityHref, typeColor } from './ui';
+import { TYPE_COLORS, typeColor } from './ui';
+import SvgGraphView from './SvgGraphView';
+import type { MapLink, MapNode } from './map-shared';
 
-/** One indexed passage of a chunked document, as shown when its node unfolds. */
-export interface MapSection {
-  /** Human label — "Sheet L-1 — Planting plan", "07 92 00 · PART 2", "Page 14". */
-  label: string;
-  /** Short excerpt of the passage text. */
-  description: string;
-}
+export type { MapLink, MapNode, MapSection } from './map-shared';
 
-export interface MapNode {
-  id: string;
-  title: string;
-  type: string;
-  reviewStatus: string;
-  tags: string[];
-  /** Declared discipline (`properties.discipline`), when the entity has one. */
-  discipline?: string;
-  /** Present for multi-passage documents (ADR 0006) — clicking the node unfolds these. */
-  sections?: MapSection[];
-  /** Total indexed passages; `sections` is capped, the rest fold into "+N more". */
-  sectionCount?: number;
-}
-
-/**
- * Whether a retrieval role favors a node — same tag/type test as the
- * `entityMatchesRole` boost the store applies, expressed over the map's lighter
- * node shape so the highlight matches what actually ranks higher.
- */
-function nodeMatchesRole(node: MapNode, role: RetrievalRole): boolean {
-  return role.boostTypes.includes(node.type) || node.tags.some((t) => role.boostTags.includes(t));
-}
-
-export interface MapLink {
-  id: string;
-  source: string;
-  target: string;
-  type: string;
-}
-
-interface SimNode extends SimulationNodeDatum, MapNode {
-  degree: number;
-}
-
-const W = 920;
-const H = 600;
+// The 3D view rides on three.js — a ~370 kB gz chunk that only ever loads
+// when someone flips the toggle, and can never render during SSR (WebGL).
+// The 2D SVG view stays the default: it server-renders, prints, and is the
+// accessible representation.
+const Graph3D = dynamic(() => import('./Graph3D'), {
+  ssr: false,
+  loading: () => <div className="map-3d-loading">Loading 3D view…</div>,
+});
 
 /** Display order for the review-status filter chips (lifecycle order). */
 const REVIEW_ORDER = ['verified', 'unverified', 'superseded', 'deprecated'];
 
-function shortTitle(title: string, max = 22): string {
-  return title.length > max ? `${title.slice(0, max - 1)}…` : title;
-}
-
-/** Word-wrap a section description into at most `maxLines` SVG text lines. */
-function wrapText(s: string, width: number, maxLines: number): string[] {
-  const lines: string[] = [];
-  let cur = '';
-  for (const word of s.split(' ')) {
-    const next = cur ? `${cur} ${word}` : word;
-    if (next.length > width && cur) {
-      if (lines.length === maxLines - 1) {
-        lines.push(`${cur.slice(0, width - 1)}…`);
-        return lines;
-      }
-      lines.push(cur);
-      cur = word;
-    } else {
-      cur = next;
-    }
-  }
-  if (cur) lines.push(cur);
-  return lines;
-}
+const VIEW_STORAGE_KEY = 'ekg-map-view';
 
 /**
- * Interactive graph "mind map" (PRD P0-9 graph explorer): force-directed
- * layout, pan/zoom, hover-highlighting of neighborhoods, filters for entity
- * type, relationship type, review status, and tags, click-through to entity
- * pages. Chunked documents (ADR 0006) carry a §-count badge and unfold on
- * click into a radial fan of their sections, each with a short description.
- * Layout is computed synchronously over whatever the server hands it — the
- * page keeps that bounded (overview cap, or focus-mode neighborhood), which
- * is how the P0-9 100k+ scale requirement is met.
+ * Interactive graph "mind map" (PRD P0-9 graph explorer). This shell owns the
+ * toolbar — 2D/3D view toggle, filters for entity type, relationship type,
+ * review status, discipline, and tags, plus the retrieval-role lens — and the
+ * legend, and hands the same node/link payload plus visibility sets to the
+ * active renderer: the SSR-safe SVG view (default) or the lazily-loaded
+ * WebGL 3D view. Layout is computed once per payload in either view — the
+ * page keeps the payload bounded (overview cap, or focus-mode neighborhood),
+ * which is how the P0-9 100k+ scale requirement is met — and filters only
+ * toggle visibility, so positions hold steady while chips are clicked.
  */
 export default function GraphMap({
   nodes,
   links,
   roles = [],
+  focusId,
 }: {
   nodes: MapNode[];
   links: MapLink[];
   roles?: RetrievalRole[];
+  /** Entity the page's focus mode centered on — the 3D view flies to it. */
+  focusId?: string;
 }) {
+  const [view, setView] = useState<'2d' | '3d'>('2d');
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set());
   const [hiddenRelTypes, setHiddenRelTypes] = useState<Set<string>>(new Set());
   const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set());
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const [activeDisciplines, setActiveDisciplines] = useState<Set<string>>(new Set());
   const [activeRoleId, setActiveRoleId] = useState<string>('');
-  const [hoverId, setHoverId] = useState<string | null>(null);
-  // Document node currently unfolded into its sections (one at a time keeps
-  // the radial labels readable; clicking the node again folds it back).
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [resetSignal, setResetSignal] = useState(0);
   const activeRole = roles.find((r) => r.id === activeRoleId);
-  const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
+
+  // SSR always renders the 2D view; the stored preference kicks in after
+  // hydration so the markup matches on both sides.
+  useEffect(() => {
+    if (window.localStorage.getItem(VIEW_STORAGE_KEY) === '3d') setView('3d');
+  }, []);
+  const switchView = (v: '2d' | '3d') => {
+    setView(v);
+    window.localStorage.setItem(VIEW_STORAGE_KEY, v);
+  };
 
   const allTypes = useMemo(() => [...new Set(nodes.map((n) => n.type))].sort(), [nodes]);
   const allRelTypes = useMemo(() => [...new Set(links.map((l) => l.type))].sort(), [links]);
@@ -144,92 +88,69 @@ export default function GraphMap({
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
   }, [nodes]);
 
-  const { placedNodes, placedLinks, adjacency } = useMemo(() => {
-    const visible = nodes.filter(
-      (n) =>
-        !hiddenTypes.has(n.type) &&
-        !hiddenStatuses.has(n.reviewStatus) &&
-        (activeTags.size === 0 || n.tags.some((t) => activeTags.has(t))) &&
-        (activeDisciplines.size === 0 || (n.discipline !== undefined && activeDisciplines.has(n.discipline))),
-    );
-    const ids = new Set(visible.map((n) => n.id));
-    const visibleLinks = links.filter(
-      (l) => ids.has(l.source) && ids.has(l.target) && !hiddenRelTypes.has(l.type),
-    );
-
-    const degree = new Map<string, number>();
-    for (const l of visibleLinks) {
-      degree.set(l.source, (degree.get(l.source) ?? 0) + 1);
-      degree.set(l.target, (degree.get(l.target) ?? 0) + 1);
-    }
-    const simNodes: SimNode[] = visible.map((n) => ({ ...n, degree: degree.get(n.id) ?? 0 }));
-    const simLinks = visibleLinks.map((l) => ({ ...l }));
-
-    const sim = forceSimulation(simNodes)
-      .force(
-        'link',
-        forceLink<SimNode, SimulationLinkDatum<SimNode>>(simLinks)
-          .id((d) => d.id)
-          .distance(110),
+  // Filters resolve to visibility sets; the renderers never re-layout on a
+  // chip toggle, they only show/hide. A link is visible when its type is
+  // shown AND both endpoints are.
+  const { visibleNodeIds, visibleLinkIds } = useMemo(() => {
+    const nodeIds = new Set<string>();
+    for (const n of nodes) {
+      if (hiddenTypes.has(n.type)) continue;
+      if (hiddenStatuses.has(n.reviewStatus)) continue;
+      if (activeTags.size > 0 && !n.tags.some((t) => activeTags.has(t))) continue;
+      if (
+        activeDisciplines.size > 0 &&
+        !(n.discipline !== undefined && activeDisciplines.has(n.discipline))
       )
-      .force('charge', forceManyBody().strength(-300))
-      .force('center', forceCenter(W / 2, H / 2))
-      .force('collide', forceCollide(34))
-      // Gentle pull toward the middle so disconnected candidates stay on
-      // the map instead of being flung to the edges by the charge force.
-      .force('x', forceX(W / 2).strength(0.06))
-      .force('y', forceY(H / 2).strength(0.09))
-      .stop();
-    for (let i = 0; i < 300; i += 1) sim.tick();
-
-    // Round to a fixed precision so SSR and client hydration render
-    // byte-identical coordinates. d3-force leans on Math.sqrt/etc whose
-    // last-ULP results differ between Node and the browser's V8, which
-    // otherwise yields a hydration mismatch on every node, link, and label.
-    // Links reference these same node objects, so this also fixes their
-    // endpoints and the deterministically-derived label midpoints.
-    for (const n of simNodes) {
-      n.x = Math.round((n.x ?? 0) * 100) / 100;
-      n.y = Math.round((n.y ?? 0) * 100) / 100;
+        continue;
+      nodeIds.add(n.id);
     }
-
-    const adj = new Map<string, Set<string>>();
-    for (const l of simLinks) {
-      const s = (l.source as unknown as SimNode).id;
-      const t = (l.target as unknown as SimNode).id;
-      if (!adj.has(s)) adj.set(s, new Set());
-      if (!adj.has(t)) adj.set(t, new Set());
-      adj.get(s)!.add(t);
-      adj.get(t)!.add(s);
+    const linkIds = new Set<string>();
+    for (const l of links) {
+      if (hiddenRelTypes.has(l.type)) continue;
+      if (nodeIds.has(l.source) && nodeIds.has(l.target)) linkIds.add(l.id);
     }
-    return { placedNodes: simNodes, placedLinks: simLinks, adjacency: adj };
+    return { visibleNodeIds: nodeIds, visibleLinkIds: linkIds };
   }, [nodes, links, hiddenTypes, hiddenRelTypes, hiddenStatuses, activeTags, activeDisciplines]);
 
-  // React registers wheel as passive; zooming needs preventDefault, so
-  // attach a native non-passive listener.
-  useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      setTransform((t) => {
-        const k = Math.min(4, Math.max(0.3, t.k * (e.deltaY < 0 ? 1.12 : 0.89)));
-        return { ...t, k };
-      });
-    };
-    svg.addEventListener('wheel', onWheel, { passive: false });
-    return () => svg.removeEventListener('wheel', onWheel);
-  }, []);
-
-  // An unfolded document focuses its neighborhood the same way hover does, so
-  // the sections read against a quiet background; hover still wins while active.
-  const focusId = hoverId ?? expandedId;
-  const dimmed = (id: string) =>
-    focusId !== null && id !== focusId && !(adjacency.get(focusId)?.has(id) ?? false);
+  const toggleIn = (set: (fn: (prev: Set<string>) => Set<string>) => void, value: string) =>
+    set((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
 
   return (
     <div className="map-card">
       <div className="map-toolbar">
+        {/* View switch — a distinct segmented control, not a filter chip, so
+            it reads as "which renderer" rather than one more toggle. */}
+        <div
+          className="map-view-toggle"
+          role="group"
+          aria-label="Map view: 2D or 3D"
+        >
+          <span className="map-view-label">View</span>
+          <button
+            type="button"
+            className={`map-view-btn${view === '2d' ? ' active' : ''}`}
+            aria-pressed={view === '2d'}
+            title="Flat force-directed map"
+            onClick={() => switchView('2d')}
+          >
+            ▤ 2D
+          </button>
+          <button
+            type="button"
+            className={`map-view-btn${view === '3d' ? ' active' : ''}`}
+            aria-pressed={view === '3d'}
+            title="Orbit the same graph in three dimensions"
+            onClick={() => switchView('3d')}
+          >
+            ◈ 3D
+          </button>
+        </div>
+        <span className="toolbar-sep" />
         {roles.length > 0 ? (
           <>
             <label className="map-role-picker">
@@ -256,14 +177,7 @@ export default function GraphMap({
             type="button"
             className={`chip-btn${hiddenTypes.has(t) ? ' off' : ''}`}
             style={{ borderColor: typeColor(t), color: hiddenTypes.has(t) ? undefined : typeColor(t) }}
-            onClick={() =>
-              setHiddenTypes((prev) => {
-                const next = new Set(prev);
-                if (next.has(t)) next.delete(t);
-                else next.add(t);
-                return next;
-              })
-            }
+            onClick={() => toggleIn(setHiddenTypes, t)}
           >
             ● {t}
           </button>
@@ -275,14 +189,7 @@ export default function GraphMap({
             type="button"
             className={`chip-btn${hiddenRelTypes.has(t) ? ' off' : ''}`}
             title={`Toggle ${t} relationships`}
-            onClick={() =>
-              setHiddenRelTypes((prev) => {
-                const next = new Set(prev);
-                if (next.has(t)) next.delete(t);
-                else next.add(t);
-                return next;
-              })
-            }
+            onClick={() => toggleIn(setHiddenRelTypes, t)}
           >
             ⇢ {t}
           </button>
@@ -294,14 +201,7 @@ export default function GraphMap({
             type="button"
             className={`chip-btn${hiddenStatuses.has(s) ? ' off' : ''}`}
             title={`Toggle ${s} items`}
-            onClick={() =>
-              setHiddenStatuses((prev) => {
-                const next = new Set(prev);
-                if (next.has(s)) next.delete(s);
-                else next.add(s);
-                return next;
-              })
-            }
+            onClick={() => toggleIn(setHiddenStatuses, s)}
           >
             ◆ {s}
           </button>
@@ -315,14 +215,7 @@ export default function GraphMap({
                 type="button"
                 className={`chip-btn tag${activeDisciplines.has(d) ? ' active' : ''}`}
                 title={`Show only ${d} knowledge`}
-                onClick={() =>
-                  setActiveDisciplines((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(d)) next.delete(d);
-                    else next.add(d);
-                    return next;
-                  })
-                }
+                onClick={() => toggleIn(setActiveDisciplines, d)}
               >
                 ◈ {d} <span className="chip-count">{count}</span>
               </button>
@@ -335,284 +228,37 @@ export default function GraphMap({
             key={t}
             type="button"
             className={`chip-btn tag${activeTags.has(t) ? ' active' : ''}`}
-            onClick={() =>
-              setActiveTags((prev) => {
-                const next = new Set(prev);
-                if (next.has(t)) next.delete(t);
-                else next.add(t);
-                return next;
-              })
-            }
+            onClick={() => toggleIn(setActiveTags, t)}
           >
             #{t} <span className="chip-count">{count}</span>
           </button>
         ))}
         <span className="toolbar-sep" />
-        <button
-          type="button"
-          className="chip-btn"
-          onClick={() => setTransform({ x: 0, y: 0, k: 1 })}
-        >
+        <button type="button" className="chip-btn" onClick={() => setResetSignal((s) => s + 1)}>
           ⟳ Reset view
         </button>
       </div>
 
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
-        role="img"
-        aria-label="Knowledge graph map"
-        style={{
-          cursor: dragRef.current ? 'grabbing' : 'grab',
-          touchAction: 'none',
-          userSelect: 'none',
-        }}
-        onPointerDown={(e) => {
-          dragRef.current = {
-            startX: e.clientX,
-            startY: e.clientY,
-            ox: transform.x,
-            oy: transform.y,
-          };
-        }}
-        onPointerMove={(e) => {
-          const d = dragRef.current;
-          if (!d) return;
-          setTransform((t) => ({
-            ...t,
-            x: d.ox + (e.clientX - d.startX),
-            y: d.oy + (e.clientY - d.startY),
-          }));
-        }}
-        onPointerUp={() => {
-          dragRef.current = null;
-        }}
-        onPointerLeave={() => {
-          dragRef.current = null;
-        }}
-      >
-        <g transform={`translate(${transform.x} ${transform.y}) scale(${transform.k})`}>
-          {placedLinks.map((l) => {
-            const s = l.source as unknown as SimNode;
-            const t = l.target as unknown as SimNode;
-            const dim = focusId !== null && s.id !== focusId && t.id !== focusId;
-            return (
-              <g key={l.id} opacity={dim ? 0.12 : 1}>
-                <line x1={s.x} y1={s.y} x2={t.x} y2={t.y} stroke="#cbd5e1" strokeWidth={1.4} />
-                <text
-                  x={((s.x ?? 0) + (t.x ?? 0)) / 2}
-                  y={((s.y ?? 0) + (t.y ?? 0)) / 2 - 4}
-                  textAnchor="middle"
-                  fontSize={8.5}
-                  fill="#94a3b8"
-                >
-                  {l.type}
-                </text>
-              </g>
-            );
-          })}
-          {placedNodes.map((n) => {
-            const r = 14 + Math.min(n.degree, 6) * 3;
-            const flagged = n.reviewStatus === 'superseded' || n.reviewStatus === 'deprecated';
-            const focused = activeRole ? nodeMatchesRole(n, activeRole) : false;
-            // A role pushes everything it does NOT favor into the background, so
-            // the lens's knowledge stands out — mirrors the hover-dim behavior.
-            const roleDimmed = activeRole ? !focused : false;
-            const opacity = dimmed(n.id) ? 0.15 : roleDimmed ? 0.18 : 1;
-            const expandable = (n.sections?.length ?? 0) > 0;
-            const isExpanded = expandedId === n.id;
-            const badge = expandable ? `§${n.sectionCount ?? n.sections!.length}` : '';
-            const badgeW = badge.length * 5.5 + 8;
-            const disc = (
-              <>
-                {focused ? (
-                  <circle
-                    cx={n.x}
-                    cy={n.y}
-                    r={r + 7}
-                    fill="#f59e0b"
-                    opacity={0.18}
-                    stroke="#f59e0b"
-                    strokeWidth={2.5}
-                  />
-                ) : null}
-                {isExpanded ? (
-                  <circle
-                    cx={n.x}
-                    cy={n.y}
-                    r={r + 5}
-                    fill="none"
-                    stroke={typeColor(n.type)}
-                    strokeWidth={1.5}
-                    strokeDasharray="3 3"
-                  />
-                ) : null}
-                <circle
-                  cx={n.x}
-                  cy={n.y}
-                  r={r}
-                  fill={typeColor(n.type)}
-                  opacity={n.reviewStatus === 'unverified' ? 0.55 : 0.92}
-                  stroke={flagged ? '#d97706' : '#0f172a'}
-                  strokeWidth={flagged ? 2.5 : 0.8}
-                  strokeDasharray={flagged ? '4 3' : undefined}
-                />
-                {expandable ? (
-                  <g
-                    transform={`translate(${(n.x ?? 0) + r * 0.8}, ${(n.y ?? 0) - r * 0.8})`}
-                  >
-                    <rect
-                      x={-badgeW / 2}
-                      y={-7}
-                      width={badgeW}
-                      height={14}
-                      rx={7}
-                      fill="#0f172a"
-                      opacity={0.9}
-                    />
-                    <text x={0} y={3.5} textAnchor="middle" fontSize={8.5} fontWeight={600} fill="#fff">
-                      {badge}
-                    </text>
-                  </g>
-                ) : null}
-              </>
-            );
-            return (
-              <g
-                key={n.id}
-                style={{ opacity }}
-                onMouseEnter={() => setHoverId(n.id)}
-                onMouseLeave={() => setHoverId(null)}
-              >
-                {expandable ? (
-                  // Chunked documents unfold in place; the title below stays a
-                  // link, so the entity page is always one click away.
-                  <g
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={isExpanded}
-                    aria-label={`${n.title} — ${n.sectionCount ?? n.sections!.length} sections, click to ${isExpanded ? 'fold' : 'unfold'}`}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setExpandedId(isExpanded ? null : n.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        setExpandedId(isExpanded ? null : n.id);
-                      }
-                    }}
-                  >
-                    {disc}
-                  </g>
-                ) : (
-                  <a href={entityHref(n.id)}>{disc}</a>
-                )}
-                <a href={entityHref(n.id)}>
-                  <text
-                    x={n.x}
-                    y={(n.y ?? 0) + r + 12}
-                    textAnchor="middle"
-                    fontSize={10.5}
-                    fill="#334155"
-                  >
-                    {shortTitle(n.title)}
-                  </text>
-                </a>
-              </g>
-            );
-          })}
-          {(() => {
-            // Radial section fan for the unfolded document — client-only state,
-            // so it never renders during SSR and cannot cause hydration drift.
-            const doc = expandedId ? placedNodes.find((p) => p.id === expandedId) : undefined;
-            if (!doc || !doc.sections || doc.sections.length === 0) return null;
-            const ex = doc.x ?? 0;
-            const ey = doc.y ?? 0;
-            const r = 14 + Math.min(doc.degree, 6) * 3;
-            const extra = (doc.sectionCount ?? doc.sections.length) - doc.sections.length;
-            const items = [
-              ...doc.sections.map((s) => ({ ...s, more: false })),
-              ...(extra > 0
-                ? [
-                    {
-                      label: `+${extra} more section${extra === 1 ? '' : 's'}`,
-                      description: 'Open the document for the full list',
-                      more: true,
-                    },
-                  ]
-                : []),
-            ];
-            const orbit = Math.max(92, 48 + items.length * 9);
-            const color = typeColor(doc.type);
-            return (
-              <g>
-                {items.map((s, i) => {
-                  const a = -Math.PI / 2 + (2 * Math.PI * i) / items.length;
-                  const x = ex + orbit * Math.cos(a);
-                  const y = ey + orbit * Math.sin(a);
-                  const descLines = wrapText(s.description, 34, 2);
-                  // Side items read outward left/right; items near 12/6 o'clock
-                  // stack centered above/below so they don't collide with their
-                  // angular neighbors' labels.
-                  const vertical = Math.abs(Math.cos(a)) < 0.2;
-                  const anchor = vertical ? 'middle' : Math.cos(a) >= 0 ? 'start' : 'end';
-                  const tx = vertical ? x : x + (Math.cos(a) >= 0 ? 11 : -11);
-                  const labelY = vertical
-                    ? Math.sin(a) < 0
-                      ? y - 12 - descLines.length * 9.5
-                      : y + 16
-                    : y - 3;
-                  const descY = labelY + 10;
-                  return (
-                    <a key={`${doc.id}-sec-${i}`} href={entityHref(doc.id)}>
-                      <line
-                        x1={ex + r * Math.cos(a)}
-                        y1={ey + r * Math.sin(a)}
-                        x2={x}
-                        y2={y}
-                        stroke={color}
-                        strokeWidth={1.1}
-                        strokeDasharray="3 3"
-                        opacity={0.6}
-                      />
-                      <circle
-                        cx={x}
-                        cy={y}
-                        r={6.5}
-                        fill="var(--surface, #fff)"
-                        stroke={color}
-                        strokeWidth={1.6}
-                        strokeDasharray={s.more ? '2.5 2' : undefined}
-                      />
-                      <text
-                        x={tx}
-                        y={labelY}
-                        textAnchor={anchor}
-                        fontSize={9}
-                        fontWeight={600}
-                        fill="var(--text, #0f172a)"
-                      >
-                        {shortTitle(s.label, 30)}
-                      </text>
-                      {descLines.map((line, j) => (
-                        <text
-                          key={j}
-                          x={tx}
-                          y={descY + j * 9.5}
-                          textAnchor={anchor}
-                          fontSize={8}
-                          fill="var(--muted, #475569)"
-                        >
-                          {line}
-                        </text>
-                      ))}
-                    </a>
-                  );
-                })}
-              </g>
-            );
-          })()}
-        </g>
-      </svg>
+      {view === '2d' ? (
+        <SvgGraphView
+          nodes={nodes}
+          links={links}
+          visibleNodeIds={visibleNodeIds}
+          visibleLinkIds={visibleLinkIds}
+          activeRole={activeRole}
+          resetSignal={resetSignal}
+        />
+      ) : (
+        <Graph3D
+          nodes={nodes}
+          links={links}
+          visibleNodeIds={visibleNodeIds}
+          visibleLinkIds={visibleLinkIds}
+          activeRole={activeRole}
+          resetSignal={resetSignal}
+          focusId={focusId}
+        />
+      )}
 
       <div className="map-legend">
         {Object.entries(TYPE_COLORS)

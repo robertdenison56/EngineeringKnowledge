@@ -107,7 +107,13 @@ export default async function MapPage({
     relationships = [...rels.values()];
   } else {
     entities = await store.list(caller, { limit: OVERVIEW_CAP });
-    relationships = await store.listRelationships(caller);
+    // Bound the payload on the links axis too: past the entity cap a tenant's
+    // edge set dwarfs the window shown, and an edge to an off-map node can't
+    // render anyway — only edges with both endpoints on the map ship.
+    const onMap = new Set(entities.map((e) => e.id));
+    relationships = (await store.listRelationships(caller)).filter(
+      (r) => onMap.has(r.fromId) && onMap.has(r.toId),
+    );
   }
 
   // Section summaries for chunked documents (ADR 0006), so the map can unfold
@@ -168,7 +174,8 @@ export default async function MapPage({
           relationships. Scroll to zoom, drag to pan, hover to highlight a neighborhood, click a
           node to open it. Documents marked § unfold on click into their indexed sections.
           Toggle types, relationships, tags, and review status to focus the map, or pick a
-          retrieval role to see the knowledge it favors light up.
+          retrieval role to see the knowledge it favors light up. Flip to 3D to orbit the same
+          graph.
         </p>
       )}
       {focus && !focusEntity ? (
@@ -206,7 +213,7 @@ export default async function MapPage({
         </select>
         <button type="submit">Focus</button>
       </form>
-      <GraphMap nodes={nodes} links={links} roles={roles} />
+      <GraphMap nodes={nodes} links={links} roles={roles} focusId={focusEntity?.id} />
     </>
   );
 }
