@@ -101,6 +101,9 @@ const child = spawn(process.execPath, [join(root, 'dist/index.js')], {
     EKG_DB_PATH: '',
     EKG_AUDIT_LOG: auditPath,
     EKG_UPLOAD_ROOT: uploadRoot,
+    // Writes require the curator role (write-authz gate); the engineer
+    // identity below drives the ingest checks, so map its group to curator.
+    EKG_CURATOR_GROUP: 'group:engineering',
   },
   stdio: ['ignore', 'inherit', 'inherit'],
 });

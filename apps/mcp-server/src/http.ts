@@ -86,6 +86,18 @@ export async function startHttp(): Promise<void> {
     );
   }
 
+  // Writes require the curator role, and remote callers only get it through
+  // the directory-group mapping. With neither variable set, every caller is
+  // read-only (plus propose_knowledge) — a sane default posture, but say so,
+  // or the first refused ingest looks like a bug instead of a policy.
+  if (!process.env.EKG_CURATOR_GROUP && !process.env.EKG_ADMIN_GROUP) {
+    console.error(
+      'ekg-mcp: EKG_CURATOR_GROUP / EKG_ADMIN_GROUP are not set — no remote caller maps to the ' +
+        'curator role, so ingest_document and save_description will be refused (not_authorized) ' +
+        'for everyone. Set them to the directory group ids that should hold each role.',
+    );
+  }
+
   // One store and one audit sink, shared across every request — identity is
   // per-request (from the token), these are not. The store is built once so we
   // never re-seed per connection; the sink is shared so all sessions append to

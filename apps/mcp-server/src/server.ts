@@ -8,6 +8,7 @@ import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import { z, type ZodRawShape } from 'zod';
 import { auditSinkFromEnv, type AuditEvent, type AuditSink } from './audit.js';
+import { ADMIN_PRINCIPAL, CURATOR_PRINCIPAL, isCurator } from './auth.js';
 import {
   DEMO_TENANT,
   InMemoryGraphStore,
@@ -221,11 +222,14 @@ async function resolveRole(
  * Fixed local-development identity. stdio is single-user, so the dev caller
  * is resolved for every request. The remote HTTP gateway injects a
  * `resolveCaller` that derives the real caller from the request's verified
- * token instead (PRD P0-3, P0-7).
+ * token instead (PRD P0-3, P0-7). Carries curator + admin — like the web
+ * app's dev identity — so a single local developer can exercise every tool;
+ * a remote caller only gets these roles through the EKG_ADMIN_GROUP /
+ * EKG_CURATOR_GROUP directory mapping.
  */
 export const DEV_CALLER: Caller = {
   tenantId: DEMO_TENANT,
-  principals: ['user:dev', 'group:engineering'],
+  principals: ['user:dev', 'group:engineering', CURATOR_PRINCIPAL, ADMIN_PRINCIPAL],
 };
 
 /** Resolve the calling identity from the per-request auth, if any. */
@@ -374,6 +378,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     extra: { authInfo?: AuthInfo } | undefined,
     result: unknown,
     errored: boolean,
+    outcomeOverride?: AuditEvent['outcome'],
   ): void {
     try {
       const caller = resolveCaller(extra?.authInfo);
@@ -386,7 +391,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         transport,
         args: summarizeArgs(args),
         ...(ids.length > 0 ? { resultIds: ids } : {}),
-        outcome: errored ? 'error' : outcome,
+        outcome: outcomeOverride ?? (errored ? 'error' : outcome),
       });
     } catch {
       /* identity unresolvable or sink unavailable — drop rather than fail the call */
@@ -408,14 +413,48 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
   // have (P0-8), and the audit trail recorded the stripped args as if they were
   // the whole call (P0-7). Sealing here rather than per-tool keeps it impossible
   // to register a tool that lacks the check.
+  //
+  // Write authorization is enforced here for the same reason. Any tool not
+  // annotated `readOnlyHint: true` requires the curator role (admin curates
+  // implicitly) — the same boundary the workspace app's edit/merge actions
+  // re-check — so a tool CANNOT be registered with an ungated write path,
+  // and a tool with no annotations at all is treated as a write (fail
+  // closed). `proposeOnly` is the one deliberate carve-out: a tool that only
+  // ADDS new unverified candidates under fresh random ids and can touch
+  // nothing that already exists (PRD P1-5 capture-from-chat) stays open to
+  // every authenticated caller — the curation queue exists precisely to
+  // receive untrusted proposals. Without this gate, any authenticated caller
+  // could re-ingest an existing path and overwrite its ACL (the ingest id is
+  // a hash of tenant + path), locking the owner out of their own document.
   function register<InputArgs extends ZodRawShapeCompat>(
     name: string,
-    config: { title: string; description: string; annotations?: ToolAnnotations; inputSchema: InputArgs },
+    config: {
+      title: string;
+      description: string;
+      annotations?: ToolAnnotations;
+      inputSchema: InputArgs;
+      /** Adds new unverified candidates only — exempt from the curator gate. */
+      proposeOnly?: boolean;
+    },
     cb: ToolCallback<InputArgs>,
   ): void {
-    const sealed = { ...config, inputSchema: z.object(config.inputSchema as ZodRawShape).strict() };
+    const { proposeOnly, ...toolConfig } = config;
+    const needsWriter = config.annotations?.readOnlyHint !== true && !proposeOnly;
+    const sealed = { ...toolConfig, inputSchema: z.object(config.inputSchema as ZodRawShape).strict() };
     server.registerTool(name, sealed as never, (async (args, extra) => {
       try {
+        if (needsWriter && !isCurator(resolveCaller(extra?.authInfo))) {
+          const result = asContent({
+            error: 'not_authorized',
+            message: `${name} writes to the firm knowledge graph, which requires the curator role — and this signed-in user does not have it.`,
+            guidance:
+              'Tell the user their account lacks curation rights in the knowledge workspace, so the ' +
+              'write was refused. A workspace admin can grant the role (directory groups map to it ' +
+              'via EKG_CURATOR_GROUP / EKG_ADMIN_GROUP). Reads are unaffected; do not retry the write.',
+          });
+          recordAudit(name, args, extra, result, false, 'denied');
+          return result;
+        }
         const result = await cb(args, extra);
         recordAudit(name, args, extra, result, false);
         return result;
@@ -810,6 +849,10 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
     {
       title: 'Propose a lesson learned or design detail',
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+      // Open to every authenticated caller, not just curators: it only ADDS a
+      // new unverified candidate under a fresh random id (no overwrite path),
+      // and gating field capture on curatorship would gut PRD P1-5.
+      proposeOnly: true,
       description:
         'Save a lesson learned or design detail the user states in chat ("save this as a lesson ' +
         'learned") into the firm knowledge graph as an UNVERIFIED candidate — it lands in the ' +

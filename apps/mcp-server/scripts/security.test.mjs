@@ -31,7 +31,7 @@ import { spawn } from 'node:child_process';
 import { createHmac } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -145,6 +145,10 @@ const child = spawn(process.execPath, [join(root, 'dist/index.js')], {
     EKG_DB_PATH: '',
     EKG_AUDIT_LOG: auditPath,
     EKG_UPLOAD_ROOT: uploadRoot,
+    // The write-authz mapping under test (f): engineering are curators, so the
+    // engineer's ingests in (c)/(d) pass the gate; dana (group:structures)
+    // and the role-smuggling token do not.
+    EKG_CURATOR_GROUP: 'group:engineering',
   },
   stdio: ['ignore', 'inherit', 'inherit'],
 });
@@ -350,6 +354,77 @@ try {
   assert(
     otherFetchPublic.error === 'not_found',
     "default-ACL: even a visibility:'public' doc is not readable across tenants",
+  );
+
+  // =========================================================================
+  // (f) Write authorization — mutating tools require the curator role, which
+  //     remote callers get ONLY via the EKG_CURATOR_GROUP / EKG_ADMIN_GROUP
+  //     directory mapping (the server was spawned with
+  //     EKG_CURATOR_GROUP='group:engineering', which is what let the (c)/(d)
+  //     ingests by the engineer succeed). propose_knowledge alone stays open:
+  //     it only adds new unverified candidates (PRD P1-5).
+  // =========================================================================
+
+  // A non-curator (dana: group:structures, not in EKG_CURATOR_GROUP) cannot
+  // ingest — this is the re-ingest ACL-takeover fix: without the gate, any
+  // authenticated caller could re-ingest an existing path and overwrite its
+  // ACL, locking the owner out of their own document.
+  const bIngest = body(await engineerB.callTool({ name: 'ingest_document', arguments: { path: insideFile } }));
+  assert(bIngest.error === 'not_authorized', 'write-authz: non-curator ingest_document is refused');
+
+  // ...nor deface an entity they can READ: save_description would overwrite
+  // the summary/properties of any visible entity.
+  const bDescribe = body(
+    await engineerB.callTool({
+      name: 'save_description',
+      arguments: { entityId: ingPublic.id, description: 'defaced', annotations: [] },
+    }),
+  );
+  assert(bDescribe.error === 'not_authorized', 'write-authz: non-curator save_description is refused');
+
+  // ...but CAN still propose knowledge into the curation queue (PRD P1-5) —
+  // proposals are the untrusted input the queue exists to receive.
+  const bPropose = body(
+    await engineerB.callTool({
+      name: 'propose_knowledge',
+      arguments: {
+        title: 'Backer rod sizing at wide joints',
+        type: 'lesson-learned',
+        summary: 'Size backer rod one increment up at joints over 1 inch.',
+      },
+    }),
+  );
+  assert(
+    bPropose.status === 'queued_unverified',
+    'write-authz: non-curator propose_knowledge still queues a candidate (proposals stay open)',
+  );
+
+  // Role smuggling: a token claiming role:curator in its groups must NOT
+  // become a curator — roles come only from the directory mapping.
+  const malloryTok = sign({
+    tid: 'demo-firm',
+    sub: 'user:mallory',
+    groups: ['group:structures', 'role:curator'],
+  });
+  const mallory = await connect(malloryTok);
+  clients.push(mallory);
+  const smuggled = body(await mallory.callTool({ name: 'ingest_document', arguments: { path: insideFile } }));
+  assert(
+    smuggled.error === 'not_authorized',
+    'write-authz: a token smuggling role:curator in groups is still refused (roles are never claim-supplied)',
+  );
+
+  // The refusals are on the audit trail as their own outcome — a refused
+  // unauthorized write must be distinguishable from a crash (PRD P0-7).
+  const auditLines = readFileSync(auditPath, 'utf8')
+    .trim()
+    .split('\n')
+    .map((l) => JSON.parse(l));
+  assert(
+    auditLines.some(
+      (e) => e.tool === 'ingest_document' && e.principal === 'user:dana' && e.outcome === 'denied',
+    ),
+    "write-authz: the refused write is audited with outcome 'denied'",
   );
 
   // Close the MCP clients before the raw-JWT block; from here we only use fetch.

@@ -24,7 +24,12 @@ export interface AuditEvent {
   args?: Record<string, unknown>;
   /** Ids of the entities surfaced to or changed by the caller. */
   resultIds?: string[];
-  outcome: 'ok' | 'no_results' | 'error';
+  /**
+   * `denied` is an authorization refusal (the caller lacked the role the
+   * operation requires) — distinct from `error` so the trail separates
+   * "refused an unauthorized write" from "the call blew up" (PRD P0-7).
+   */
+  outcome: 'ok' | 'no_results' | 'error' | 'denied';
   /**
    * Full snapshot of destroyed data (reject/merge), so a curator mistake is
    * recoverable from the trail even after the row is gone.
