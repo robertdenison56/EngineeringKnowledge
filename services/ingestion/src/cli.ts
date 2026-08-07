@@ -51,10 +51,23 @@ let skipped = 0;
 let needsOcr = 0;
 let ocrExtracted = 0;
 let ocrFlagged = 0;
+const unreadable: string[] = [];
 
 for (const name of readdirSync(root, { recursive: true }) as string[]) {
   const filePath = join(root, name);
-  if (!statSync(filePath).isFile()) continue;
+  // A folder we are handed is not a folder we control: a dangling symlink (an
+  // alias to a moved folder, a cloud-sync placeholder) makes `stat` throw, and
+  // an unhandled throw here abandons the whole walk mid-run — every document
+  // after it silently missing, with a partial write already committed. Report
+  // the entry and keep going; the summary names what was passed over.
+  let entry;
+  try {
+    entry = statSync(filePath);
+  } catch {
+    unreadable.push(name);
+    continue;
+  }
+  if (!entry.isFile()) continue;
   if (!KNOWN_EXTENSIONS.has(extname(name).toLowerCase())) {
     skipped += 1;
     continue;
@@ -102,6 +115,10 @@ if (needsOcr > 0)
     `  ${needsOcr} scanned PDF(s) flagged needs-ocr — ${ocr ? 'nothing legible recovered' : 'no OCR engine installed'}`,
   );
 if (skipped > 0) console.log(`  skipped ${skipped} file(s) with unsupported extensions`);
+if (unreadable.length > 0)
+  console.log(
+    `  ${unreadable.length} unreadable entr(y/ies) passed over (broken link or no permission): ${unreadable.slice(0, 8).join(', ')}`,
+  );
 if (edges.length > 0) console.log(`  ${edges.length} cross-sheet reference edge(s) created from callouts/match lines`);
 if (unresolved.length > 0)
   console.log(`  ${unresolved.length} referenced sheet(s) not in the graph yet: ${unresolved.slice(0, 8).join(', ')}`);
