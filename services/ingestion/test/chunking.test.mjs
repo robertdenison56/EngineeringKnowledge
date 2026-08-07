@@ -35,6 +35,52 @@ test('spec page anchors carry the MasterFormat section detected on the page', ()
   assert.equal(chunks[0].anchor.page, 12);
 });
 
+test('a dated page header does not anchor the chunk to a fake section', () => {
+  // Reproduces the real failure: every page of the Caltrans standard
+  // specifications opens with this line, so the citation for page 212 read
+  // "04 15 22 (p. 212)" — a section that does not exist.
+  const chunks = chunkDocument({
+    entityId: 'e:caltrans',
+    tenantId: 't',
+    pages: [
+      {
+        pageNumber: 212,
+        text:
+          'REVISED STANDARD SPECIFICATIONS DATED 04-15-22\n' +
+          'Concrete shall contain silica fume admixture per the special provisions.',
+      },
+    ],
+  });
+  assert.equal(chunks[0].anchor.specSection, undefined, 'no fabricated section');
+  assert.equal(chunks[0].anchor.page, 212);
+  assert.equal(chunks[0].heading, 'Page 212');
+});
+
+test('a dated header does not hide a real section further down the page', () => {
+  const chunks = chunkDocument({
+    entityId: 'e:spec',
+    tenantId: 't',
+    pages: [
+      {
+        pageNumber: 8,
+        text: 'REVISED 06-30-24\nSECTION 07 84 00 - FIRESTOPPING\nPART 1 - GENERAL',
+      },
+    ],
+  });
+  assert.equal(chunks[0].anchor.specSection, '07 84 00');
+  assert.equal(chunks[0].heading, '07 84 00 (p. 8)');
+});
+
+test('the document-level section still backfills a page with none of its own', () => {
+  const chunks = chunkDocument({
+    entityId: 'e:spec2',
+    tenantId: 't',
+    specSection: '07 92 00',
+    pages: [{ pageNumber: 3, text: 'Tool joints to a concave profile. Dated 01-02-25.' }],
+  });
+  assert.equal(chunks[0].anchor.specSection, '07 92 00', 'falls back, not fabricates');
+});
+
 test('a very long page sub-splits but keeps its anchor', () => {
   const long = 'word '.repeat(2000); // ~10k chars > MAX_CHUNK_CHARS
   const chunks = chunkDocument({

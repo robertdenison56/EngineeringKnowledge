@@ -1,5 +1,5 @@
 import type { Chunk, SourceAnchor } from '@ekg/core';
-import { parseSpecSection } from './classify.js';
+import { parseSpecSectionHeading } from './classify.js';
 
 /**
  * Split a document into retrievable passages (ADR 0006). The 20k-char entity
@@ -83,7 +83,7 @@ export function chunkDocument(source: ChunkSource): Chunk[] {
     for (const page of source.pages) {
       const body = clean(page.text);
       if (body.length === 0) continue;
-      const specSection = parseSpecSection(body.slice(0, 200)) ?? source.specSection;
+      const specSection = parseSpecSectionHeading(body.slice(0, 200)) ?? source.specSection;
       const anchor: SourceAnchor = {
         page: page.pageNumber,
         ...(page.sheet ? { sheet: page.sheet } : {}),

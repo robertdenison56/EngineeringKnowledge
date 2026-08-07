@@ -17,7 +17,7 @@ import { Canvas, type RGB } from './canvas.js';
  * same primitives.
  */
 
-type Matrix = [number, number, number, number, number, number];
+export type Matrix = [number, number, number, number, number, number];
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 const mul = (m: Matrix, n: Matrix): Matrix => [
   n[0] * m[0] + n[1] * m[2],
@@ -41,7 +41,17 @@ const WHITE: RGB = [255, 255, 255];
 
 /** Page primitives, fetched once and re-rasterized for overview + tiles. */
 export interface PageModel {
+  /** MediaBox/CropBox in unrotated PDF user space, for provenance. */
   view: [number, number, number, number];
+  /** The page's /Rotate, normalized to 0 | 90 | 180 | 270. */
+  rotate: number;
+  /**
+   * pdf.js unit viewport transform: user space → *display* space (origin
+   * top-left, y down), with /Rotate and any view offset already folded in.
+   * The single source of truth for where a page point lands on the sheet.
+   */
+  transform: Matrix;
+  /** Display dimensions — swapped relative to `view` on 90°/270° pages. */
   pageWidth: number;
   pageHeight: number;
   fnArray: number[];
@@ -51,7 +61,7 @@ export interface PageModel {
 
 export interface RasterOptions {
   dpi?: number;
-  /** Crop in page points [x, y, w, h] (bottom-left origin) for tiling. */
+  /** Crop in display points [x, y, w, h] (bottom-left origin) for tiling. */
   crop?: [number, number, number, number];
   supersample?: number;
 }
@@ -87,6 +97,17 @@ export async function loadPageModel(data: Uint8Array, pageNumber: number): Promi
     const doc = await task.promise;
     const page = await doc.getPage(pageNumber);
     const view = page.view as [number, number, number, number];
+    // Honor /Rotate. Sheets exported from CAD are overwhelmingly rotated (the
+    // whole District 3 corpus is /Rotate 270), and reading the raw view
+    // renders every one of them sideways: the vision model reads turned text,
+    // and the quadrant tiles split across the wrong axis so "tile 1" is not
+    // the sheet's top-left. It also desynchronizes ADR 0007/0008 fusion —
+    // extractSheetFacts describes an upright sheet (vector.ts normalizes
+    // through getViewport) while the pixels show a sideways one, so the facts
+    // and the image disagree about where things are. The unit viewport folds
+    // rotation and view offset into one matrix, the same primitive vector.ts
+    // normalizes with.
+    const viewport = page.getViewport({ scale: 1 });
     const opList = await page.getOperatorList();
     const tc = await page.getTextContent();
     const texts = (tc.items as Array<Record<string, unknown>>)
@@ -94,8 +115,10 @@ export async function loadPageModel(data: Uint8Array, pageNumber: number): Promi
       .map((it) => ({ str: it.str as string, transform: it.transform as number[], height: (it.height as number) ?? 6 }));
     return {
       view,
-      pageWidth: view[2] - view[0],
-      pageHeight: view[3] - view[1],
+      rotate: ((((page.rotate as number) ?? 0) % 360) + 360) % 360,
+      transform: Array.from(viewport.transform) as Matrix,
+      pageWidth: viewport.width,
+      pageHeight: viewport.height,
       fnArray: Array.from(opList.fnArray),
       argsArray: opList.argsArray,
       texts,
@@ -109,13 +132,18 @@ export async function loadPageModel(data: Uint8Array, pageNumber: number): Promi
 export function rasterize(model: PageModel, options: RasterOptions = {}): SheetImage {
   const dpi = options.dpi ?? 150;
   const scale = dpi / 72;
-  const [vx0, vy0] = model.view;
   const [cx, cy, cw, ch] = options.crop ?? [0, 0, model.pageWidth, model.pageHeight];
   const canvas = new Canvas(cw * scale, ch * scale, options.supersample ?? 3);
-  const toDevice = (px: number, py: number): [number, number] => [
-    (px - vx0 - cx) * scale,
-    (ch - (py - vy0 - cy)) * scale,
-  ];
+  // user space → display space (y down) → crop-relative, y up from the crop's
+  // bottom edge → device pixels. On an unrotated page the viewport transform is
+  // [1,0,0,-1,-x0,y1], so this reduces to exactly the previous formula.
+  const V = model.transform;
+  const displayH = model.pageHeight;
+  const toDevice = (px: number, py: number): [number, number] => {
+    const vx = V[0] * px + V[2] * py + V[4];
+    const vy = V[1] * px + V[3] * py + V[5];
+    return [(vx - cx) * scale, (ch - (displayH - vy - cy)) * scale];
+  };
 
   const ctmStack: Matrix[] = [];
   let ctm: Matrix = IDENTITY;
@@ -183,15 +211,40 @@ export function rasterize(model: PageModel, options: RasterOptions = {}): SheetI
     const tm = item.transform;
     const size = Math.hypot(tm[2], tm[3]) || item.height || 6;
     const sizePx = size * scale;
-    const angle = Math.atan2(tm[1], tm[0]);
+    // Baseline direction carried through the viewport, so "horizontal" means
+    // horizontal *as the sheet is displayed*, not in unrotated user space.
+    // On an unrotated page this is -atan2(tm[1], tm[0]) — the previous value.
+    const angle = Math.atan2(V[1] * tm[0] + V[3] * tm[1], V[0] * tm[0] + V[2] * tm[1]);
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
     const [dx, dy] = toDevice(tm[4], tm[5]);
+    // Glyph-local (x along the run, y down) → device, matching Canvas.text.
+    const place = (lx: number, ly: number): [number, number] => [
+      dx + lx * cos - ly * sin,
+      dy + lx * sin + ly * cos,
+    ];
     // Halo only for near-horizontal text (axis-aligned rect); rotated dims
     // skip it to avoid covering geometry at the wrong angle.
     if (Math.abs(angle) < 0.05 || Math.abs(Math.abs(angle) - Math.PI) < 0.05) {
       const wPx = item.str.length * sizePx * 0.62;
-      canvas.rect(dx - sizePx * 0.1, dy - sizePx * 1.05, wPx, sizePx * 1.2, WHITE);
+      // AABB of the run's halo box, taken through the same basis so a rotated
+      // page haloes the glyphs instead of a patch beside them.
+      const corners = [
+        place(-sizePx * 0.1, -sizePx * 1.05),
+        place(-sizePx * 0.1 + wPx, -sizePx * 1.05),
+        place(-sizePx * 0.1 + wPx, sizePx * 0.15),
+        place(-sizePx * 0.1, sizePx * 0.15),
+      ];
+      const xs = corners.map((c) => c[0]);
+      const ys = corners.map((c) => c[1]);
+      const x0 = Math.min(...xs);
+      const y0 = Math.min(...ys);
+      canvas.rect(x0, y0, Math.max(...xs) - x0, Math.max(...ys) - y0, WHITE);
     }
-    canvas.text(dx, dy - sizePx, item.str, sizePx, TEXT, -angle);
+    // Canvas.text takes the glyph cell's top-left; "up" from the baseline is
+    // perpendicular to the run, so the offset rotates with it.
+    const [tx, ty] = place(0, -sizePx);
+    canvas.text(tx, ty, item.str, sizePx, TEXT, angle);
   }
 
   return { label: '', png: canvas.toPng(), width: canvas.w, height: canvas.h };
@@ -228,6 +281,8 @@ export function renderModelImages(
   images.push({ ...overview, label: `page ${pageNumber} overview (${overviewDpi} DPI)` });
 
   if (options.tiles ?? true) {
+    // Halves of the *displayed* sheet, so tiles 1–4 are top-left, top-right,
+    // bottom-left, bottom-right as a reader sees them on a rotated page too.
     const hw = model.pageWidth / 2;
     const hh = model.pageHeight / 2;
     const quads: Array<[number, number]> = [[0, hh], [hw, hh], [0, 0], [hw, 0]];
