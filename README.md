@@ -20,6 +20,7 @@ How to set up, use, add to, and refine it: [Guides](docs/guides/) (start with
 | `apps/web` | Knowledge workspace app — dashboard, search/browse, entity pages with graph view and inline curation (edit fields/ACL, supersede/deprecate, merge, relationships), curation workbench with bulk actions and a restorable trash, capture form with graph linking (`npm run dev --workspace @ekg/web`) | P0-9 |
 | `services/ingestion` | Ingestion CLI v0 — classify files, extract PDF text layers (scans flagged `needs-ocr`), CAD-native vector parsing of drawing sheets (title blocks, views, dimensions, schedules, callouts → cross-sheet `references` edges), queue candidates for curation | P0-2, P0-2a |
 | `docs/decisions` | Architecture decision records | — |
+| `research` | Research Arc 1 — public Caltrans benchmark + Python (Inspect) harness: hashed corpus manifest (HDM 7th ed., 2025 and 2018 Standard Plans/Specs), question schema with page anchors, deterministic scoring, closed-book / RAG / EKG-tools conditions, pinned EKG snapshot script (`research/README.md`) | Goals → Research arcs |
 
 ## Getting started
 

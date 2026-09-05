@@ -1,0 +1,65 @@
+name: Research smoke
+
+# The Python benchmark harness (research/): lint, unit tests, manifest
+# consistency, anchor validation against the real Caltrans PDFs the smoke
+# questions cite, and one end-to-end Inspect run on the mock model.
+on:
+  push:
+    branches: [main]
+    paths: ['research/**', '.github/workflows/research-smoke.yml']
+  pull_request:
+    paths: ['research/**', '.github/workflows/research-smoke.yml']
+
+concurrency:
+  group: research-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: research
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: research/uv.lock
+
+      - name: Install
+        run: uv sync --frozen --group dev
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Unit tests
+        run: uv run pytest -q
+
+      - name: Manifest consistency
+        run: uv run caltrans-bench manifest verify --offline
+
+      # Only the documents the smoke questions anchor to are fetched (a few MB),
+      # cached on the manifest hash so a green run costs Caltrans nothing.
+      - name: Smoke documents
+        id: docs
+        run: echo "ids=$(uv run caltrans-bench questions docs questions/smoke.jsonl)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: research/corpus/raw
+          key: corpus-${{ hashFiles('research/corpus/manifest.json') }}-${{ steps.docs.outputs.ids }}
+
+      - name: Fetch and verify smoke documents
+        run: |
+          uv run caltrans-bench manifest fetch --only "${{ steps.docs.outputs.ids }}"
+          uv run caltrans-bench manifest verify --only "${{ steps.docs.outputs.ids }}"
+
+      - name: Validate anchors
+        run: uv run caltrans-bench questions validate questions/smoke.jsonl
+
+      - name: Inspect smoke (mock model)
+        run: |
+          uv run caltrans-bench smoke --condition closed_book --limit 10
+          uv run caltrans-bench smoke --condition rag --limit 10
