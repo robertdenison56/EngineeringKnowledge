@@ -34,6 +34,10 @@ _REFUSAL_PHRASES = (
     "cannot be determined from",
     "not specified in",
     "not addressed in",
+    "does not specify",
+    "do not specify",
+    "not provided in",
+    "no information",
 )
 
 # Unit spellings → canonical symbol.
@@ -130,9 +134,41 @@ def cited_pages(response: str) -> set[tuple[str, int]]:
     return pairs
 
 
+_UNICODE_FRACTIONS = {
+    "½": ".5",
+    "¼": ".25",
+    "¾": ".75",
+    "⅓": ".333",
+    "⅔": ".667",
+    "⅛": ".125",
+    "⅜": ".375",
+    "⅝": ".625",
+    "⅞": ".875",
+}
+_MIXED_RE = re.compile(r"(?<![\d.])(\d+)[- ](\d)/(\d+)(?!\d)")
+_BARE_FRACTION_RE = re.compile(r"(?<![\d./-])(\d)/(\d+)(?![\d/])")
+
+
+_FEET_INCHES_RE = re.compile(r"(\d+)\s*(?:'|′|ft\b|feet\b)\s*[-–]?\s*(\d+(?:\.\d+)?)\s*(?:\"|″|in\b|inches\b)")
+
+
+def fold_fractions(text: str) -> str:
+    """16½ → 16.5, 1-1/2 → 1.5, 16 1/2 → 16.5, ½ → 0.5, 23'-4" → 23.3333 ft.
+
+    Drawing-style values then score as ordinary numbers.
+    """
+    text = _FEET_INCHES_RE.sub(lambda m: f"{int(m.group(1)) + float(m.group(2)) / 12:.4f} ft", text)
+    for glyph, dec in _UNICODE_FRACTIONS.items():
+        text = re.sub(rf"(\d)\s*{glyph}", rf"\1{dec}", text)
+        text = text.replace(glyph, f"0{dec}")
+    text = _MIXED_RE.sub(lambda m: f"{int(m.group(1)) + int(m.group(2)) / int(m.group(3)):g}", text)
+    text = _BARE_FRACTION_RE.sub(lambda m: f"{int(m.group(1)) / int(m.group(2)):g}", text)
+    return text
+
+
 def parse_quantity(text: str) -> tuple[float, str | None] | None:
     """First number in `text` with its unit, if any. Commas in numbers are ignored."""
-    m = _QUANTITY_RE.search(text)
+    m = _QUANTITY_RE.search(fold_fractions(text))
     if not m:
         return None
     value = float(m.group(1).replace(",", ""))
@@ -176,7 +212,7 @@ def score_number(response: str, expected: float, unit: str | None, tolerance: fl
 
 
 def _last_quantity(text: str) -> tuple[float, str | None] | None:
-    matches = list(_QUANTITY_RE.finditer(text))
+    matches = list(_QUANTITY_RE.finditer(fold_fractions(text)))
     if not matches:
         return None
     m = matches[-1]

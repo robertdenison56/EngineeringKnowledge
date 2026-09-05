@@ -20,7 +20,7 @@ RAW="$RESEARCH/corpus/raw"
 OUT="$RESEARCH/snapshots"
 DB="$OUT/ekg-caltrans.db"
 # (not GROUPS: that is a bash builtin array and assignments to it are ignored)
-INGEST_GROUPS="hdm std-2025 std-2018 district3"
+INGEST_GROUPS="hdm std-2025"   # benchmark corpus; add std-2018 / district3 with --groups for the grounding study
 # The combined HDM is the same content as the chapter files; ingesting both
 # would double every HDM passage in retrieval.
 EXCLUDE="hdm-combined"

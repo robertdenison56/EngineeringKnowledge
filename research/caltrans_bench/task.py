@@ -36,6 +36,16 @@ from .scoring import (
 
 DEFAULT_QUESTIONS = QUESTIONS_DIR / "smoke.jsonl"
 DEFAULT_SNAPSHOT = SNAPSHOT_DIR / "ekg-caltrans.db"
+# The benchmark corpus: current HDM chapter files plus the 2025 Standard Plans and
+# Specifications. Older editions and the District 3 bid documents stay in the manifest
+# for the grounding study but are not retrieval targets here.
+BENCH_GROUPS = "hdm,std-2025"
+BENCH_EXCLUDE = {"hdm-combined"}
+
+
+def bench_doc_ids(manifest) -> list[str]:
+    return [d.id for d in manifest.select(group=BENCH_GROUPS) if d.id not in BENCH_EXCLUDE]
+
 
 SYSTEM_PROMPT = f"""You answer questions about Caltrans design standards: the Highway Design Manual,
 the Standard Plans, and the Standard Specifications.
@@ -63,7 +73,7 @@ def rag_context(k: int, retriever: str, only: list[str] | None) -> Solver:
     from .rag import PageIndex, format_context
 
     manifest = load_manifest(MANIFEST_PATH)
-    index = PageIndex(manifest, RAW_DIR, only=only)
+    index = PageIndex(manifest, RAW_DIR, only=only or bench_doc_ids(manifest))
     if retriever != "lexical":
         raise NotImplementedError("dense retrieval lands with the `dense` extra in task 11")
 
@@ -79,15 +89,37 @@ def rag_context(k: int, retriever: str, only: list[str] | None) -> Solver:
     return solve
 
 
-@scorer(metrics={"answer": [accuracy(), stderr()], "citation": [accuracy(), stderr()]})
-def bench_scorer() -> Scorer:
-    """Deterministic scoring dispatched on the question's answer_type; see scoring.py."""
+@scorer(
+    metrics={
+        "answer": [accuracy(), stderr()],
+        "citation": [accuracy(), stderr()],
+        "protocol": [accuracy()],
+    }
+)
+def bench_scorer(strict: bool = True) -> Scorer:
+    """Deterministic scoring dispatched on the question's answer_type; see scoring.py.
+
+    ``strict`` (default) requires the ANSWER: line: a reply without one scores 0 on
+    `answer`, and `protocol` reports how often the line was present. With
+    ``strict=False`` the scorer falls back to the last number in the reply, which is
+    lenient enough that a small model echoing retrieved context can hit by accident.
+    """
 
     async def score(state: TaskState, target: Target) -> Score:
         meta = state.metadata
         response = state.output.completion
         anchors = [(a["doc"], a["page"]) for a in meta.get("anchors", [])]
         atype = meta["answer_type"]
+        followed = final_answer(response) is not None
+        if strict and not followed:
+            cited = cited_pages(response)
+            citation_ok = score_citation(response, anchors).correct if anchors else not cited
+            return Score(
+                value={"answer": 0.0, "citation": 1.0 if citation_ok else 0.0, "protocol": 0.0},
+                answer=None,
+                explanation="no ANSWER line (protocol not followed)",
+                metadata={"bucket": meta["bucket"], "answer_type": atype},
+            )
         if atype == "number":
             v = score_number(
                 response, float(meta["answer"].replace(",", "")), meta.get("unit"), meta.get("tolerance", 0.0)
@@ -105,7 +137,11 @@ def bench_scorer() -> Scorer:
             citation_ok = not cited_pages(response)
             citation_reason = "no citation on a refusal" if citation_ok else "cited a page for a refusal"
         return Score(
-            value={"answer": 1.0 if v.correct else 0.0, "citation": 1.0 if citation_ok else 0.0},
+            value={
+                "answer": 1.0 if v.correct else 0.0,
+                "citation": 1.0 if citation_ok else 0.0,
+                "protocol": 1.0 if followed else 0.0,
+            },
             answer=final_answer(response),
             explanation=f"{v.reason} | citation: {citation_reason}",
             metadata={"bucket": meta["bucket"], "answer_type": atype},
@@ -123,6 +159,7 @@ def caltrans_bench(
     retriever: str = "lexical",
     ekg_db: str = str(DEFAULT_SNAPSHOT),
     docs: str | None = None,
+    strict: bool = True,
 ) -> Task:
     qs = load_questions(Path(questions), split=split)
     if not qs:
@@ -141,6 +178,6 @@ def caltrans_bench(
     return Task(
         dataset=MemoryDataset([_sample(q) for q in qs], name=f"caltrans-bench:{Path(questions).stem}"),
         solver=chain,
-        scorer=bench_scorer(),
-        metadata={"condition": condition, "split": split, "k": k, "retriever": retriever},
+        scorer=bench_scorer(strict=strict),
+        metadata={"condition": condition, "split": split, "k": k, "retriever": retriever, "strict": strict},
     )

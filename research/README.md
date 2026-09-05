@@ -40,14 +40,53 @@ scripts/build-ekg-snapshot.sh          # once; builds snapshots/ekg-caltrans.db
 uv run inspect eval caltrans_bench/task.py -T condition=ekg --model anthropic/claude-fable-5-1
 ```
 
+## Question sets
+
+| File | What |
+|---|---|
+| `questions/smoke.jsonl` | 10 questions CI runs on the mock model; anchors only two documents so CI downloads a few MB. |
+| `questions/caltrans-v0.jsonl` | The working benchmark set (split `dev` until the dev/test split is frozen). Scope: current HDM chapter files + 2025 Standard Plans and Specifications. |
+
+`caltrans-bench questions stats questions/caltrans-v0.jsonl` prints bucket, answer-type, and document counts.
+
+### Authoring workflow
+
+1. Find the fact: `caltrans-bench corpus grep "<regex>" --docs hdm-chp0300 --pages 1-20` searches the cached
+   page text (one hit per page, PDF page numbers); `caltrans-bench corpus page stdspecs-2025 319` prints a page.
+2. Write the line: `answer` is the canonical value, `unit` and `tolerance` drive numeric scoring, `aliases`
+   widen text matching, and every anchor's `quote` is a short verbatim string from that page. Prefer a quote that
+   contains the answer itself. Standard Plans sheet pages are the printed page plus 23.
+3. `caltrans-bench questions validate questions/caltrans-v0.jsonl` opens every anchored page and fails the line
+   if the quote or table label is not there. Nothing ships unvalidated.
+4. Keep the buckets moving toward the target mix in `DATASET_CARD.md` (lookup 60 · multihop 40 · trap 30 · refusal 30).
+
+## Running models through Ollama
+
+Inspect's Ollama provider talks to the local server (`ollama serve`) through its OpenAI-compatible API:
+
+```bash
+uv run caltrans-bench smoke --condition rag --model ollama/qwen2.5:0.5b --questions questions/caltrans-v0.jsonl --limit 50
+uv run inspect eval caltrans_bench/task.py -T condition=closed_book -T questions=questions/caltrans-v0.jsonl --model ollama/gpt-oss:120b-cloud
+uv run inspect view   # browse logs/
+```
+
+Any model `ollama list` shows works, cloud-backed ones included.
+
 ## Answer protocol
 
 Every condition is asked to end with `ANSWER: <value or NOT IN DOCUMENT>` and
 `CITE: <doc-id> p<page>`. Scoring reads only those lines: numbers are compared
-with unit normalization and a per-question tolerance, citations must land on
-an anchored page, refusals must say NOT IN DOCUMENT, and short text answers
-are matched after normalization. Prose answers that need judgment are the
-only place a model grader is used.
+with unit normalization (feet-inches, vulgar fractions, ft/m, mph/km/h, psi/MPa)
+and a per-question tolerance, citations must land on an anchored page, refusals
+must say NOT IN DOCUMENT, and short text answers are matched after
+normalization. Prose answers that need judgment are the only place a model
+grader is used.
+
+The protocol is strict by default: a reply with no ANSWER line scores 0 and the
+`protocol` metric reports how often the line was present. Pass `-T strict=false`
+to fall back to the last number in the reply; that mode is lenient enough that a
+tiny model echoing retrieved context can score by accident, so use it only for
+exploration.
 
 ## Manifest conventions
 

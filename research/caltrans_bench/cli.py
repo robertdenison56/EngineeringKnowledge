@@ -58,6 +58,20 @@ def cmd_questions(args: argparse.Namespace) -> int:
     if args.qcmd == "docs":
         print(",".join(sorted({a.doc for q in qs for a in q.anchors})))
         return 0
+    if args.qcmd == "stats":
+        from collections import Counter
+
+        buckets, types, splits, docs = Counter(), Counter(), Counter(), Counter()
+        for q in qs:
+            buckets[q.bucket] += 1
+            types[q.answer_type] += 1
+            splits[q.split] += 1
+            for a in q.anchors:
+                docs[a.doc] += 1
+        print(f"{len(qs)} questions in {path.name}")
+        for name, c in (("bucket", buckets), ("answer_type", types), ("split", splits), ("anchored doc", docs)):
+            print(f"  {name}: " + ", ".join(f"{k}={v}" for k, v in sorted(c.items(), key=lambda kv: -kv[1])))
+        return 0
     # validate
     manifest = load_manifest(args.manifest).by_id()
     failures: list[str] = []
@@ -88,6 +102,43 @@ def cmd_questions(args: argparse.Namespace) -> int:
         + (" (schema only)" if args.offline else "")
     )
     return 1 if failures else 0
+
+
+def cmd_corpus(args: argparse.Namespace) -> int:
+    """Authoring helpers over the cached page text: grep a regex, or print one page."""
+    import re
+
+    from .text import page_text, page_texts
+
+    manifest = load_manifest(args.manifest)
+    raw_dir = Path(args.raw_dir)
+    if args.ccmd == "page":
+        doc = manifest.by_id()[args.doc]
+        print(page_text(doc, args.page, raw_dir))
+        return 0
+    pattern = re.compile(args.pattern, re.IGNORECASE)
+    lo_page, hi_page = 1, 10**9
+    if args.pages:
+        a, _, b = args.pages.partition("-")
+        lo_page, hi_page = int(a or 1), int(b or a or 10**9)
+    shown = 0
+    for doc in manifest.select(_ids(args.docs), args.group):
+        if not doc.path(raw_dir).exists():
+            continue
+        for page_no, text in enumerate(page_texts(doc, raw_dir), start=1):
+            if not lo_page <= page_no <= hi_page:
+                continue
+            flat = " ".join(text.split())
+            for m in pattern.finditer(flat):
+                lo, hi = max(0, m.start() - args.context), min(len(flat), m.end() + args.context)
+                print(f"{doc.id} p{page_no}: …{flat[lo:hi]}…")
+                shown += 1
+                if shown >= args.max:
+                    print(f"(stopped at --max {args.max})")
+                    return 0
+                break  # one hit per page keeps the listing scannable
+    print(f"{shown} page hit(s)")
+    return 0
 
 
 def cmd_smoke(args: argparse.Namespace) -> int:
@@ -141,12 +192,30 @@ def main(argv: list[str] | None = None) -> int:
 
     q = sub.add_parser("questions", help="question sets: validate, docs")
     qs = q.add_subparsers(dest="qcmd", required=True)
-    for name, help_ in (("validate", "schema + anchor check"), ("docs", "print the document ids a set anchors to")):
+    for name, help_ in (
+        ("validate", "schema + anchor check"),
+        ("docs", "print the document ids a set anchors to"),
+        ("stats", "bucket / answer-type / split / document counts"),
+    ):
         sp = qs.add_parser(name, help=help_)
         sp.add_argument("path", nargs="?", default=str(QUESTIONS_DIR / "smoke.jsonl"))
         sp.add_argument("--split")
         sp.add_argument("--offline", action="store_true")
     q.set_defaults(func=cmd_questions)
+
+    c = sub.add_parser("corpus", help="authoring helpers over cached page text: grep, page")
+    cs = c.add_subparsers(dest="ccmd", required=True)
+    g = cs.add_parser("grep", help="regex search over every page; one hit per page")
+    g.add_argument("pattern")
+    g.add_argument("--docs", help="comma-separated document ids")
+    g.add_argument("--group")
+    g.add_argument("--context", type=int, default=90)
+    g.add_argument("--pages", help="restrict to a PDF page range, e.g. 855-878")
+    g.add_argument("--max", type=int, default=40)
+    pg = cs.add_parser("page", help="print the text of one page")
+    pg.add_argument("doc")
+    pg.add_argument("page", type=int)
+    c.set_defaults(func=cmd_corpus)
 
     s = sub.add_parser("smoke", help="run the Inspect task end to end (default: mock model)")
     s.add_argument("--condition", default="closed_book", choices=["closed_book", "rag", "ekg"])

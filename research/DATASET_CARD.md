@@ -19,8 +19,9 @@ size_categories:
 # Caltrans Design Standards QA
 
 A retrieval-grounded question set over public Caltrans design standards: the
-Highway Design Manual (7th edition), the 2025 Standard Plans and Standard
-Specifications, and the 2018 editions of both for edition traps. Every answer
+current Highway Design Manual (7th edition) and the 2025 Standard Plans and
+Standard Specifications. Older editions are kept in the corpus manifest for
+later edition-trap work but are not question targets in this release. Every answer
 carries a source anchor (document id, PDF page, table label), and the answer
 is a number, a citation, or a short string wherever possible so scoring is
 deterministic. The harness lives at
@@ -28,12 +29,15 @@ https://github.com/robertdenison56/EngineeringKnowledge/tree/main/research.
 
 ## Buckets
 
-| Bucket | Meaning | Target count |
-|---|---|---|
-| `lookup` | one value read from one table or clause | 60 |
-| `multihop` | HDM → Standard Plan → Standard Specification cross-reference | 40 |
-| `trap` | unit and edition traps (metric vs. US customary, 2018 vs. 2025) | 30 |
-| `refusal` | plausible questions the documents do not answer | 30 |
+| Bucket | Meaning | Target | In `caltrans-v0.jsonl` (2026-09-05) |
+|---|---|---|---|
+| `lookup` | one value read from one table or clause | 60 | 113 |
+| `multihop` | HDM → Standard Plan sheet or Standard Specifications clause, and within-spec cross-references | 40 | 23 |
+| `trap` | unit traps (metric vs. US customary, short tons, psi/MPa); edition traps parked until older editions are in scope | 30 | 15 |
+| `refusal` | plausible questions the documents do not answer (values outside a table's range, rows that do not exist) | 30 | 22 |
+
+The lookup surplus will be trimmed to the target when the dev/test split is
+frozen; the other buckets are still being filled.
 
 ## Record format
 

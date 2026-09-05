@@ -63,7 +63,8 @@ class Manifest:
     def select(self, only: list[str] | None = None, group: str | None = None) -> list[Document]:
         docs = self.documents
         if group:
-            docs = [d for d in docs if d.group == group]
+            wanted_groups = {g.strip() for g in group.split(",") if g.strip()}
+            docs = [d for d in docs if d.group in wanted_groups]
         if only:
             wanted = set(only)
             unknown = wanted - {d.id for d in self.documents}

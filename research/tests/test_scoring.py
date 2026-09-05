@@ -63,3 +63,28 @@ def test_score_text_normalized_containment():
     assert score_text("ANSWER: Section 19, Earthwork\nCITE: x p1", "Section 19").correct
     assert score_text("ANSWER: earth-work\nCITE: x p1", "Section 19", aliases=["Earthwork"]).correct
     assert not score_text("ANSWER: Section 39\nCITE: x p1", "Section 19").correct
+
+
+def test_fractions_fold_into_numbers():
+    from caltrans_bench.scoring import fold_fractions
+
+    assert fold_fractions("16½ ft") == "16.5 ft"
+    assert fold_fractions("1-1/2 inches") == "1.5 inches"
+    assert fold_fractions("16 1/2 ft") == "16.5 ft"
+    assert fold_fractions("½ inch") == "0.5 inch"
+    assert parse_quantity("7½ s") == (7.5, "s")
+    assert score_number("ANSWER: 16½ ft\nCITE: x p1", 16.5, "ft", 0).correct
+    assert score_number("ANSWER: 1-1/2 in\nCITE: x p1", 1.5, "in", 0).correct
+
+
+def test_day_units_and_refusal_phrases():
+    assert score_number("ANSWER: 10 days\nCITE: x p1", 10, "day", 0).correct
+    assert is_refusal("ANSWER: The document does not specify this value.")
+
+
+def test_feet_inches_fold():
+    from caltrans_bench.scoring import fold_fractions
+
+    assert fold_fractions("23'-4\"").startswith("23.3333 ft")
+    assert score_number("ANSWER: 23'-4\"\nCITE: x p1", 23.33, "ft", 0.01).correct
+    assert score_number("ANSWER: 19 ft 0 in\nCITE: x p1", 19, "ft", 0).correct
