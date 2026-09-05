@@ -157,6 +157,9 @@ def fold_fractions(text: str) -> str:
 
     Drawing-style values then score as ordinary numbers.
     """
+    text = (
+        text.replace("\u202f", " ").replace("\u00a0", " ").replace("\u2009", " ")
+    )  # narrow/no-break spaces before units
     text = _FEET_INCHES_RE.sub(lambda m: f"{int(m.group(1)) + float(m.group(2)) / 12:.4f} ft", text)
     for glyph, dec in _UNICODE_FRACTIONS.items():
         text = re.sub(rf"(\d)\s*{glyph}", rf"\1{dec}", text)

@@ -88,3 +88,8 @@ def test_feet_inches_fold():
     assert fold_fractions("23'-4\"").startswith("23.3333 ft")
     assert score_number("ANSWER: 23'-4\"\nCITE: x p1", 23.33, "ft", 0.01).correct
     assert score_number("ANSWER: 19 ft 0 in\nCITE: x p1", 19, "ft", 0).correct
+
+
+def test_narrow_no_break_space_before_unit():
+    assert parse_quantity("580\u202fft") == (580.0, "ft")
+    assert score_number("ANSWER: 176.8\u202fm\nCITE: x p1", 580, "ft", 1).correct
