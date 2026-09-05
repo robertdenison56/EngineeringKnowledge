@@ -71,6 +71,24 @@ The gateways and the workspace app are *how* this reaches users; the three point
 4. **Knowledge capture**: each active tenant adds or curates ≥ 50 knowledge items per month by month 6 (leading indicator that the graph compounds rather than decays).
 5. **Business**: 10 paying design-team customers (50–2,000 staff) within 2 quarters of GA. The differentiator vs. horizontal KM and single-ecosystem tools is the vertical wedge (AEC-native parsing + provenance + cross-vendor coverage — see [Where the defensibility lives](#where-the-defensibility-lives)); gateway breadth is an adoption lever, not the moat.
 
+### Research arcs
+
+**The objective.** Turn the two existing projects into two public, measured artifacts that a research team can evaluate — EKG for the Knowledge Team (#14), RoadDraft for Domain Scaling (#13) — while producing the Python and evaluation-framework proof that the Tier 1 and Tier 2 applications (FDE, Applied AI Architect) need this month.
+
+**The rule for both:** bounded scope with a number at the end. Neither project gets "finished." Each gets a milestone that ships a repo, a dataset, a results table, and a writeup.
+
+#### Arc 1 — EKG research arc (Python, ~8–9 weeks, target mid-November 2026)
+
+**Goal:** a public, retrieval-grounded benchmark on US transportation standards, plus a research note with measured results.
+
+**Position against prior art:** AECBench (Tongji, 2025), DesignQA (2024), Qwen-BIM (2026). None cover US transportation standards, none are retrieval-grounded (model is given the documents and tools), none are deterministically scored. That is the gap.
+
+1. **Hard eval set.** 120–200 questions over the Caltrans HDM, Standard Plans, and Standard Specs (all public). Four buckets: single-table lookups (K values, SSD, superelevation); multi-hop cross-references (HDM → Standard Plan → spec section); unit and edition traps; "not in the document" refusals. Every answer carries a source anchor (document, page, table). Harness runs closed-book, vanilla RAG, and EKG's tools. Deterministic scoring wherever the answer is a number or citation; LLM-judge only for the rest. Build in Inspect or the verifiers format. *Done when:* dataset on Hugging Face, harness on GitHub, results table for 3+ frontier models.
+2. **Grounding track.** Port the vision-annotation grounding pipeline (the 44% → 76% result, [ADR 0007](docs/decisions/0007-vlm-fusion.md)) to Python and re-run it on public Caltrans bid plan sets. *Done when:* the number reproduces from a public repo on public drawings.
+3. **Agentic search study.** On the same questions, compare single-shot RAG, tool-loop agentic search, and graph traversal via EKG's MCP tools. *Done when:* accuracy, steps, tokens, and a failure-mode taxonomy are reported per method.
+4. **First fine-tune.** Fine-tune a small embedding model or reranker on query → passage pairs mined from the corpus. Report recall@k before and after on the held-out set, then the generalization check: train on the HDM, test on the Standard Specs. Runs on the 4060. Optional harder variant: QLoRA a 3B model to emit page-anchored citations; measure citation validity. *Done when:* baseline, treatment, and result are in one table.
+5. **Research note.** Setup, metric, baselines, results, failure taxonomy, limitations, next steps. *Done when:* published (GitHub README plus LinkedIn/HN cross-post) and linked from the resume.
+
 ## Non-Goals
 
 - **Not a chatbot of our own.** The product's bet is meeting users inside ChatGPT, Claude, and Copilot for conversational Q&A. The knowledge workspace app (P0-9) is a full first-party product for building, curating, and visually exploring the graph — but it deliberately has no chat interface. Building one would dilute the gateway bet and compete with the host platforms.
