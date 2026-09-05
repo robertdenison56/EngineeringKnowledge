@@ -1,5 +1,6 @@
 import type { ReviewStatus } from '@ekg/core';
-import { getCaller, getFirmName, getRoles, getStore, isAdmin } from '../../lib/store';
+import { inspectDatabase } from '@ekg/store-sqlite';
+import { getCaller, getFirmName, getRoles, getStore, isAdmin, storePath } from '../../lib/store';
 import { AppearanceSettings } from '../../components/AppearanceSettings';
 import { FirmNameSettings } from '../../components/FirmNameSettings';
 import { RolesSettings } from '../../components/RolesSettings';
@@ -36,6 +37,18 @@ export default async function SettingsPage() {
   const retrieval = provider
     ? `Hybrid — lexical + FTS5 + dense (${provider})`
     : 'Lexical + FTS5 only (no embedding provider configured)';
+  // Schema state of the file this process opened (ADR 0012) — read-only, no
+  // integrity scan on a page render; `npm run db -- status` does the full check.
+  const dbFile = storePath();
+  const schema = dbFile ? inspectDatabase(dbFile, { check: false }) : undefined;
+  const schemaLine = !schema
+    ? 'in-memory (ephemeral, no file)'
+    : schema.tooNew
+      ? `v${schema.version} — newer than this build supports (v${schema.latest})`
+      : schema.pending.length > 0
+        ? `v${schema.version} → v${schema.latest} pending (applied on next open)`
+        : `v${schema.version} (current)`;
+  const lastUpgrade = schema?.ledger[schema.ledger.length - 1];
 
   return (
     <>
@@ -99,6 +112,22 @@ export default async function SettingsPage() {
             <dt>Store</dt>
             <dd>
               SQLite · <code>{dbPath}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>Schema</dt>
+            <dd>
+              {schemaLine}
+              {schema?.ftsRecipe !== undefined && schema?.ftsRecipe !== null
+                ? ` · FTS recipe v${schema.ftsRecipe}`
+                : ''}
+              {lastUpgrade ? ` · last upgraded ${lastUpgrade.appliedAt.slice(0, 10)} (${lastUpgrade.name})` : ''}
+              {schema ? (
+                <>
+                  {' '}
+                  — backups, verify and restore via <code className="inline-code">npm run db -- status</code>
+                </>
+              ) : null}
             </dd>
           </div>
         </dl>

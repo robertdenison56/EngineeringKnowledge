@@ -1,7 +1,7 @@
 {
   "name": "engineering-knowledge",
   "private": true,
-  "description": "Engineering Knowledge Graph for AEC firms — knowledge graph + multi-gateway grounding for ChatGPT, Claude, and Microsoft 365 Copilot",
+  "description": "Engineering Knowledge Graph for AEC firms \u2014 knowledge graph + multi-gateway grounding for ChatGPT, Claude, and Microsoft 365 Copilot",
   "workspaces": [
     "packages/*",
     "services/*",
@@ -11,7 +11,8 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "pack:mcp-server": "npm run build && mkdir -p release && npm pack --workspace @ekg/mcp-server --pack-destination release",
-    "eval": "node packages/store-sqlite/scripts/eval.mjs"
+    "eval": "node packages/store-sqlite/scripts/eval.mjs",
+    "db": "node packages/store-sqlite/dist/cli.js"
   },
   "engines": {
     "node": ">=20"

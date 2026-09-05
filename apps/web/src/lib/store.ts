@@ -42,6 +42,17 @@ const globalForStore = globalThis as unknown as {
  * The seed/backfill run on the RAW store, before wrapping, so bootstrap writes
  * are never journaled — only deliberate, operation-scoped edits are undoable.
  */
+/**
+ * The SQLite file this process opens, or undefined for the ephemeral in-memory
+ * store — the same resolution `createStore` uses, for read-only diagnostics
+ * (Settings shows the schema state from it).
+ */
+export function storePath(): string | undefined {
+  const envPath = process.env.EKG_DB_PATH;
+  if (envPath === ':memory:') return undefined;
+  return envPath ?? path.join(process.cwd(), '.data', 'ekg.db');
+}
+
 async function createStore(): Promise<{ store: GraphStore; journal: OperationJournal }> {
   const envPath = process.env.EKG_DB_PATH;
   if (envPath === ':memory:') {
@@ -50,7 +61,7 @@ async function createStore(): Promise<{ store: GraphStore; journal: OperationJou
     const journal = new InMemoryOperationJournal();
     return { store: new JournaledGraphStore(raw, journal, currentOperation), journal };
   }
-  const dbPath = envPath ?? path.join(process.cwd(), '.data', 'ekg.db');
+  const dbPath = storePath()!;
   mkdirSync(path.dirname(dbPath), { recursive: true });
   const raw = new SqliteGraphStore(dbPath, { embeddings: providerFromEnv() });
   // The dev workspace seeds the demo corpus on first run so the app is

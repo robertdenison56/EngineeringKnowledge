@@ -234,7 +234,48 @@ touching the call sites.
 
 `EKG_DB_PATH` selects the SQLite database. The app creates and seeds it on first
 run; the gateway serves it read-mostly. Use `:memory:` for an ephemeral seeded
-store (tests, demos). Back this file up like any other database of record.
+store (tests, demos). The file runs in WAL mode, so the app, gateway, and
+ingestion CLI can share it; treat the `-wal` and `-shm` sidecars as part of it.
+
+### Upgrades, backups, and restore
+
+The database carries a **schema version** (`PRAGMA user_version`), and every
+build knows the version it needs ([ADR 0012](../decisions/0012-schema-versioning-migrations-restore.md)).
+Opening a file with a newer build **upgrades it in place** — after writing a
+snapshot next to it (`ekg.db.v<from>-<stamp>.backup`) — and logs one
+`ekg-store: upgraded ...` line. Opening a file with an *older* build than the
+one that last wrote it is **refused**, with the two remedies in the message
+(upgrade the software, or restore that snapshot). The same happens for the
+full-text index: when a build changes what it indexes, the index is rebuilt
+once on the next open.
+
+`ekg-db` (`npm run db -- <command>` from the repo root, or the `ekg-db` bin of
+`@ekg/store-sqlite`) is the operator surface. `--db` defaults to `EKG_DB_PATH`.
+
+```sh
+npm run db -- status  --db /srv/ekg/ekg.db          # version, pending steps, ledger, row counts, quick check (read-only)
+npm run db -- backup  /srv/backups/ekg-$(date +%F).backup --db /srv/ekg/ekg.db
+npm run db -- verify  /srv/backups/ekg-2026-09-04.backup    # full integrity check, any file
+npm run db -- migrate --db /srv/ekg/ekg.db          # upgrade now (snapshot first) instead of on the next open
+npm run db -- restore /srv/backups/ekg-2026-09-04.backup --db /srv/ekg/ekg.db
+```
+
+- **Backups are safe while everything is running.** `backup` takes one
+  consistent read snapshot (`VACUUM INTO`), never overwrites an existing file,
+  and verifies what it wrote before reporting success. Schedule it, and copy
+  the file off the box — that part is still yours.
+- **Restore is rehearsed, not copied.** `restore` verifies the backup, refuses
+  while the app, gateway, or an ingestion run has the file open (**stop them
+  first**), snapshots the live file to `ekg.db.pre-restore-<stamp>.backup` so
+  the restore is itself reversible, swaps the backup in, migrates it forward
+  if it predates the current schema, and verifies the result. Rehearse it on a
+  copy before you need it: `restore` into a scratch `--db` path is exactly the
+  production sequence.
+- **Want upgrades to be a deliberate step?** Set `EKG_DB_MIGRATE=manual` on
+  the app, gateway, and ingestion CLI: an existing file that needs upgrading
+  then refuses to open until you run `migrate`. New files are still created.
+  `EKG_DB_BACKUP_ON_MIGRATE=0` skips the automatic pre-upgrade snapshot (only
+  sensible when you take your own immediately before deploying).
 
 ### Semantic retrieval (embeddings)
 
@@ -420,6 +461,8 @@ Every setting is an environment variable — no config file.
 | Variable | Used by | Purpose | Default |
 |---|---|---|---|
 | `EKG_DB_PATH` | app, gateway, ingestion | Curated SQLite database path. `:memory:` = ephemeral seeded. | app: `apps/web/.data/ekg.db`; gateway: in-memory demo |
+| `EKG_DB_MIGRATE` | app, gateway, ingestion | `auto` upgrades an older database on open (after a snapshot); `manual` refuses until `ekg-db migrate` is run. New files are initialized either way. | `auto` |
+| `EKG_DB_BACKUP_ON_MIGRATE` | app, gateway, ingestion | `0` skips the `<db>.v<from>-<stamp>.backup` snapshot written before an on-open upgrade. | on |
 | `EKG_TRANSPORT` | gateway | `stdio` (single-user) or `http` (remote, multi-user). | `stdio` |
 | `EKG_JWT_SECRET` | gateway (http) | HS256 secret for verifying dev bearer tokens. **Required for http unless OIDC mode is configured** (then ignored). | — |
 | `EKG_OIDC_ISSUER` | gateway (http) | OAuth resource-server mode: expected token `iss` (the Entra tenant issuer URL). Set together with `EKG_OIDC_AUDIENCE` — half-set refuses to start. | unset (dev-secret mode) |
@@ -445,7 +488,8 @@ Every setting is an environment variable — no config file.
   key on the gateway (client models do the reading).
 - **You must provide:** TLS termination / reverse proxy, secret management for
   `EKG_JWT_SECRET` and any embedding API keys, log retention for the audit trail,
-  and backups of the SQLite database.
+  and a schedule plus off-box copy for database backups (`ekg-db backup` is the
+  safe primitive; see [Upgrades, backups, and restore](#upgrades-backups-and-restore)).
 - **Enforced today (continued):** the gateway's OAuth 2.1 resource-server mode —
   RS256/JWKS verification of Entra-federated tokens with RFC 9728 discovery
   ([production SSO](#production-sso-oauth-21--entra)) — validated against a mock

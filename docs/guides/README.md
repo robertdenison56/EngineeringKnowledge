@@ -25,7 +25,7 @@ These guides are organized around the four things you do with EKG, mapped to the
 | [2 · Using EKG](02-using-the-app.md) | **Use** — search, browse, the map, entity pages, provenance & warnings, and asking from a connected assistant | Project Engineer (Priya), QA Reviewer (Elena) |
 | [3 · Adding knowledge](03-adding-knowledge.md) | **Add** — the capture form, the ingestion CLI, and ingesting from your assistant | Knowledge Manager (Marcus), any engineer |
 | [4 · Curating & refining](04-curating-knowledge.md) | **Refine** — the curation workbench, the review lifecycle, tags, supersede/deprecate, and how to keep answers trustworthy | Knowledge Manager (Marcus), QA Reviewer (Elena) |
-| [5 · Administration](05-admin-guide.md) | **Operate** — the remote gateway, identity/tenants/ACLs, audit logs, retrieval config, and connecting assistants org-wide | IT / Security Admin (Dana) |
+| [5 · Administration](05-admin-guide.md) | **Operate** — the remote gateway, identity/tenants/ACLs, audit logs, retrieval config, database upgrades/backups/restore, and connecting assistants org-wide | IT / Security Admin (Dana) |
 | [6 · Testing with Claude Desktop](06-testing-with-claude-desktop.md) | **Prove it** — the scripted end-to-end tour: ingest → describe → curate → query → supersede, all from Claude Desktop against one shared database | Anyone validating the build |
 
 New here? Read them in order — each builds on the last. Just want to try it on

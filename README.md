@@ -15,7 +15,7 @@ How to set up, use, add to, and refine it: [Guides](docs/guides/) (start with
 | Path | What it is | PRD |
 |---|---|---|
 | `packages/core` | Ontology (entities, relationships, document chunks), `GraphStore` interface, shared retrieval semantics, in-memory dev store, demo seed | P0-1 |
-| `packages/store-sqlite` | Persistent `GraphStore` on SQLite (`node:sqlite`, no native deps) — entity + chunk-level FTS and embeddings, hybrid retrieval (ADR 0003, 0006) | OQ 1 reference |
+| `packages/store-sqlite` | Persistent `GraphStore` on SQLite (`node:sqlite`, no native deps) — entity + chunk-level FTS and embeddings, hybrid retrieval (ADR 0003, 0006); versioned schema with on-open migrations, pre-upgrade snapshots, and the `ekg-db` backup / verify / restore CLI (ADR 0012) | OQ 1 reference |
 | `apps/mcp-server` | MCP gateway — `search` / `fetch` / `traverse` / `find_experts` / `get_project_context`, `ingest_document` / `save_description` (users add documents from their assistant, and *their* model describes drawing sheets), and `propose_knowledge` ("save this as a lesson learned" → curation queue, P1-5). Runs on stdio (single-user dev) or remote **Streamable HTTP** with per-request JWT identity, per-caller ACL/tenant trimming, and an audit trail (P0-7); `EKG_DB_PATH` serves the curated database, `EKG_INGEST_ROOT` confines ingestion, `EKG_SEED_DEMO` gates demo data | P0-2, P0-3…P0-6 |
 | `apps/web` | Knowledge workspace app — dashboard, search/browse, entity pages with graph view and inline curation (edit fields/ACL, supersede/deprecate, merge, relationships), curation workbench with bulk actions and a restorable trash, capture form with graph linking (`npm run dev --workspace @ekg/web`) | P0-9 |
 | `services/ingestion` | Ingestion CLI v0 — classify files, extract PDF text layers (scans flagged `needs-ocr`), CAD-native vector parsing of drawing sheets (title blocks, views, dimensions, schedules, callouts → cross-sheet `references` edges), queue candidates for curation | P0-2, P0-2a |
@@ -112,7 +112,10 @@ Capture-from-chat ships as the gateway's `propose_knowledge` tool (P1-5).
 The shared SQLite store runs in WAL mode with transactional writes so the
 app, gateway, and CLI can safely share one database — the setup
 [Guide 6](docs/guides/06-testing-with-claude-desktop.md) uses to test the
-whole loop from Claude Desktop.
+whole loop from Claude Desktop. The file carries a schema version: a newer
+build upgrades it in place after writing a snapshot, an older build refuses
+it, and `npm run db -- status | backup | verify | restore` is the operator
+lifecycle, restore included (ADR 0012).
 Open before Phase 2 exit: production graph engine (OQ 1), SharePoint sync,
 and OAuth 2.1 + Entra federation on the gateway — the
 JWT identity uses the same claim shape, so that work swaps only the token

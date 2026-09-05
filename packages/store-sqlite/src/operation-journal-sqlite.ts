@@ -9,28 +9,6 @@ import {
   type RecordKey,
 } from '@ekg/core';
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS operations (
-  id TEXT PRIMARY KEY,
-  tenant_id TEXT NOT NULL,
-  label TEXT NOT NULL,
-  kind TEXT NOT NULL,
-  actor TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending'
-);
-CREATE INDEX IF NOT EXISTS idx_ops_tenant_created ON operations(tenant_id, status, created_at DESC);
-CREATE TABLE IF NOT EXISTS operation_entries (
-  op_id TEXT NOT NULL,
-  seq INTEGER NOT NULL,
-  record_key TEXT NOT NULL,
-  before_json TEXT NOT NULL,
-  PRIMARY KEY (op_id, record_key)
-);
-CREATE INDEX IF NOT EXISTS idx_entries_op ON operation_entries(op_id, seq);
-CREATE INDEX IF NOT EXISTS idx_entries_key ON operation_entries(record_key);
-`;
-
 interface OpRow {
   id: string;
   tenant_id: string;
@@ -46,7 +24,9 @@ interface OpRow {
  * SQLite-backed {@link OperationJournal}, living in the SAME database file as the
  * graph it journals (constructed over the store's connection via
  * `SqliteGraphStore.createJournal()`), so before-images survive restarts and
- * stay consistent with the data. Before-images are stored as JSON, mirroring how
+ * stay consistent with the data. Its tables are part of the versioned schema
+ * (`operations`, `operation_entries` in the baseline migration), so this class
+ * runs no DDL of its own. Before-images are stored as JSON, mirroring how
  * the store already serializes entities/provenance/acl into TEXT columns.
  *
  * `PRIMARY KEY (op_id, record_key)` makes `INSERT OR IGNORE` enforce
@@ -54,9 +34,8 @@ interface OpRow {
  * truth even when a record is written more than once in one operation.
  */
 export class SqliteOperationJournal implements OperationJournal {
-  constructor(private readonly db: DatabaseSync) {
-    this.db.exec(SCHEMA);
-  }
+  /** Over a connection the store has already migrated: the tables come from the baseline migration (schema.ts). */
+  constructor(private readonly db: DatabaseSync) {}
 
   begin(meta: OperationMeta): void {
     this.db

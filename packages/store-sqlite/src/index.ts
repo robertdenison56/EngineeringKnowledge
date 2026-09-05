@@ -1,4 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
+import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { dirname } from 'node:path';
 import {
   buildQueryGroups,
   canRead,
@@ -7,7 +9,6 @@ import {
   embeddingText,
   groupConcept,
   matchesTagFilter,
-  normalizeText,
   relaxedScoreEntityMatch,
   roleBoostFactor,
   scoreChunkMatch,
@@ -29,159 +30,52 @@ import {
 } from '@ekg/core';
 
 import { SqliteOperationJournal } from './operation-journal-sqlite.js';
+import { FTS_RECIPE_KEY, FTS_RECIPE_VERSION, chunkFtsText, ftsText, rebuildFts } from './fts.js';
+import {
+  rowToChunk,
+  rowToEntity,
+  rowToRelationship,
+  type ChunkRow,
+  type EntityRow,
+  type RelationshipRow,
+} from './rows.js';
+import {
+  SchemaError,
+  assertNotInUse,
+  backupDatabase,
+  defaultBackupPath,
+  migrate,
+  readSchemaVersion,
+  utcStamp,
+  verifyDatabase,
+  type MigrateResult,
+  type VerifyResult,
+} from './schema.js';
 
 export { providerFromEnv } from './providers.js';
 export { SqliteOperationJournal } from './operation-journal-sqlite.js';
-
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS entities (
-  id TEXT PRIMARY KEY,
-  tenant_id TEXT NOT NULL,
-  type TEXT NOT NULL,
-  title TEXT NOT NULL,
-  summary TEXT,
-  properties TEXT NOT NULL,
-  tags TEXT,
-  aliases TEXT,
-  content TEXT,
-  embedding TEXT,
-  embedding_provider TEXT,
-  provenance TEXT NOT NULL,
-  acl TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_entities_tenant_type ON entities(tenant_id, type);
-CREATE TABLE IF NOT EXISTS relationships (
-  id TEXT PRIMARY KEY,
-  tenant_id TEXT NOT NULL,
-  type TEXT NOT NULL,
-  from_id TEXT NOT NULL,
-  to_id TEXT NOT NULL,
-  properties TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_rel_from ON relationships(from_id);
-CREATE INDEX IF NOT EXISTS idx_rel_to ON relationships(to_id);
-CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
-  id UNINDEXED, tenant_id UNINDEXED, text,
-  tokenize = 'unicode61 remove_diacritics 2'
-);
-CREATE TABLE IF NOT EXISTS chunks (
-  id TEXT PRIMARY KEY,
-  entity_id TEXT NOT NULL,
-  tenant_id TEXT NOT NULL,
-  ordinal INTEGER NOT NULL,
-  anchor TEXT,
-  heading TEXT,
-  text TEXT NOT NULL,
-  embedding TEXT,
-  embedding_provider TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_chunks_entity ON chunks(entity_id);
-CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
-  id UNINDEXED, entity_id UNINDEXED, tenant_id UNINDEXED, text,
-  tokenize = 'unicode61 remove_diacritics 2'
-);
-CREATE TABLE IF NOT EXISTS settings (
-  tenant_id TEXT NOT NULL,
-  key TEXT NOT NULL,
-  value TEXT NOT NULL,
-  PRIMARY KEY (tenant_id, key)
-);
-`;
-
-interface EntityRow {
-  id: string;
-  tenant_id: string;
-  type: string;
-  title: string;
-  summary: string | null;
-  properties: string;
-  tags: string | null;
-  aliases: string | null;
-  content: string | null;
-  embedding: string | null;
-  embedding_provider: string | null;
-  provenance: string;
-  acl: string;
-}
-
-interface RelationshipRow {
-  id: string;
-  tenant_id: string;
-  type: string;
-  from_id: string;
-  to_id: string;
-  properties: string | null;
-}
-
-interface ChunkRow {
-  id: string;
-  entity_id: string;
-  tenant_id: string;
-  ordinal: number;
-  anchor: string | null;
-  heading: string | null;
-  text: string;
-  embedding: string | null;
-  embedding_provider: string | null;
-}
-
-function rowToChunk(row: ChunkRow): Chunk {
-  return {
-    id: row.id,
-    entityId: row.entity_id,
-    tenantId: row.tenant_id,
-    ordinal: row.ordinal,
-    anchor: row.anchor ? JSON.parse(row.anchor) : {},
-    text: row.text,
-    ...(row.heading ? { heading: row.heading } : {}),
-  };
-}
-
-/** Raw + normalized chunk text indexed by FTS5 so both spellings tokenize. */
-function chunkFtsText(chunk: Chunk): string {
-  const raw = `${chunk.heading ?? ''}\n${chunk.text}`;
-  return `${raw}\n${normalizeText(raw)}`;
-}
-
-function rowToEntity(row: EntityRow): Entity {
-  return {
-    id: row.id,
-    tenantId: row.tenant_id,
-    type: row.type,
-    title: row.title,
-    summary: row.summary ?? undefined,
-    properties: JSON.parse(row.properties),
-    tags: row.tags ? JSON.parse(row.tags) : undefined,
-    aliases: row.aliases ? JSON.parse(row.aliases) : undefined,
-    content: row.content ?? undefined,
-    provenance: JSON.parse(row.provenance),
-    acl: JSON.parse(row.acl),
-  };
-}
-
-function rowToRelationship(row: RelationshipRow): Relationship {
-  return {
-    id: row.id,
-    tenantId: row.tenant_id,
-    type: row.type,
-    fromId: row.from_id,
-    toId: row.to_id,
-    properties: row.properties ? JSON.parse(row.properties) : undefined,
-  };
-}
-
-/** Raw + normalized text indexed by FTS5 so both spellings tokenize. */
-function ftsText(entity: Entity): string {
-  const raw = [
-    entity.title,
-    entity.summary ?? '',
-    (entity.aliases ?? []).join(' '),
-    (entity.tags ?? []).join(' '),
-    entity.content ?? '',
-    JSON.stringify(entity.properties),
-  ].join('\n');
-  return `${raw}\n${normalizeText(raw)}`;
-}
+export { FTS_RECIPE_VERSION, rebuildFts } from './fts.js';
+export {
+  LATEST_SCHEMA_VERSION,
+  MIGRATIONS,
+  SchemaError,
+  assertNotInUse,
+  backupDatabase,
+  defaultBackupPath,
+  inspectDatabase,
+  migrate,
+  readSchemaVersion,
+  utcStamp,
+  verifyDatabase,
+  type AppliedMigration,
+  type LedgerEntry,
+  type MigrateOptions,
+  type MigrateResult,
+  type Migration,
+  type SchemaErrorCode,
+  type SchemaStatus,
+  type VerifyResult,
+} from './schema.js';
 
 /** FTS5 MATCH expression mirroring the AND-across/OR-within group contract. */
 function ftsQuery(groups: string[][]): string {
@@ -207,6 +101,21 @@ const EXPAND_FROM = 6;
 export interface SqliteStoreOptions {
   /** Optional dense-retrieval provider; lexical-only without it. */
   embeddings?: EmbeddingProvider;
+  /**
+   * Schema upgrades on open (ADR 0012): `auto` applies pending migrations;
+   * `manual` refuses an existing database that needs one, so an operator runs
+   * `ekg-db migrate` deliberately. Default: `manual` when `EKG_DB_MIGRATE=manual`,
+   * else `auto`.
+   */
+  migrate?: 'auto' | 'manual';
+  /**
+   * Snapshot an existing file next to itself before the first pending
+   * migration touches it (`<db>.v<from>-<stamp>.backup`). Default: on, unless
+   * `EKG_DB_BACKUP_ON_MIGRATE=0`. Meaningless for `:memory:`.
+   */
+  backupOnMigrate?: boolean;
+  /** Where lifecycle notices (upgrade applied, FTS rebuilt) go; default stderr. */
+  log?: (message: string) => void;
 }
 
 /**
@@ -221,8 +130,16 @@ export class SqliteGraphStore implements GraphStore {
   private db: DatabaseSync;
   private embeddings?: EmbeddingProvider;
   private embedWarned = false;
+  private readonly path: string;
+  private readonly fileBacked: boolean;
+  private readonly log: (message: string) => void;
+  /** What opening did to the schema: version before/after, migrations applied, snapshot written. */
+  readonly migration: MigrateResult;
 
   constructor(path: string, options: SqliteStoreOptions = {}) {
+    this.path = path;
+    this.fileBacked = path !== ':memory:' && !/^file:.*mode=memory/.test(path);
+    this.log = options.log ?? ((message) => console.error(`ekg-store: ${message}`));
     this.db = new DatabaseSync(path);
     // Concurrency + durability for the documented shared-DB story: the workspace
     // app and the MCP gateway open the same file at once (README "full loop").
@@ -233,22 +150,55 @@ export class SqliteGraphStore implements GraphStore {
     this.db.exec('PRAGMA journal_mode = WAL');
     this.db.exec('PRAGMA busy_timeout = 5000');
     this.embeddings = options.embeddings;
-    // Migrations for databases created before newer columns existed; must
-    // run before SCHEMA so CREATE INDEX statements find current shape.
-    const tables = this.db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'entities'")
-      .all() as unknown as { name: string }[];
-    if (tables.length > 0) {
-      const cols = this.db.prepare('PRAGMA table_info(entities)').all() as unknown as {
-        name: string;
-      }[];
-      const have = new Set(cols.map((c) => c.name));
-      for (const col of ['tags', 'aliases', 'content', 'embedding', 'embedding_provider']) {
-        if (!have.has(col)) this.db.exec(`ALTER TABLE entities ADD COLUMN ${col} TEXT`);
-      }
+    // Schema first (ADR 0012): apply whatever migrations this file still needs,
+    // snapshotting an existing file before the first one touches it, and
+    // refuse a file whose schema is newer than this build.
+    const mode = options.migrate ?? (process.env.EKG_DB_MIGRATE === 'manual' ? 'manual' : 'auto');
+    const snapshot = options.backupOnMigrate ?? process.env.EKG_DB_BACKUP_ON_MIGRATE !== '0';
+    this.migration = migrate(this.db, {
+      mode,
+      backup:
+        this.fileBacked && snapshot
+          ? (from) => backupDatabase(this.db, defaultBackupPath(path, from)).path
+          : undefined,
+    });
+    if (this.migration.existing && this.migration.applied.length > 0) {
+      const steps = this.migration.applied.map((m) => `v${m.version} ${m.name}`).join(', ');
+      this.log(
+        `upgraded ${path} from schema v${this.migration.from} to v${this.migration.to} (${steps})` +
+          (this.migration.backupPath ? `; pre-upgrade snapshot: ${this.migration.backupPath}` : ''),
+      );
     }
-    this.db.exec(SCHEMA);
+    this.ensureFtsRecipe();
     this.reconcileFts();
+  }
+
+  /**
+   * Rebuild the FTS rows when the recipe they were built with is not the
+   * current one ({@link FTS_RECIPE_VERSION}) — the refresh `reconcileFts`
+   * cannot do, since it only backfills missing rows. Runs after migrations in
+   * one IMMEDIATE transaction, so concurrent openers serialize and the second
+   * finds it already done.
+   */
+  private ensureFtsRecipe(): void {
+    this.tx(() => {
+      const row = this.db.prepare('SELECT value FROM schema_meta WHERE key = ?').get(FTS_RECIPE_KEY) as
+        | { value: string }
+        | undefined;
+      if (row?.value === String(FTS_RECIPE_VERSION)) return;
+      const rebuilt = rebuildFts(this.db);
+      this.db
+        .prepare(
+          'INSERT INTO schema_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+        )
+        .run(FTS_RECIPE_KEY, String(FTS_RECIPE_VERSION));
+      if (this.fileBacked && rebuilt.entities + rebuilt.chunks > 0) {
+        this.log(
+          `rebuilt the FTS index of ${this.path} under recipe v${FTS_RECIPE_VERSION} ` +
+            `(${rebuilt.entities} entities, ${rebuilt.chunks} chunks; was ${row ? `v${row.value}` : 'unversioned'})`,
+        );
+      }
+    });
   }
 
   /**
@@ -302,6 +252,19 @@ export class SqliteGraphStore implements GraphStore {
 
   close(): void {
     this.db.close();
+  }
+
+  /** Current `PRAGMA user_version` of the open database. */
+  schemaVersion(): number {
+    return readSchemaVersion(this.db);
+  }
+
+  /**
+   * Consistent snapshot of this database at `dest` — safe while the app and
+   * gateway keep writing. See {@link backupDatabase}.
+   */
+  backup(dest: string): { path: string; bytes: number } {
+    return backupDatabase(this.db, dest);
   }
 
   /**
@@ -955,4 +918,63 @@ export class SqliteGraphStore implements GraphStore {
   createJournal(): SqliteOperationJournal {
     return new SqliteOperationJournal(this.db);
   }
+}
+
+export interface RestoreResult {
+  restoredFrom: string;
+  /** Snapshot of the live database as it was before the restore (when one existed). */
+  preRestoreBackup?: string;
+  /** Migrations the restored file needed to reach this build's schema. */
+  migration: MigrateResult;
+  verify: VerifyResult;
+}
+
+/**
+ * Rehearsed restore of `backupPath` over `dbPath` (ADR 0012): verify the
+ * backup, refuse while anything has the live file open, snapshot the live file
+ * (so the restore is itself reversible), swap the backup in with the WAL/SHM
+ * sidecars cleared, open it through the store — which migrates an older backup
+ * forward — and verify the result. Everything before the swap is read-only.
+ */
+export function restoreDatabase(
+  backupPath: string,
+  dbPath: string,
+  options: { log?: (message: string) => void } = {},
+): RestoreResult {
+  if (!existsSync(backupPath)) throw new SchemaError('not_found', `no backup at ${backupPath}`);
+  const check = verifyDatabase(backupPath);
+  if (!check.ok) {
+    throw new SchemaError('backup_invalid', `${backupPath} failed verification: ${check.problems.join('; ')}`);
+  }
+  assertNotInUse(dbPath);
+  let preRestoreBackup: string | undefined;
+  if (existsSync(dbPath)) {
+    const live = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      preRestoreBackup = backupDatabase(live, `${dbPath}.pre-restore-${utcStamp()}.backup`).path;
+    } finally {
+      live.close();
+    }
+    for (const suffix of ['', '-wal', '-shm']) rmSync(dbPath + suffix, { force: true });
+  }
+  mkdirSync(dirname(dbPath), { recursive: true });
+  copyFileSync(backupPath, dbPath);
+  // The backup itself is the fallback for this open, so no second snapshot.
+  const store = new SqliteGraphStore(dbPath, { log: options.log, backupOnMigrate: false });
+  const migration = store.migration;
+  store.close();
+  const verify = verifyDatabase(dbPath);
+  if (!verify.ok) {
+    throw new SchemaError(
+      'backup_invalid',
+      `restored database failed verification: ${verify.problems.join('; ')}` +
+        (preRestoreBackup ? ` (the pre-restore snapshot is at ${preRestoreBackup})` : ''),
+    );
+  }
+  return {
+    restoredFrom: backupPath,
+    ...(preRestoreBackup ? { preRestoreBackup } : {}),
+    migration,
+    verify,
+  };
 }

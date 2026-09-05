@@ -39,9 +39,10 @@ venv/
 release/
 *.tgz
 
-# Local databases
+# Local databases (and the snapshots ekg-db / on-open upgrades write next to them)
 .data/
 .data-backup*/
+*.backup
 
 # Misc
 .turbo/
