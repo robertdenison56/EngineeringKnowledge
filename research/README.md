@@ -60,6 +60,20 @@ uv run inspect eval caltrans_bench/task.py -T condition=ekg --model anthropic/cl
    if the quote or table label is not there. Nothing ships unvalidated.
 4. Keep the buckets moving toward the target mix in `DATASET_CARD.md` (lookup 60 · multihop 40 · trap 30 · refusal 30).
 
+### Editing in Excel
+
+`questions/caltrans-v0.xlsx` is the same set as an editable workbook: a Questions sheet with dropdowns for bucket,
+answer type, split, and document ids, a Docs sheet listing the in-scope documents, a Stats sheet of live counts
+against the bucket targets, and a Guide sheet. Add rows in Excel, then bring them back and validate:
+
+```bash
+uv run caltrans-bench questions import-xlsx questions/caltrans-v0.xlsx --out questions/caltrans-v0.jsonl
+uv run caltrans-bench questions validate questions/caltrans-v0.jsonl
+uv run caltrans-bench questions export-xlsx questions/caltrans-v0.jsonl     # regenerate the workbook from JSONL
+```
+
+Import refuses to write when a row fails the schema and names the row. The JSONL stays the source of truth.
+
 ## Running models through Ollama
 
 Inspect's Ollama provider talks to the local server (`ollama serve`) through its OpenAI-compatible API:

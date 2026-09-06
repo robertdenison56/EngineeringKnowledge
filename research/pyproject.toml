@@ -11,6 +11,7 @@ dependencies = [
   "httpx>=0.27",
   "mcp>=1.9",
   "openai>=1.50",
+  "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +39,9 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"caltrans_bench/xlsx.py" = ["E501"]  # Guide-sheet prose is written as long literal strings
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

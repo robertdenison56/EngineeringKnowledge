@@ -50,9 +50,35 @@ def cmd_manifest(args: argparse.Namespace) -> int:
     raise AssertionError(args.mcmd)
 
 
+def cmd_questions_xlsx(args: argparse.Namespace) -> int:
+    from .schema import load_questions
+    from .xlsx import export_xlsx, import_xlsx, write_jsonl
+
+    if args.qcmd == "export-xlsx":
+        src = Path(args.path)
+        out = Path(args.out) if args.out else src.with_suffix(".xlsx")
+        qs = load_questions(src)
+        export_xlsx(qs, load_manifest(args.manifest), out, src.name)
+        print(f"wrote {out} ({len(qs)} questions)")
+        return 0
+    src = Path(args.path)
+    out = Path(args.out) if args.out else src.with_suffix(".jsonl")
+    qs, errors = import_xlsx(src)
+    for e in errors:
+        print(f"FAIL {e}")
+    if errors:
+        print(f"{len(errors)} row(s) failed; nothing written. Fix them in {src.name} and re-run.")
+        return 1
+    write_jsonl(qs, out, src)
+    print(f"wrote {out} ({len(qs)} questions); now run: caltrans-bench questions validate {out}")
+    return 0
+
+
 def cmd_questions(args: argparse.Namespace) -> int:
     from .schema import load_questions
 
+    if args.qcmd in ("export-xlsx", "import-xlsx"):
+        return cmd_questions_xlsx(args)
     path = Path(args.path)
     qs = load_questions(path, split=args.split)
     if args.qcmd == "docs":
@@ -201,6 +227,14 @@ def main(argv: list[str] | None = None) -> int:
         sp.add_argument("path", nargs="?", default=str(QUESTIONS_DIR / "smoke.jsonl"))
         sp.add_argument("--split")
         sp.add_argument("--offline", action="store_true")
+    ex = qs.add_parser(
+        "export-xlsx", help="write an editable workbook (Questions, Docs, Stats, Guide sheets) from a JSONL set"
+    )
+    ex.add_argument("path", nargs="?", default=str(QUESTIONS_DIR / "caltrans-v0.jsonl"))
+    ex.add_argument("--out", help="default: same name with .xlsx")
+    im = qs.add_parser("import-xlsx", help="read the Questions sheet back into validated JSONL")
+    im.add_argument("path", nargs="?", default=str(QUESTIONS_DIR / "caltrans-v0.xlsx"))
+    im.add_argument("--out", help="default: same name with .jsonl")
     q.set_defaults(func=cmd_questions)
 
     c = sub.add_parser("corpus", help="authoring helpers over cached page text: grep, page")
