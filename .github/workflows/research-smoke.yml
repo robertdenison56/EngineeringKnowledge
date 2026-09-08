@@ -2,7 +2,8 @@ name: Research smoke
 
 # The Python benchmark harness (research/): lint, unit tests, manifest
 # consistency, anchor validation against the real Caltrans PDFs the smoke
-# questions cite, and one end-to-end Inspect run on the mock model.
+# questions cite, and end-to-end Inspect runs on the mock model, including the
+# README's `inspect eval caltrans_bench/task.py` file-path form.
 on:
   push:
     branches: [main]
@@ -63,3 +64,13 @@ jobs:
         run: |
           uv run caltrans-bench smoke --condition closed_book --limit 10
           uv run caltrans-bench smoke --condition rag --limit 10
+
+      # The documented entry point for real models. Inspect loads task.py as a standalone
+      # module and runs it from caltrans_bench/, so this catches relative-import and
+      # research-relative-path regressions that the `smoke` wrapper cannot see. The rag
+      # condition exercises the lazy retrieval import against the fetched documents.
+      - name: Inspect eval file-path form (mock model)
+        run: >
+          uv run inspect eval caltrans_bench/task.py
+          -T condition=rag -T questions=questions/smoke.jsonl
+          --model mockllm/model --limit 10 --display plain

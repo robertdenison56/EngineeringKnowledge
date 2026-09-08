@@ -21,10 +21,12 @@ from inspect_ai.dataset import MemoryDataset, Sample
 from inspect_ai.scorer import Score, Scorer, Target, accuracy, scorer, stderr
 from inspect_ai.solver import Generate, Solver, TaskState, generate, solver, system_message, use_tools
 
-from . import MANIFEST_PATH, QUESTIONS_DIR, RAW_DIR, SNAPSHOT_DIR
-from .manifest import load_manifest
-from .schema import Question, load_questions
-from .scoring import (
+# Absolute imports on purpose: `inspect eval caltrans_bench/task.py` executes this file
+# as a standalone module with no parent package, so relative imports fail there.
+from caltrans_bench import MANIFEST_PATH, QUESTIONS_DIR, RAW_DIR, RESEARCH_DIR, SNAPSHOT_DIR
+from caltrans_bench.manifest import load_manifest
+from caltrans_bench.schema import Question, load_questions
+from caltrans_bench.scoring import (
     REFUSAL_TOKEN,
     cited_pages,
     final_answer,
@@ -59,6 +61,20 @@ contain the answer, and cite only pages you actually used (document id and PDF p
 If you have no source to cite, write CITE: none."""
 
 
+def research_path(value: str) -> Path:
+    """Resolve a path argument the way the README writes it: relative to ``research/``.
+
+    ``inspect eval caltrans_bench/task.py`` loads and runs the task with the working
+    directory set to ``caltrans_bench/``, so a bare ``questions/x.jsonl`` would otherwise
+    be looked up in the wrong place. Absolute paths, and relative paths that exist from
+    the current directory (the ``caltrans-bench`` CLI case), are used as given.
+    """
+    path = Path(value).expanduser()
+    if path.is_absolute() or path.exists():
+        return path
+    return RESEARCH_DIR / path
+
+
 def _sample(q: Question) -> Sample:
     return Sample(
         id=q.id,
@@ -70,7 +86,7 @@ def _sample(q: Question) -> Sample:
 
 @solver
 def rag_context(k: int, retriever: str, only: list[str] | None) -> Solver:
-    from .rag import PageIndex, format_context
+    from caltrans_bench.rag import PageIndex, format_context
 
     manifest = load_manifest(MANIFEST_PATH)
     index = PageIndex(manifest, RAW_DIR, only=only or bench_doc_ids(manifest))
@@ -161,22 +177,23 @@ def caltrans_bench(
     docs: str | None = None,
     strict: bool = True,
 ) -> Task:
-    qs = load_questions(Path(questions), split=split)
+    questions_path = research_path(questions)
+    qs = load_questions(questions_path, split=split)
     if not qs:
-        raise ValueError(f"no questions in {questions} (split={split})")
+        raise ValueError(f"no questions in {questions_path} (split={split})")
     only = docs.split(",") if docs else None
     if condition == "closed_book":
         chain = [system_message(SYSTEM_PROMPT), generate()]
     elif condition == "rag":
         chain = [system_message(SYSTEM_PROMPT), rag_context(k, retriever, only), generate()]
     elif condition == "ekg":
-        from .ekg_tools import ekg_tool_source
+        from caltrans_bench.ekg_tools import ekg_tool_source
 
-        chain = [system_message(SYSTEM_PROMPT), use_tools(ekg_tool_source(Path(ekg_db))), generate()]
+        chain = [system_message(SYSTEM_PROMPT), use_tools(ekg_tool_source(research_path(ekg_db))), generate()]
     else:
         raise ValueError(f"unknown condition {condition!r}; expected closed_book, rag, or ekg")
     return Task(
-        dataset=MemoryDataset([_sample(q) for q in qs], name=f"caltrans-bench:{Path(questions).stem}"),
+        dataset=MemoryDataset([_sample(q) for q in qs], name=f"caltrans-bench:{questions_path.stem}"),
         solver=chain,
         scorer=bench_scorer(strict=strict),
         metadata={"condition": condition, "split": split, "k": k, "retriever": retriever, "strict": strict},

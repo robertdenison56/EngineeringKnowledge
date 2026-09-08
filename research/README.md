@@ -17,7 +17,7 @@ RAG, and with EKG's MCP tools. Plan and "done when" criteria live in the
 | `scripts/build-ekg-snapshot.sh` | Ingest the manifest corpus into a fresh EKG store and take a verified `ekg-db` backup. |
 | `snapshots/` | Pinned EKG databases the `ekg` condition runs against (gitignored). |
 | `DATASET_CARD.md` | Hugging Face dataset card draft, including the licensing statement. |
-| `tests/` | pytest for scoring, schema, manifest. |
+| `tests/` | pytest for scoring, schema, manifest, the Excel round trip, and the `inspect eval` invocation below (run through the real CLI in a subprocess). |
 
 ## Quick start
 
@@ -39,6 +39,14 @@ uv run inspect eval caltrans_bench/task.py -T condition=rag -T k=8 --model opena
 scripts/build-ekg-snapshot.sh          # once; builds snapshots/ekg-caltrans.db
 uv run inspect eval caltrans_bench/task.py -T condition=ekg --model anthropic/claude-fable-5-1
 ```
+
+`-T name=value` sets any argument of the `caltrans_bench` task in `caltrans_bench/task.py`: `condition`
+(`closed_book`, `rag`, `ekg`), `questions`, `split`, `k`, `retriever`, `ekg_db`, `docs` (comma-separated document
+ids to retrieve from), and `strict`. Relative `questions` and `ekg_db` paths are taken from this directory, and logs
+land in `logs/` (`uv run inspect view` browses them). Everything else (`--limit`, `--max-connections`,
+`--no-fail-on-error`, `--log-dir`, …) is a plain Inspect option; `uv run inspect eval --help` lists them.
+`caltrans-bench smoke` wraps the same task for CI and only exposes `--condition`, `--model`, `--questions`,
+`--split`, `--limit`, and `--log-dir`.
 
 ## Question sets
 
