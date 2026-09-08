@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build a pinned EKG database from the manifest corpus and snapshot it.
 #
-#   research/scripts/build-ekg-snapshot.sh [--groups "hdm std-2025"] [--ocr]
+#   research/scripts/build-ekg-snapshot.sh [--groups "hdm std-2025 dib"] [--ocr]
 #
 # Steps: verify the corpus against the manifest, build the TypeScript
 # workspaces, ingest each corpus group into a fresh SQLite store with the
@@ -20,7 +20,7 @@ RAW="$RESEARCH/corpus/raw"
 OUT="$RESEARCH/snapshots"
 DB="$OUT/ekg-caltrans.db"
 # (not GROUPS: that is a bash builtin array and assignments to it are ignored)
-INGEST_GROUPS="hdm std-2025"   # benchmark corpus; add std-2018 / district3 with --groups for the grounding study
+INGEST_GROUPS="hdm std-2025 dib"   # benchmark corpus; add std-2018 / district3 with --groups for the grounding study
 # The combined HDM is the same content as the chapter files; ingesting both
 # would double every HDM passage in retrieval.
 EXCLUDE="hdm-combined"

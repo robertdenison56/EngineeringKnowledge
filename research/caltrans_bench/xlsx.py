@@ -30,7 +30,7 @@ BUCKETS = ["lookup", "multihop", "trap", "refusal"]
 ANSWER_TYPES = ["number", "citation", "text", "refusal"]
 SPLITS = ["smoke", "dev", "test", "train"]
 TARGETS = {"lookup": 60, "multihop": 40, "trap": 30, "refusal": 30}
-BENCH_GROUPS = {"hdm", "std-2025"}
+BENCH_GROUPS = {"hdm", "std-2025", "dib"}
 
 # (header, width, wrap)
 COLUMNS: list[tuple[str, int, bool]] = [
@@ -330,7 +330,7 @@ def export_xlsx(questions: list[Question], manifest: Manifest, out: Path, source
         ("", False),
         ("SCOPE", True),
         (
-            "Current HDM chapter files plus the 2025 Standard Plans and Standard Specifications only (Docs sheet, in_scope = yes). "
+            "Current HDM chapter files, the 2025 Standard Plans and Standard Specifications, and DIB 82-06 (Docs sheet, in_scope = yes). "
             "Older editions and the District 3 bid documents are in the manifest for the grounding study and must not be anchored.",
             False,
         ),

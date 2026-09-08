@@ -45,7 +45,8 @@ uv run inspect eval caltrans_bench/task.py -T condition=ekg --model anthropic/cl
 | File | What |
 |---|---|
 | `questions/smoke.jsonl` | 10 questions CI runs on the mock model; anchors only two documents so CI downloads a few MB. |
-| `questions/caltrans-v0.jsonl` | The working benchmark set (split `dev` until the dev/test split is frozen). Scope: current HDM chapter files + 2025 Standard Plans and Specifications. |
+| `questions/caltrans-v0.jsonl` | The working benchmark set (split `dev` until the dev/test split is frozen). Scope: current HDM chapter files + 2025 Standard Plans and Specifications + DIB 82-06 (designer-framed accessibility questions, ids `dib-*`), plus 100 HDM questions derived from the DIB 78-04 Design Checklist (ids `dib78-*`, anchored to the HDM chapters the checklist cites). |
+| `questions/dib78-unused.jsonl` | 143 validated spare questions from the DIB 78-04 checklist pass that duplicate a value or item already in the set; move a line into `caltrans-v0.jsonl` to promote it. |
 
 `caltrans-bench questions stats questions/caltrans-v0.jsonl` prints bucket, answer-type, and document counts.
 

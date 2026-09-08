@@ -19,8 +19,15 @@ size_categories:
 # Caltrans Design Standards QA
 
 A retrieval-grounded question set over public Caltrans design standards: the
-current Highway Design Manual (7th edition) and the 2025 Standard Plans and
-Standard Specifications. Older editions are kept in the corpus manifest for
+current Highway Design Manual (7th edition), the 2025 Standard Plans and
+Standard Specifications, and Design Information Bulletin 82-06 (Pedestrian
+Accessibility Guidelines for Highway Projects, 2017). The DIB questions are
+framed as design tasks (what value a designer needs) rather than as
+compliance recitals. A further 100 questions (ids `dib78-*`) were derived from
+the DIB 78-04 Design Checklist for Geometric Plans (2019): each yes/no
+project-review item was reframed as the HDM design question behind it and is
+anchored to the HDM chapter the checklist cites, so DIB 78 itself is not a
+source document. Older editions are kept in the corpus manifest for
 later edition-trap work but are not question targets in this release. Every answer
 carries a source anchor (document id, PDF page, table label), and the answer
 is a number, a citation, or a short string wherever possible so scoring is
@@ -29,12 +36,12 @@ https://github.com/robertdenison56/EngineeringKnowledge/tree/main/research.
 
 ## Buckets
 
-| Bucket | Meaning | Target | In `caltrans-v0.jsonl` (2026-09-05) |
+| Bucket | Meaning | Target | In `caltrans-v0.jsonl` (2026-09-07) |
 |---|---|---|---|
-| `lookup` | one value read from one table or clause | 60 | 113 |
-| `multihop` | HDM → Standard Plan sheet or Standard Specifications clause, and within-spec cross-references | 40 | 23 |
-| `trap` | unit traps (metric vs. US customary, short tons, psi/MPa); edition traps parked until older editions are in scope | 30 | 15 |
-| `refusal` | plausible questions the documents do not answer (values outside a table's range, rows that do not exist) | 30 | 22 |
+| `lookup` | one value read from one table or clause | 60 | 281 |
+| `multihop` | HDM or DIB → Standard Plan sheet or Standard Specifications clause, DIB → HDM index, and within-spec cross-references | 40 | 43 |
+| `trap` | unit traps (metric vs. US customary, short tons, psi/MPa); edition traps parked until older editions are in scope | 30 | 28 |
+| `refusal` | plausible questions the documents do not answer (values outside a table's range, rows that do not exist, topics the document defers elsewhere) | 30 | 36 |
 
 The lookup surplus will be trimmed to the target when the dev/test split is
 frozen; the other buckets are still being filled.

@@ -39,7 +39,7 @@ DEFAULT_SNAPSHOT = SNAPSHOT_DIR / "ekg-caltrans.db"
 # The benchmark corpus: current HDM chapter files plus the 2025 Standard Plans and
 # Specifications. Older editions and the District 3 bid documents stay in the manifest
 # for the grounding study but are not retrieval targets here.
-BENCH_GROUPS = "hdm,std-2025"
+BENCH_GROUPS = "hdm,std-2025,dib"
 BENCH_EXCLUDE = {"hdm-combined"}
 
 

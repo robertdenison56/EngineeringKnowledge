@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "corpus": "caltrans-design-standards",
-  "generated": "2026-09-05T04:33:23+00:00",
+  "generated": "2026-09-08T02:44:40+00:00",
   "notes": "Source of truth for the Arc 1 benchmark corpus. Curated fields are hand-written; bytes/sha256/pages are filled by `caltrans-bench manifest build` and checked by `manifest verify`. Page numbers used in question anchors are 1-based PDF page indexes into these exact files.",
   "documents": [
     {
@@ -885,6 +885,20 @@
       "bytes": 3147520,
       "sha256": "486770ee0961e894ee9a29c8fe30f73be20ffa2e66099b771c59442b1d41364d",
       "pages": 494
+    },
+    {
+      "id": "dib-82-06",
+      "group": "dib",
+      "kind": "bulletin",
+      "title": "Design Information Bulletin 82-06: Pedestrian Accessibility Guidelines for Highway Projects",
+      "file": "dib82-06-a11y.pdf",
+      "edition": "DIB 82-06",
+      "revision_date": "2017-11-16",
+      "url": "https://dot.ca.gov/-/media/dot-media/programs/design/documents/dib82-06-a11y.pdf",
+      "source_note": "Listed on https://dot.ca.gov/programs/design/design-information-bulletins-dibs; memo dated 2017-11-16 supersedes DIB 82-05. Printed page N is PDF page N+5; Attachment A-1/A-2 are PDF 32-33; Appendix-1..7 are PDF 34-40.",
+      "bytes": 1942528,
+      "sha256": "89b3180c341bec3dbaf96cca0f5a18ac503b4d16c092ae5d474c1dc459e7830e",
+      "pages": 40
     }
   ]
 }
