@@ -24,6 +24,9 @@ from inspect_ai.solver import Generate, Solver, TaskState, generate, solver, sys
 # Absolute imports on purpose: `inspect eval caltrans_bench/task.py` executes this file
 # as a standalone module with no parent package, so relative imports fail there.
 from caltrans_bench import MANIFEST_PATH, QUESTIONS_DIR, RAW_DIR, RESEARCH_DIR, SNAPSHOT_DIR
+from caltrans_bench import claude_code as _claude_code  # noqa: F401  (registers the claudecode/ provider)
+from caltrans_bench import codex_cli as _codex_cli  # noqa: F401  (registers the codex/ provider)
+from caltrans_bench.ekg_tools import doc_aliases
 from caltrans_bench.manifest import load_manifest
 from caltrans_bench.schema import Question, load_questions
 from caltrans_bench.scoring import (
@@ -58,7 +61,8 @@ CITE: <doc-id> p<page>; <doc-id> p<page>
 
 Rules: give one value on the ANSWER line, use {REFUSAL_TOKEN} when the documents do not
 contain the answer, and cite only pages you actually used (document id and PDF page number).
-If you have no source to cite, write CITE: none."""
+When you answer {REFUSAL_TOKEN}, still cite the page(s) you checked (the table or index you
+inspected); write CITE: none only if you found no relevant page at all."""
 
 
 def research_path(value: str) -> Path:
@@ -85,7 +89,7 @@ def _sample(q: Question) -> Sample:
 
 
 @solver
-def rag_context(k: int, retriever: str, only: list[str] | None) -> Solver:
+def rag_context(k: int, retriever: str, only: list[str] | None, max_chars: int | None = None) -> Solver:
     from caltrans_bench.rag import PageIndex, format_context
 
     manifest = load_manifest(MANIFEST_PATH)
@@ -95,7 +99,7 @@ def rag_context(k: int, retriever: str, only: list[str] | None) -> Solver:
 
     async def solve(state: TaskState, generate: Generate) -> TaskState:
         passages = index.retrieve(state.input_text, k)
-        context = format_context(passages) if passages else "(no passages retrieved)"
+        context = format_context(passages, max_chars) if passages else "(no passages retrieved)"
         state.user_prompt.text = (
             "Use only the passages below. Each is labelled [doc-id pPAGE] for citing.\n\n"
             f"{context}\n\nQuestion: {state.input_text}"
@@ -112,13 +116,15 @@ def rag_context(k: int, retriever: str, only: list[str] | None) -> Solver:
         "protocol": [accuracy()],
     }
 )
-def bench_scorer(strict: bool = True) -> Scorer:
+def bench_scorer(strict: bool = True, aliases: dict[str, str] | None = None) -> Scorer:
     """Deterministic scoring dispatched on the question's answer_type; see scoring.py.
 
     ``strict`` (default) requires the ANSWER: line: a reply without one scores 0 on
     `answer`, and `protocol` reports how often the line was present. With
     ``strict=False`` the scorer falls back to the last number in the reply, which is
     lenient enough that a small model echoing retrieved context can hit by accident.
+    ``aliases`` maps the names a model may cite (EKG entity ids, file stems) onto manifest
+    document ids so the citation metric is comparable across conditions (``doc_aliases``).
     """
 
     async def score(state: TaskState, target: Target) -> Score:
@@ -128,8 +134,8 @@ def bench_scorer(strict: bool = True) -> Scorer:
         atype = meta["answer_type"]
         followed = final_answer(response) is not None
         if strict and not followed:
-            cited = cited_pages(response)
-            citation_ok = score_citation(response, anchors).correct if anchors else not cited
+            cited = cited_pages(response, aliases)
+            citation_ok = score_citation(response, anchors, aliases=aliases).correct if anchors else not cited
             return Score(
                 value={"answer": 0.0, "citation": 1.0 if citation_ok else 0.0, "protocol": 0.0},
                 answer=None,
@@ -143,14 +149,14 @@ def bench_scorer(strict: bool = True) -> Scorer:
         elif atype == "refusal":
             v = score_refusal(response)
         elif atype == "citation":
-            v = score_citation(response, anchors)
+            v = score_citation(response, anchors, aliases=aliases)
         else:
             v = score_text(response, meta["answer"], meta.get("aliases"))
         if anchors:
-            cite = score_citation(response, anchors)
+            cite = score_citation(response, anchors, aliases=aliases)
             citation_ok, citation_reason = cite.correct, cite.reason
         else:  # refusal questions: a citation would be a false citation
-            citation_ok = not cited_pages(response)
+            citation_ok = not cited_pages(response, aliases)
             citation_reason = "no citation on a refusal" if citation_ok else "cited a page for a refusal"
         return Score(
             value={
@@ -176,6 +182,7 @@ def caltrans_bench(
     ekg_db: str = str(DEFAULT_SNAPSHOT),
     docs: str | None = None,
     strict: bool = True,
+    max_chars: int | None = None,
 ) -> Task:
     questions_path = research_path(questions)
     qs = load_questions(questions_path, split=split)
@@ -185,16 +192,20 @@ def caltrans_bench(
     if condition == "closed_book":
         chain = [system_message(SYSTEM_PROMPT), generate()]
     elif condition == "rag":
-        chain = [system_message(SYSTEM_PROMPT), rag_context(k, retriever, only), generate()]
+        chain = [system_message(SYSTEM_PROMPT), rag_context(k, retriever, only, max_chars), generate()]
     elif condition == "ekg":
         from caltrans_bench.ekg_tools import ekg_tool_source
 
         chain = [system_message(SYSTEM_PROMPT), use_tools(ekg_tool_source(research_path(ekg_db))), generate()]
     else:
         raise ValueError(f"unknown condition {condition!r}; expected closed_book, rag, or ekg")
+    aliases = doc_aliases(load_manifest(MANIFEST_PATH), research_path(ekg_db))
     return Task(
         dataset=MemoryDataset([_sample(q) for q in qs], name=f"caltrans-bench:{questions_path.stem}"),
         solver=chain,
-        scorer=bench_scorer(strict=strict),
-        metadata={"condition": condition, "split": split, "k": k, "retriever": retriever, "strict": strict},
+        scorer=bench_scorer(strict=strict, aliases=aliases),
+        metadata={
+            "condition": condition, "split": split, "k": k, "retriever": retriever, "strict": strict,
+            "max_chars": max_chars,
+        },
     )

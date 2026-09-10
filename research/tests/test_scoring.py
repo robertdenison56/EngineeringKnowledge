@@ -93,3 +93,65 @@ def test_feet_inches_fold():
 def test_narrow_no_break_space_before_unit():
     assert parse_quantity("580\u202fft") == (580.0, "ft")
     assert score_number("ANSWER: 176.8\u202fm\nCITE: x p1", 580, "ft", 1).correct
+
+
+def test_bare_and_phrase_refusals():
+    assert is_refusal("ANSWER: --- (no value given for 15 mph)\nCITE: x p2")
+    assert is_refusal("ANSWER: N/A (Table 302.1 shows \"--\")\nCITE: x p6")
+    assert is_refusal("ANSWER: not applicable\nCITE: none")
+    assert is_refusal("ANSWER: No value is listed for 85 mph\nCITE: x p2")
+    assert not is_refusal("ANSWER: -1.5%\nCITE: x p1")  # a negative value is not a dash placeholder
+    assert score_refusal("ANSWER: ---\nCITE: x p2").correct
+
+
+def test_number_words():
+    from caltrans_bench.scoring import fold_number_words
+
+    assert fold_number_words("two curb ramps") == "2 curb ramps"
+    assert fold_number_words("twenty-three spaces") == "23 spaces"
+    assert fold_number_words("2 of 54") == "2 of 54"  # digits present: untouched
+    assert parse_quantity("two curb ramps") == (2.0, None)
+    assert score_number("ANSWER: two curb ramps\nCITE: x p13", 2, None, 0).correct
+
+
+def test_citation_aliases_map_entity_ids_and_stems():
+    aliases = {
+        "ingest:e3673a7430de": "hdm-chp0200",
+        "e3673a7430de": "hdm-chp0200",
+        "chp0200-092923-a11y": "hdm-chp0200",
+    }
+    r = "ANSWER: 360 ft\nCITE: ingest:e3673a7430de p2; chp0200-092923-a11y p5"
+    assert cited_pages(r, aliases) == {("hdm-chp0200", 2), ("hdm-chp0200", 5)}
+    assert score_citation(r, [("hdm-chp0200", 2)], aliases=aliases).correct
+    assert cited_pages(r) == {("ingest:e3673a7430de", 2), ("chp0200-092923-a11y", 5)}  # no aliases: raw ids
+    assert not score_citation(r, [("hdm-chp0200", 2)]).correct
+
+
+def test_doc_aliases_from_manifest_and_snapshot(tmp_path):
+    import sqlite3
+
+    from caltrans_bench import MANIFEST_PATH
+    from caltrans_bench.ekg_tools import doc_aliases
+    from caltrans_bench.manifest import load_manifest
+
+    manifest = load_manifest(MANIFEST_PATH)
+    db = tmp_path / "snap.db"
+    con = sqlite3.connect(db)
+    con.execute("create table entities(id text, type text, title text)")
+    con.execute("insert into entities values ('ingest:e3673a7430de','document','chp0200-092923-a11y')")
+    con.commit()
+    con.close()
+    aliases = doc_aliases(manifest, db)
+    assert aliases["chp0200-092923-a11y"] == "hdm-chp0200"
+    assert aliases["ingest:e3673a7430de"] == "hdm-chp0200"
+    assert aliases["e3673a7430de"] == "hdm-chp0200"
+    assert doc_aliases(manifest, tmp_path / "missing.db")["2025_stdspecs"] == "stdspecs-2025"
+
+
+def test_format_context_passes_whole_pages_unless_capped():
+    from caltrans_bench.rag import Passage, format_context
+
+    long = Passage("hdm-chp0200", 2, "x" * 5000, 1.0)
+    assert len(format_context([long])) > 5000
+    assert format_context([long], max_chars=100).endswith(" …")
+    assert format_context([long]).startswith("[hdm-chp0200 p2]\n")

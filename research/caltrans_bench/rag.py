@@ -85,11 +85,18 @@ class PageIndex:
         return [Passage(self.pages[i][0], self.pages[i][1], self.pages[i][2], s) for s, i in scores[:k]]
 
 
-def format_context(passages: list[Passage], max_chars: int = 3000) -> str:
+def format_context(passages: list[Passage], max_chars: int | None = None) -> str:
+    """Label each passage ``[doc-id pPAGE]`` so the model can cite it.
+
+    Pages are passed whole by default. The former 3,000-character cap cut the answer off
+    roughly half of the HDM and Standard Specifications pages it retrieved (they run 3,500+
+    characters), which showed up as spurious refusals; k=8 whole pages is still well under
+    50k characters. Pass ``max_chars`` only to study the effect of a cap deliberately.
+    """
     parts = []
     for p in passages:
         body = p.text.strip()
-        if len(body) > max_chars:
+        if max_chars is not None and len(body) > max_chars:
             body = body[:max_chars] + " …"
         parts.append(f"[{p.doc} p{p.page}]\n{body}")
     return "\n\n".join(parts)

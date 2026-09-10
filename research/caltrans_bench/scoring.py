@@ -16,13 +16,15 @@ what lets closed-book, RAG, and tool-using runs be scored identically.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 REFUSAL_TOKEN = "NOT IN DOCUMENT"
 
 _ANSWER_RE = re.compile(r"^[ \t]*\**ANSWER\**[ \t]*:[ \t]*(.+?)[ \t]*$", re.IGNORECASE | re.MULTILINE)
 _CITE_RE = re.compile(r"^[ \t]*\**CITE\**[ \t]*:[ \t]*(.+?)[ \t]*$", re.IGNORECASE | re.MULTILINE)
-_CITATION_ITEM_RE = re.compile(r"([A-Za-z][A-Za-z0-9._-]*)[ \t]*,?[ \t]*(?:p\.?|pg\.?|page)[ \t]*(\d+)", re.IGNORECASE)
+# The document token may carry a namespace (EKG entity ids look like ``ingest:e3673a7430de``).
+_CITATION_ITEM_RE = re.compile(r"([A-Za-z][A-Za-z0-9._:-]*)[ \t]*,?[ \t]*(?:p\.?|pg\.?|page)[ \t]*(\d+)", re.IGNORECASE)
 _QUANTITY_RE = re.compile(r"(-?\d[\d,]*(?:\.\d+)?)[ \t]*([A-Za-z/%°]+(?:/[A-Za-z]+)?|'|\")?")
 _REFUSAL_PHRASES = (
     "not in document",
@@ -38,7 +40,44 @@ _REFUSAL_PHRASES = (
     "do not specify",
     "not provided in",
     "no information",
+    "no value",
+    "not applicable",
+    "not given",
+    "not listed",
+    "not stated",
+    "not established",
+    "not available",
+    "no entry",
 )
+# An ANSWER line that is only a dash placeholder or N/A is a refusal in substance
+# (models copy a table's "---" cell or write "N/A (no value given)").
+_BARE_REFUSAL_RE = re.compile(r"^\s*(?:-{2,}|—|–|n/?a\b|none\s*\.?\s*$)", re.IGNORECASE)
+
+# Number words → digits, for text answers such as "two curb ramps" to a number question.
+_ONES = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7,
+    "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+    "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
+}
+_TENS = {"twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90}
+_NUMBER_WORD_RE = re.compile(
+    r"\b(?:(" + "|".join(_TENS) + r")(?:[ -](" + "|".join(k for k in _ONES if _ONES[k] and _ONES[k] < 10) + r"))?|("
+    + "|".join(_ONES) + r"))\b",
+    re.IGNORECASE,
+)
+
+
+def fold_number_words(text: str) -> str:
+    """'two curb ramps' → '2 curb ramps'; only when the text carries no digit at all."""
+    if re.search(r"\d", text):
+        return text
+
+    def repl(m: re.Match[str]) -> str:
+        if m.group(3):
+            return str(_ONES[m.group(3).lower()])
+        return str(_TENS[m.group(1).lower()] + (_ONES[m.group(2).lower()] if m.group(2) else 0))
+
+    return _NUMBER_WORD_RE.sub(repl, text, count=1)
 
 # Unit spellings → canonical symbol.
 UNIT_ALIASES: dict[str, str] = {
@@ -125,12 +164,27 @@ def final_answer(response: str) -> str | None:
     return matches[-1].strip() if matches else None
 
 
-def cited_pages(response: str) -> set[tuple[str, int]]:
-    """All (doc-id, page) pairs on CITE: lines."""
+def canonical_doc(doc: str, aliases: Mapping[str, str] | None = None) -> str:
+    """Lower-cased document id, mapped through ``aliases`` (entity id / file stem → manifest id).
+
+    A namespaced id (``ingest:e3673a7430de``) is tried whole and then by its last segment,
+    so a model that only ever saw the gateway's ids can still be scored on the benchmark's.
+    """
+    key = doc.lower()
+    if not aliases:
+        return key
+    if key in aliases:
+        return aliases[key]
+    tail = key.rsplit(":", 1)[-1]
+    return aliases.get(tail, key)
+
+
+def cited_pages(response: str, aliases: Mapping[str, str] | None = None) -> set[tuple[str, int]]:
+    """All (doc-id, page) pairs on CITE: lines, with document ids canonicalised."""
     pairs: set[tuple[str, int]] = set()
     for line in _CITE_RE.findall(response):
         for doc, page in _CITATION_ITEM_RE.findall(line):
-            pairs.add((doc.lower(), int(page)))
+            pairs.add((canonical_doc(doc, aliases), int(page)))
     return pairs
 
 
@@ -171,7 +225,7 @@ def fold_fractions(text: str) -> str:
 
 def parse_quantity(text: str) -> tuple[float, str | None] | None:
     """First number in `text` with its unit, if any. Commas in numbers are ignored."""
-    m = _QUANTITY_RE.search(fold_fractions(text))
+    m = _QUANTITY_RE.search(fold_fractions(fold_number_words(text)))
     if not m:
         return None
     value = float(m.group(1).replace(",", ""))
@@ -194,6 +248,8 @@ def convert(value: float, from_unit: str | None, to_unit: str | None) -> float |
 
 def is_refusal(response: str) -> bool:
     answer = final_answer(response)
+    if answer is not None and _BARE_REFUSAL_RE.match(answer):
+        return True
     haystack = (answer if answer is not None else response).lower()
     return any(phrase in haystack for phrase in _REFUSAL_PHRASES)
 
@@ -215,16 +271,21 @@ def score_number(response: str, expected: float, unit: str | None, tolerance: fl
 
 
 def _last_quantity(text: str) -> tuple[float, str | None] | None:
-    matches = list(_QUANTITY_RE.finditer(fold_fractions(text)))
+    matches = list(_QUANTITY_RE.finditer(fold_fractions(fold_number_words(text))))
     if not matches:
         return None
     m = matches[-1]
     return float(m.group(1).replace(",", "")), canonical_unit(m.group(2))
 
 
-def score_citation(response: str, anchors: list[tuple[str, int]], page_slack: int = 0) -> Verdict:
+def score_citation(
+    response: str,
+    anchors: list[tuple[str, int]],
+    page_slack: int = 0,
+    aliases: Mapping[str, str] | None = None,
+) -> Verdict:
     """Correct when any cited (doc, page) lands on an anchor, within `page_slack` pages."""
-    cited = cited_pages(response)
+    cited = cited_pages(response, aliases)
     if not cited:
         return Verdict(False, "no CITE line")
     wanted = {(doc.lower(), page) for doc, page in anchors}
