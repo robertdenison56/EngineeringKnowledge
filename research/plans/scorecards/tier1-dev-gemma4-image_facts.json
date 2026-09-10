@@ -1,0 +1,2496 @@
+{
+  "meta": {
+    "generated": "2026-09-10T04:35:48+00:00",
+    "commit": "a63ceb2",
+    "gold": "plans/gold/sheets-v0.jsonl",
+    "preds": [
+      "plans/preds-gemma4-image_facts/d3-03-2H4504-plans.jsonl"
+    ],
+    "split": "dev",
+    "tier": 1
+  },
+  "sheets": {
+    "gold": 27,
+    "scored": 27,
+    "missing_prediction": 0,
+    "extracted": 27,
+    "extracted_rate": 1.0,
+    "unresolved_match_lines": 0
+  },
+  "scalars": {
+    "sheet_number": {
+      "n": 27,
+      "correct": 13,
+      "wrong": 3,
+      "missed": 0,
+      "fabricated": 11,
+      "both_null": 0,
+      "accuracy": 0.4815,
+      "precision": 0.4815,
+      "recall": 0.8125,
+      "null_recall": 0.0
+    },
+    "sheet_index": {
+      "n": 27,
+      "correct": 11,
+      "wrong": 13,
+      "missed": 3,
+      "fabricated": 0,
+      "both_null": 0,
+      "accuracy": 0.4074,
+      "precision": 0.4583,
+      "recall": 0.4074,
+      "null_recall": 0.0
+    },
+    "sheet_total": {
+      "n": 27,
+      "correct": 18,
+      "wrong": 7,
+      "missed": 2,
+      "fabricated": 0,
+      "both_null": 0,
+      "accuracy": 0.6667,
+      "precision": 0.72,
+      "recall": 0.6667,
+      "null_recall": 0.0
+    },
+    "title": {
+      "n": 27,
+      "correct": 21,
+      "wrong": 5,
+      "missed": 0,
+      "fabricated": 1,
+      "both_null": 0,
+      "accuracy": 0.7778,
+      "precision": 0.7778,
+      "recall": 0.8077,
+      "null_recall": 0.0
+    },
+    "revision": {
+      "n": 27,
+      "correct": 10,
+      "wrong": 0,
+      "missed": 1,
+      "fabricated": 5,
+      "both_null": 11,
+      "accuracy": 0.7778,
+      "precision": 0.6667,
+      "recall": 0.9091,
+      "null_recall": 0.6875
+    }
+  },
+  "sets": {
+    "scales": {
+      "tp": 25,
+      "fp": 3,
+      "fn": 4,
+      "precision": 0.8929,
+      "recall": 0.8621,
+      "f1": 0.8772,
+      "sheets": 27,
+      "sheets_exact": 23,
+      "exact_rate": 0.8519
+    },
+    "views": {
+      "tp": 60,
+      "fp": 26,
+      "fn": 16,
+      "precision": 0.6977,
+      "recall": 0.7895,
+      "f1": 0.7408,
+      "sheets": 27,
+      "sheets_exact": 13,
+      "exact_rate": 0.4815
+    },
+    "match_lines": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "sheets": 27,
+      "sheets_exact": 27,
+      "exact_rate": 1.0
+    },
+    "references": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 23,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "sheets": 27,
+      "sheets_exact": 17,
+      "exact_rate": 0.6296
+    },
+    "schedules": {
+      "tp": 20,
+      "fp": 3,
+      "fn": 1,
+      "precision": 0.8696,
+      "recall": 0.9524,
+      "f1": 0.9091,
+      "sheets": 27,
+      "sheets_exact": 24,
+      "exact_rate": 0.8889
+    }
+  },
+  "context": {
+    "sheets": 27,
+    "scalars": {
+      "route": {
+        "n": 27,
+        "correct": 23,
+        "wrong": 1,
+        "missed": 3,
+        "fabricated": 0,
+        "both_null": 0,
+        "accuracy": 0.8519,
+        "precision": 0.9583,
+        "recall": 0.8519,
+        "null_recall": 0.0
+      },
+      "post_miles": {
+        "n": 27,
+        "correct": 1,
+        "wrong": 7,
+        "missed": 19,
+        "fabricated": 0,
+        "both_null": 0,
+        "accuracy": 0.037,
+        "precision": 0.125,
+        "recall": 0.037,
+        "null_recall": 0.0
+      }
+    },
+    "sets": {
+      "counties": {
+        "tp": 22,
+        "fp": 4,
+        "fn": 32,
+        "precision": 0.8462,
+        "recall": 0.4074,
+        "f1": 0.55,
+        "sheets": 27,
+        "sheets_exact": 5,
+        "exact_rate": 0.1852
+      },
+      "roads": {
+        "tp": 17,
+        "fp": 7,
+        "fn": 5,
+        "precision": 0.7083,
+        "recall": 0.7727,
+        "f1": 0.7391,
+        "sheets": 27,
+        "sheets_exact": 20,
+        "exact_rate": 0.7407
+      },
+      "alignments": {
+        "tp": 12,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "sheets": 27,
+        "sheets_exact": 27,
+        "exact_rate": 1.0
+      },
+      "structures": {
+        "tp": 19,
+        "fp": 5,
+        "fn": 5,
+        "precision": 0.7917,
+        "recall": 0.7917,
+        "f1": 0.7917,
+        "sheets": 27,
+        "sheets_exact": 21,
+        "exact_rate": 0.7778
+      }
+    },
+    "stations": {
+      "tp": 10,
+      "fp": 3,
+      "fn": 13,
+      "precision": 0.7692,
+      "recall": 0.4348,
+      "f1": 0.5556,
+      "sheets": 27,
+      "sheets_exact": 21,
+      "exact_rate": 0.7778
+    },
+    "facts": {
+      "facts": 163,
+      "covered": 72,
+      "coverage": 0.4417,
+      "sheets": 27,
+      "sheets_described": 27,
+      "described_rate": 1.0
+    }
+  },
+  "by_doc": {
+    "d3-03-2H4504-plans": {
+      "sheets": 27,
+      "scalar_accuracy": 0.6222,
+      "set_f1": 0.7343
+    }
+  },
+  "errors": [
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "sheet_number",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "1"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "title",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "INDEX OF PLANS"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "00-00-00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "context.roads",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PUTAH CREEK"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "context.roads",
+      "kind": "fn",
+      "gold": "ROUTE 505",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Route 505",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 2,
+      "pred": 1
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PLAN"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"P1\" 10+00.00 to 16+95.81 (P1 line, BEG to END)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"P1\" 10+59.21 to 16+45.42 (curve 1, BC to EC)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "P1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Putah Creek Rd",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "10+00.00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "16+95.81",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "22-0072",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "curve data",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 3,
+      "pred": 1
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PLAN"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.post_miles",
+      "kind": "wrong",
+      "gold": "R10.6/0.0",
+      "pred": "0.00"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.roads",
+      "kind": "fp",
+      "gold": null,
+      "pred": "ROUTE 505 NB"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.roads",
+      "kind": "fp",
+      "gold": null,
+      "pred": "SB ROUTE 505"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.roads",
+      "kind": "fn",
+      "gold": "ROUTE 505",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "561+00 to 571+00 (station ticks along Route 505)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "12kV",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Putah Creek Rd",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 4,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "title",
+      "kind": "wrong",
+      "gold": "CONSTRUCTION AREA SIGNS",
+      "pred": "APPROVED FOR CONSTRUCTION AREA SIGN WORK ONLY"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PLAN"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "W20-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "ROAD WORK AHEAD",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "G20-2",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "sign code",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.roads",
+      "kind": "fn",
+      "gold": "ROUTE 505",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.structures",
+      "kind": "fn",
+      "gold": "Br No. 22-0072L",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"P1\" 11+85 to 15+45 (temporary barrier system, EB)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"P1\" 10+00.00 to 16+95.81 (P1 line, BEG to END)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "11+85",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "15+45",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Section A-A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Bent 2",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "references",
+      "kind": "fn",
+      "gold": "L-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "360",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "crash cushion",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "L-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 7,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PLAN"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "context.roads",
+      "kind": "fn",
+      "gold": "ROUTE 505",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Putah Creek Rd",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 8,
+      "pred": 7
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "DETAIL 27B"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "references",
+      "kind": "fn",
+      "gold": "PD-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.post_miles",
+      "kind": "wrong",
+      "gold": "R10.6/0.0",
+      "pred": "11.60-12.20"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Detail 27B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "500",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "1000",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "PD-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 9,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "references",
+      "kind": "fn",
+      "gold": "L-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "TCD"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "918",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "200",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "fiber roll",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "800",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "construction entrance",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "fiber roll",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "compost",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "netting",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 11,
+      "pred": 27
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PLAN"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "schedules",
+      "kind": "fp",
+      "gold": null,
+      "pred": "EROSION CONTROL LEGEND"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.post_miles",
+      "kind": "wrong",
+      "gold": "R10.6/0.0",
+      "pred": "81.0/81.6"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.roads",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PUTAH CREEK ROAD"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "564+00 to 569+00 (station ticks along the B and A3 lines)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Putah Creek",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "564+00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "sheet_number",
+      "kind": "wrong",
+      "gold": "RSP A20B",
+      "pred": "P A20B"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "DETAIL 27A"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "DETAIL 30"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "DETAIL 33"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "MARKER DETAILS"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "TYPE H",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "TYPE RY AND TYPE D",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "schedules",
+      "kind": "fp",
+      "gold": null,
+      "pred": "LEGEND"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.roads",
+      "kind": "fp",
+      "gold": null,
+      "pred": "CENTERLINE INTERSECTING STREET"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "edge line",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "median island",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Detail 27B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "revision",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "6-20-22"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "ELEVATION STAKE NOTCH DETAIL"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PERSPECTIVE FIBER ROLL (TYPE 1) COMPOST SOCK"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PERSPECTIVE FIBER ROLL (TYPE 2)"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PLAN FIBER ROLL (TYPE 2)"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "SECTION COMPOST SOCK"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "SECTION FIBER ROLL (TYPE 1)"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "SECTION FIBER ROLL (TYPE 2)"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "COMPOST SOCK",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "ELEVATION",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "FIBER ROLL (TYPE 1)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "FIBER ROLL (TYPE 2)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PERSPECTIVE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "STAKE NOTCH DETAIL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "fiber roll",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "compost sock",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "stake",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "sheet_number",
+      "kind": "wrong",
+      "gold": "RSP T13",
+      "pred": "T13"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "title",
+      "kind": "wrong",
+      "gold": "TRAFFIC CONTROL SYSTEM WITH REVERSIBLE CONTROL ON TWO LANE CONVENTIONAL HIGHWAYS",
+      "pred": "REVISED STANDARD PLAN RSP T13"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "revision",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "6-20-22"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "references",
+      "kind": "fn",
+      "gold": "T9",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "flagger",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "cone",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "title",
+      "kind": "wrong",
+      "gold": "TRAFFIC CONTROL SYSTEM TWO LANE CONVENTIONAL HIGHWAYS",
+      "pred": "REVISED STANDARD RAN RSP T13B"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "references",
+      "kind": "fn",
+      "gold": "RSP T13",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "references",
+      "kind": "fn",
+      "gold": "T9",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "context.route",
+      "kind": "missed",
+      "gold": "505",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "flagger",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "revision",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "6-20-22"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PLAN"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "references",
+      "kind": "fn",
+      "gold": "T9",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.route",
+      "kind": "missed",
+      "gold": "505",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "PCMS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "sign size",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "sheet_number",
+      "kind": "wrong",
+      "gold": "RSP T22",
+      "pred": "RTP T22"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "revision",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "04-16-2021"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "references",
+      "kind": "fn",
+      "gold": "RSP T13",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "references",
+      "kind": "fn",
+      "gold": "RSP T13A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.route",
+      "kind": "missed",
+      "gold": "505",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "speed limit reduction",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "sign panel size",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "sheet_number",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "1"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 18,
+      "pred": 1
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "sheet_total",
+      "kind": "wrong",
+      "gold": 27,
+      "pred": 10
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.post_miles",
+      "kind": "wrong",
+      "gold": "R10.6/0.0",
+      "pred": "45.04"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "BUTTE"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.roads",
+      "kind": "fp",
+      "gold": null,
+      "pred": "VACAVILLE CREEK"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.roads",
+      "kind": "fp",
+      "gold": null,
+      "pred": "WILLIAMS"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.roads",
+      "kind": "fn",
+      "gold": "Putah Creek Rd",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.structures",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PUTAH CREEK BRIDGE 2H4504"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.structures",
+      "kind": "fn",
+      "gold": "22-0072L/R",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.structures",
+      "kind": "fn",
+      "gold": "PUTAH CREEK BRIDGE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.stations",
+      "kind": "fp",
+      "gold": null,
+      "pred": "\"B LINE\" 564+58.70 (Right Bridge start)"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.stations",
+      "kind": "fp",
+      "gold": null,
+      "pred": "\"B LINE\" 564+59.87 (Plan view start)"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 564+35.87 to 568+55.12 (BB to EB, bridge limits)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 564+56.70 (profile grade, 56' Rt)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "column casing",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Bent 2",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "pipe seat extender",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "hinge",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "lumber blocking",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "564+35.87",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "568+55.12",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "box girder",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "sheet_number",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "INDEX TO PLANS"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 19,
+      "pred": 1
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "sheet_total",
+      "kind": "wrong",
+      "gold": 27,
+      "pred": 19
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "views",
+      "kind": "fn",
+      "gold": "LIMITS OF EXCAVATION AND BACKFILL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SITE SPECIFIC ARS CURVE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10D",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10E",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A3A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A3B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A3C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "schedules",
+      "kind": "fp",
+      "gold": null,
+      "pred": "STANDARD PLANS BARDEN STD 2018"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "STANDARD PLANS DATED 2018",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.post_miles",
+      "kind": "wrong",
+      "gold": "R10.6/0.0",
+      "pred": "R10.0/R10.1"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "index to plans",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "AASHTO",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "ARS curve",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "excavation",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "backfill",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "sheet_number",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "13"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 20,
+      "pred": 13
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "scales",
+      "kind": "fp",
+      "gold": null,
+      "pred": "1/4\" = 1'-0\""
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "3/8\" = 1'-0\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.post_miles",
+      "kind": "wrong",
+      "gold": "R10.6/0.0",
+      "pred": "RTE 05/0.00"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "8\" x 12\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Section A-A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Section B-B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "backwall",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "sheet_number",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "BENT 2 DETAILS"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 21,
+      "pred": 4
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "sheet_total",
+      "kind": "wrong",
+      "gold": 27,
+      "pred": 15
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "3/4\" = 1'-0\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.structures",
+      "kind": "fp",
+      "gold": null,
+      "pred": "2H4504"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Type P/F",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Section C-C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "18.75",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "sheet_number",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "P-5"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 22,
+      "pred": 5
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "sheet_total",
+      "kind": "wrong",
+      "gold": 27,
+      "pred": 10
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "CASING OPENING"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "DETAIL A"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "DETAIL B"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "ELEVATION"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "ELLIPTICAL CASING-DATE TYPE P/F COLUMN"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "SECTION X-X"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "TYPE F COLUMN"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fn",
+      "gold": "WELDED FIELD SPLICE (OPTIONAL)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.route",
+      "kind": "wrong",
+      "gold": "505",
+      "pred": "01"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.post_miles",
+      "kind": "wrong",
+      "gold": "R10.6/0.0",
+      "pred": "0.00 to 0.00"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.structures",
+      "kind": "fp",
+      "gold": null,
+      "pred": "2H4504"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.structures",
+      "kind": "fn",
+      "gold": "PUTAH CREEK BRIDGE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "column casing",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "welded field splice",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Detail C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "sheet_number",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "15"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 23,
+      "pred": 15
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "BUTTE"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.structures",
+      "kind": "fp",
+      "gold": null,
+      "pred": "2H4504"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "soffit access opening",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "pipe seat extender",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "left bridge",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "sheet_number",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "D3-03-2H4504"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 24,
+      "pred": 7
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "sheet_total",
+      "kind": "wrong",
+      "gold": 27,
+      "pred": 12
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SOFFIT ACCESS DOOR ASSEMBLY AT \"HINGE\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "BUTTE"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "saw cut",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "expansion anchorage",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "2'-6\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "cored hole",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "sheet_number",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "8"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 25,
+      "pred": 8
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "sheet_total",
+      "kind": "wrong",
+      "gold": 27,
+      "pred": 10
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "title",
+      "kind": "wrong",
+      "gold": "300 KIP PIPE SEAT EXTENDER (RETROFIT)",
+      "pred": "BRIDGES WITH SKEWS"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "views",
+      "kind": "fp",
+      "gold": null,
+      "pred": "LEGEND"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "views",
+      "kind": "fn",
+      "gold": "BRIDGES WITH SKEWS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.structures",
+      "kind": "fp",
+      "gold": null,
+      "pred": "PUTAH CREEK BRIDGE 300 KIP PIPE SET EXTENDER (RETROFIT)"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.structures",
+      "kind": "fn",
+      "gold": "PUTAH CREEK BRIDGE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "pipe seat extender",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "300 kip",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "8\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "cored hole",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "bolster",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "skew",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "sheet_number",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "B-1"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "sheet_index",
+      "kind": "wrong",
+      "gold": 26,
+      "pred": 1
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "sheet_total",
+      "kind": "wrong",
+      "gold": 27,
+      "pred": 2
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "revision",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "4-1-2022"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "scales",
+      "kind": "fp",
+      "gold": null,
+      "pred": "Vert. 1\" = 10'"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 10'",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10F",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10G",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10H",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fp",
+      "gold": null,
+      "pred": "\"B\" 564+00 to 569+00 (plan view extent)"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 564+20.0 (boring RC-20-001, 15.0 Lt)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 568+80.0 (boring RC-20-002, 2.0 Rt)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 568+91.93 (POT Bk)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"A3\" 2+00.00 (POT Ahd)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"A3\" 568+71.89 (bench mark)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "564+20.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "568+80.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "borehole location table",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "bench mark",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "boring",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "sheet_number",
+      "kind": "fabricated",
+      "gold": null,
+      "pred": "LOG OF TEST BORINGS 1 OF 2"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "title",
+      "kind": "wrong",
+      "gold": "LOG OF TEST BORINGS 2 OF 2",
+      "pred": "FOR PLAN VIEW, SEE \"LOG OF TEST BORINGS 1 OF 2\""
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "scales",
+      "kind": "fp",
+      "gold": null,
+      "pred": "Vert: 1\" = 10'"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 10'",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10F",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10G",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10H",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "context.post_miles",
+      "kind": "missed",
+      "gold": "R10.6/0.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "129.7",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "blow",
+      "pred": null
+    }
+  ]
+}

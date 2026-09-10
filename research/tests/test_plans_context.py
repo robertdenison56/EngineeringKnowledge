@@ -113,7 +113,7 @@ def test_context_normalization():
     assert norm_county("Sol") == norm_county("SOLANO COUNTY") == "solano"
     assert norm_alignment('"P1" LINE') == norm_alignment("p1") == "P1"
     assert norm_structure("Br No. 22-0072L") == norm_structure("Bridge No 22-0072L") == norm_structure("22-0072L")
-    assert norm_structure("PUTAH CREEK BRIDGE") == "putah creek bridge"
+    assert norm_structure("PUTAH CREEK BRIDGE") == norm_structure("Putah Creek Br") == "putah creek"
     assert norm_field("post_miles", "R10.6 / 0.0") == "r10.6/0.0"
     assert parse_station("564+20.30") == 56420.30
     assert parse_station("Sta 10+00") == 1000.0
@@ -208,6 +208,69 @@ def test_station_matching_tolerance_and_alignment():
     assert score([gold], {gold.id: other_line}).to_dict()["context"]["stations"]["tp"] == 0
     single = SheetPrediction.from_facts("d", 2, {"context": {"stations": [{"alignment": "P1", "begin": "11+85"}]}})
     assert score([gold], {gold.id: single}).to_dict()["context"]["stations"]["tp"] == 0
+
+
+def test_lenient_readings_scale_prefix_joined_structures_endpoint_stations():
+    from caltrans_bench.plans import split_structure
+
+    assert norm_field("scales", "SCALE: 1\" = 50'") == norm_field("scales", "1\"=50'")
+    assert split_structure("PUTAH CREEK BRIDGE Br No. 22-0072L") == ["Br No. 22-0072L", "PUTAH CREEK BRIDGE"]
+    assert split_structure("PUTAH CREEK Br No. 22-0072 R/L") == ["Br No. 22-0072 R/L", "PUTAH CREEK"]
+    assert split_structure("Br No. 22-0072L") == ["Br No. 22-0072L"] and split_structure("Bent 2") == ["Bent 2"]
+    assert norm_structure("PUTAH CREEK") == norm_structure("PUTAH CREEK BRIDGE") == norm_structure("Putah Creek Br")
+
+    gold = SheetGold.model_validate(
+        {
+            **GOLD,
+            "context": {
+                "structures": ["Br No. 22-0072L", "PUTAH CREEK BRIDGE"],
+                "stations": [{"alignment": "A1", "begin": "554+00", "end": "578+00", "what": "project limits"}],
+            },
+        }
+    )
+    joined = SheetPrediction.from_facts(
+        "d",
+        2,
+        {
+            "scales": ["SCALE: 1\" = 50'"],
+            "context": {
+                "structures": ["PUTAH CREEK BRIDGE Br No. 22-0072L"],
+                "stations": [
+                    {"alignment": "A1", "begin": "554+00", "what": "Begin Work"},
+                    {"alignment": "A1", "begin": "578+00", "what": "End Work"},
+                ],
+            },
+        },
+    )
+    ctx = score([gold], {gold.id: joined}).to_dict()["context"]
+    assert (ctx["sets"]["structures"]["tp"], ctx["sets"]["structures"]["fp"], ctx["sets"]["structures"]["fn"]) == (
+        2,
+        0,
+        0,
+    )
+    assert (ctx["stations"]["tp"], ctx["stations"]["fp"], ctx["stations"]["fn"]) == (1, 0, 0)
+
+    # The other direction: gold has the two endpoint callouts, the model gives one range.
+    gold2 = SheetGold.model_validate(
+        {
+            **GOLD,
+            "context": {
+                "stations": [
+                    {"alignment": "P1", "begin": "11+85.00", "what": "crash cushion"},
+                    {"alignment": "P1", "begin": "15+45.00", "what": "crash cushion"},
+                ]
+            },
+        }
+    )
+    one_range = SheetPrediction.from_facts(
+        "d", 2, {"context": {"stations": [{"alignment": "P1", "begin": "11+85", "end": "15+45"}]}}
+    )
+    ctx2 = score([gold2], {gold2.id: one_range}).to_dict()["context"]
+    assert (ctx2["stations"]["tp"], ctx2["stations"]["fp"], ctx2["stations"]["fn"]) == (2, 0, 0)
+    # A lone single station still does not satisfy a range.
+    lone = SheetPrediction.from_facts("d", 2, {"context": {"stations": [{"alignment": "A1", "begin": "554+00"}]}})
+    ctx3 = score([gold], {gold.id: lone}).to_dict()["context"]
+    assert (ctx3["stations"]["tp"], ctx3["stations"]["fp"], ctx3["stations"]["fn"]) == (0, 1, 1)
 
 
 def test_context_regressions_gate():

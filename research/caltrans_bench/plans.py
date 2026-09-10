@@ -484,6 +484,29 @@ _ROAD_SUFFIXES = {
 }  # fmt: skip
 _ROUTE_WORDS = re.compile(r"^(?:state\s+route|route|rte|sr|hwy|highway|us|i)[\s\-]*", re.IGNORECASE)
 _STATION_RE = re.compile(r"^\s*(?:sta\.?\s*)?(\d{1,5})\s*\+\s*(\d{2}(?:\.\d+)?)\s*$", re.IGNORECASE)
+_SCALE_PREFIX = re.compile(r"^\s*scales?\s*[:=]?\s*", re.IGNORECASE)
+_BRIDGE_NO_RE = re.compile(
+    r"\b(?:br|bridge)\.?\s*(?:no|number)\.?\s*([0-9]{1,3}-[0-9A-Za-z]+(?:\s*/\s*[A-Za-z0-9]+)?(?:\s*[LR](?:/[LR])?)?)",
+    re.IGNORECASE,
+)
+
+
+def split_structure(value: str) -> list[str]:
+    """``PUTAH CREEK BRIDGE Br No. 22-0072L`` → ``["Br No. 22-0072L", "PUTAH CREEK BRIDGE"]``.
+
+    A model tends to join a bridge's name and number into one string where the sheet
+    (and the gold) print them apart; both readings are defensible, so structures are
+    compared part by part.
+    """
+    numbers = [m.group(0).strip() for m in _BRIDGE_NO_RE.finditer(value)]
+    if not numbers:
+        return [value.strip()]
+    remainder = _BRIDGE_NO_RE.sub(" ", value)
+    remainder = re.sub(r"[\s,;:()\-]+", " ", remainder).strip()
+    parts = list(numbers)
+    if re.search(r"[A-Za-z]{2,}", remainder):
+        parts.append(remainder)
+    return parts
 
 
 def norm_route(value: str) -> str:
@@ -516,11 +539,13 @@ def norm_alignment(value: str) -> str:
 
 
 def norm_structure(value: str) -> str:
-    """``Br No. 22-0072L`` == ``Bridge No 22-0072L`` == ``22-0072L``."""
+    """``Br No. 22-0072L`` == ``Bridge No 22-0072L`` == ``22-0072L``; ``PUTAH CREEK BRIDGE`` == ``Putah Creek Br``."""
     words = norm_words(value).split()
     words = [("bridge" if w in ("br", "brdg") else w) for w in words if w not in ("no", "number")]
     if words and words[0] == "bridge" and len(words) > 1 and any(ch.isdigit() for ch in words[-1]):
         words = words[1:]  # the number identifies it; "bridge" is filler before a number
+    if len(words) > 1 and words[-1] == "bridge" and not any(ch.isdigit() for ch in words[-2]):
+        words = words[:-1]  # "Putah Creek Bridge" and "Putah Creek Br" name the same structure
     return " ".join(words)
 
 
@@ -535,7 +560,9 @@ def parse_station(value: str) -> float | None:
 def norm_field(name: str, value: str) -> str:
     if name in ("sheet_number", "match_lines", "references"):
         return norm_sheet(value)
-    if name in ("scales", "revision", "post_miles"):
+    if name == "scales":
+        return norm_compact(_SCALE_PREFIX.sub("", value))
+    if name in ("revision", "post_miles"):
         return norm_compact(value)
     if name == "schedules":
         return "table" if _UNTITLED_TABLE.match(value.strip()) else norm_words(value)
@@ -978,8 +1005,12 @@ def _score_context(card: Scorecard, row: SheetGold, pred: SheetPrediction) -> No
             tally.wrong += 1
             card.errors.append(SheetError(row.id, f"context.{name}", "wrong", g_raw, p_raw))
     for name in CONTEXT_SETS:
-        want = {norm_field(name, v): v for v in getattr(gold, name)}
-        have = {norm_field(name, v): v for v in getattr(got, name)}
+        gold_items, got_items = list(getattr(gold, name)), list(getattr(got, name))
+        if name == "structures":
+            gold_items = [part for v in gold_items for part in split_structure(v)]
+            got_items = [part for v in got_items for part in split_structure(v)]
+        want = {norm_field(name, v): v for v in gold_items}
+        have = {norm_field(name, v): v for v in got_items}
         tally = card.context_sets[name]
         tally.sheets += 1
         tp = want.keys() & have.keys()
@@ -997,16 +1028,45 @@ def _score_context(card: Scorecard, row: SheetGold, pred: SheetPrediction) -> No
     # within tolerance and the alignments agree or either side left it blank.
     card.stations.sheets += 1
     unmatched = list(got.stations)
-    fps_st: list[StationLimit] = []
+    endpoint_hits: dict[int, set[str]] = {}  # predicted ranges whose endpoints matched gold singles
     fns_st: list[StationLimit] = []
     for g_st in gold.stations:
         hit = next((p_st for p_st in unmatched if _station_match(g_st, p_st)), None)
-        if hit is None:
-            fns_st.append(g_st)
-        else:
+        if hit is not None:
             unmatched.remove(hit)
             card.stations.tp += 1
-    fps_st = unmatched
+            continue
+        if g_st.end:
+            # "Begin Work 554+00" + "End Work 578+00" is the range 554+00 to 578+00 read as two callouts.
+            a = next((p for p in unmatched if p.end is None and _same_station(p.begin, g_st.begin, p, g_st)), None)
+            b = next(
+                (p for p in unmatched if p is not a and p.end is None and _same_station(p.begin, g_st.end, p, g_st)),
+                None,
+            )
+            if a is not None and b is not None:
+                unmatched.remove(a)
+                unmatched.remove(b)
+                card.stations.tp += 1
+                continue
+        else:
+            # A gold single station at either end of a predicted range: each endpoint counts once.
+            for p in unmatched:
+                if p.end is None:
+                    continue
+                for key, value in (("begin", p.begin), ("end", p.end)):
+                    if key not in endpoint_hits.get(id(p), set()) and _same_station(value, g_st.begin, p, g_st):
+                        endpoint_hits.setdefault(id(p), set()).add(key)
+                        break
+                else:
+                    continue
+                break
+            else:
+                fns_st.append(g_st)
+                continue
+            card.stations.tp += 1
+            continue
+        fns_st.append(g_st)
+    fps_st = [p for p in unmatched if id(p) not in endpoint_hits]
     card.stations.fp += len(fps_st)
     card.stations.fn += len(fns_st)
     if not fps_st and not fns_st:
@@ -1029,6 +1089,15 @@ def _score_context(card: Scorecard, row: SheetGold, pred: SheetPrediction) -> No
         else:
             for fact in gold.facts:
                 card.errors.append(SheetError(row.id, "context.facts", "uncovered", fact, None))
+
+
+def _same_station(a_text: str | None, b_text: str | None, a: StationLimit, b: StationLimit) -> bool:
+    if not a_text or not b_text:
+        return False
+    av, bv = parse_station(a_text), parse_station(b_text)
+    if av is None or bv is None or abs(av - bv) > STATION_TOLERANCE_FT:
+        return False
+    return not (a.alignment and b.alignment and norm_alignment(a.alignment) != norm_alignment(b.alignment))
 
 
 def _station_match(a: StationLimit, b: StationLimit) -> bool:

@@ -1,7 +1,7 @@
 {
   "meta": {
-    "generated": "2026-09-10T04:09:10+00:00",
-    "commit": "256a809",
+    "generated": "2026-09-10T04:32:46+00:00",
+    "commit": "a63ceb2",
     "gold": "plans/gold/sheets-v0.jsonl",
     "preds": [
       "plans/preds-textlayer/d3-03-2H4504-plans.jsonl"
@@ -211,12 +211,12 @@
       }
     },
     "stations": {
-      "tp": 8,
-      "fp": 5,
-      "fn": 15,
-      "precision": 0.6154,
-      "recall": 0.3478,
-      "f1": 0.4444,
+      "tp": 12,
+      "fp": 1,
+      "fn": 11,
+      "precision": 0.9231,
+      "recall": 0.5217,
+      "f1": 0.6666,
       "sheets": 27,
       "sheets_exact": 19,
       "exact_rate": 0.7037
@@ -2229,20 +2229,6 @@
     {
       "id": "d3-03-2H4504-plans:p18",
       "field": "context.stations",
-      "kind": "fp",
-      "gold": null,
-      "pred": "\"B\" 564+17.59 to 568+91.93"
-    },
-    {
-      "id": "d3-03-2H4504-plans:p18",
-      "field": "context.stations",
-      "kind": "fp",
-      "gold": null,
-      "pred": "564+20.30 to 568+55.12"
-    },
-    {
-      "id": "d3-03-2H4504-plans:p18",
-      "field": "context.stations",
       "kind": "fn",
       "gold": "\"B\" 564+35.87 to 568+55.12 (BB to EB, bridge limits)",
       "pred": null
@@ -2251,21 +2237,7 @@
       "id": "d3-03-2H4504-plans:p18",
       "field": "context.stations",
       "kind": "fn",
-      "gold": "\"B\" 564+20.30 (profile grade, 56' Lt)",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p18",
-      "field": "context.stations",
-      "kind": "fn",
       "gold": "\"B\" 564+56.70 (profile grade, 56' Rt)",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p18",
-      "field": "context.stations",
-      "kind": "fn",
-      "gold": "\"B\" 568+91.93 (POT Bk)",
       "pred": null
     },
     {
@@ -3286,36 +3258,8 @@
     {
       "id": "d3-03-2H4504-plans:p26",
       "field": "context.stations",
-      "kind": "fp",
-      "gold": null,
-      "pred": "\"B\" 564+00 to 568+91.93"
-    },
-    {
-      "id": "d3-03-2H4504-plans:p26",
-      "field": "context.stations",
-      "kind": "fp",
-      "gold": null,
-      "pred": "564+20.0 to 569+00"
-    },
-    {
-      "id": "d3-03-2H4504-plans:p26",
-      "field": "context.stations",
-      "kind": "fn",
-      "gold": "\"B\" 564+20.0 (boring RC-20-001, 15.0 Lt)",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p26",
-      "field": "context.stations",
       "kind": "fn",
       "gold": "\"B\" 568+80.0 (boring RC-20-002, 2.0 Rt)",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p26",
-      "field": "context.stations",
-      "kind": "fn",
-      "gold": "\"B\" 568+91.93 (POT Bk)",
       "pred": null
     },
     {

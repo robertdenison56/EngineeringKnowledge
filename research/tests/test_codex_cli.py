@@ -33,3 +33,11 @@ def test_config_toml_is_hermetic_and_adds_gateway_only_for_ekg(tmp_path):
     db = tmp_path / "snap.db"
     ekg = config_toml("gpt-5.6-sol", "low", db)
     assert "[mcp_servers.ekg]" in ekg and str(db) in ekg and '"search"' in ekg
+
+
+def test_usage_cap_is_not_retried():
+    from caltrans_bench.codex_cli import _RETRYABLE, _USAGE_CAP
+
+    cap = "You've hit your usage limit. Upgrade to Pro or try again at 11:02 PM."
+    assert _USAGE_CAP.search(cap) and _RETRYABLE.search(cap)  # matches both; the cap check must win
+    assert not _USAGE_CAP.search("rate limit exceeded, try again") and _RETRYABLE.search("rate limit exceeded")

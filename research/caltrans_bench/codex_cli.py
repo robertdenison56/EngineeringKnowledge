@@ -53,6 +53,7 @@ from . import SNAPSHOT_DIR
 from .ekg_tools import GATEWAY_ENTRY, READ_TOOLS, gateway_env
 
 DEFAULT_SNAPSHOT = SNAPSHOT_DIR / "ekg-caltrans.db"
+_USAGE_CAP = re.compile(r"usage limit|purchase more credits", re.I)
 _RETRYABLE = re.compile(
     r"rate.?limit|usage limit|overloaded|too many requests|\b429\b|\b5\d\d\b|try again|temporarily|quota", re.I
 )
@@ -204,7 +205,14 @@ class CodexAPI(ModelAPI):
         return "codex"
 
     def should_retry(self, ex: Exception) -> bool:
-        return isinstance(ex, CodexError) and bool(_RETRYABLE.search(str(ex)))
+        if not isinstance(ex, CodexError):
+            return False
+        # A plan usage cap ("You've hit your usage limit … try again at 11:02 PM") does not
+        # clear within Inspect's backoff window; fail fast so a resume loop can sleep until
+        # the stated reset and `eval-retry` the errored samples.
+        if _USAGE_CAP.search(str(ex)):
+            return False
+        return bool(_RETRYABLE.search(str(ex)))
 
     def _home(self, with_ekg: bool) -> Path:
         """One hermetic CODEX_HOME per (run, condition); created lazily."""
