@@ -167,6 +167,108 @@ def cmd_corpus(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_plans(args: argparse.Namespace) -> int:
+    """Plan understanding work: gold templates, renders, validation, extraction, scoring."""
+    import json
+
+    from . import plans
+
+    manifest = load_manifest(args.manifest)
+    raw_dir = Path(args.raw_dir)
+    if args.pcmd == "template":
+        out = Path(args.out)
+        existing: dict[str, plans.SheetGold] = {}
+        if out.exists():
+            existing = {r.id: r for r in plans.load_gold(out, include_todo=True)}
+        fresh = [r for r in plans.template_rows(manifest, _ids(args.docs) or [], raw_dir) if r.id not in existing]
+        rows = sorted([*existing.values(), *fresh], key=lambda r: (r.doc, r.page))
+        header = (
+            "Plan understanding work — Tier 1 sheet gold. One line per PDF page; status=todo rows are unscored.\n"
+            "Scalars null = not printed; lists empty = none printed. See caltrans_bench/plans.py for field meanings."
+        )
+        plans.dump_gold(rows, out, header=header if not existing else None)
+        print(f"{out}: {len(fresh)} new todo rows, {len(existing)} kept ({len(rows)} total)")
+        return 0
+    if args.pcmd == "render":
+        doc = manifest.by_id()[args.doc]
+        for page in _page_list(args.pages):
+            print(plans.render_page(doc, page, Path(args.out_dir), args.dpi, raw_dir))
+        return 0
+    if args.pcmd == "extract":
+        if args.system == "textlayer":
+            from .plans_context import write_textlayer_predictions
+
+            out_dir = Path(args.out_dir or plans.PLANS_DIR / "preds-textlayer")
+            for doc in manifest.select(_ids(args.docs), args.group):
+                n = write_textlayer_predictions(doc, out_dir / f"{doc.id}.jsonl", raw_dir)
+                print(f"{doc.id}: {n} pages (text-layer context baseline) → {out_dir / f'{doc.id}.jsonl'}")
+            return 0
+        problems = plans.extraction_prerequisites()
+        if problems:
+            print("\n".join(f"PROBLEM {p}" for p in problems))
+            return 1
+        out_dir = Path(args.out_dir or plans.PREDS_DIR)
+        lo_hi = None
+        if args.pages:
+            a, _, b = args.pages.partition("-")
+            lo_hi = (int(a), int(b or a))
+        for doc in manifest.select(_ids(args.docs), args.group):
+            n = plans.run_extraction(doc, out_dir / f"{doc.id}.jsonl", raw_dir, lo_hi)
+            print(f"{doc.id}: {n} pages → {out_dir / f'{doc.id}.jsonl'}")
+        return 0
+    if args.pcmd == "import-log":
+        from .plans_context import import_eval_log
+
+        n, files = import_eval_log(Path(args.log), Path(args.out_dir))
+        for f in files:
+            print(f"wrote {f}")
+        print(f"{n} sample replies imported; now: caltrans-bench plans score --preds {args.out_dir}")
+        return 0
+    if args.pcmd == "score":
+        gold_path = Path(args.gold)
+        gold = plans.load_gold(gold_path, split=args.split)
+        pred_paths = plans.prediction_files(Path(args.preds))
+        preds = plans.load_predictions(pred_paths)
+        card = plans.score(gold, preds, plans.scorecard_meta(gold_path, pred_paths, args.split))
+        print(plans.format_scorecard(card, errors=args.errors))
+        data = card.to_dict()
+        if args.out:
+            out = Path(args.out)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            print(f"wrote {out}")
+        if args.baseline:
+            drops = plans.regressions(data, json.loads(Path(args.baseline).read_text(encoding="utf-8")), args.tolerance)
+            for d in drops:
+                print(f"REGRESSION {d}")
+            print(f"{len(drops)} regression(s) against {args.baseline}")
+            return 1 if drops else 0
+        return 0
+    # validate / stats
+    path = Path(args.path)
+    rows = plans.load_gold(path, split=args.split, include_todo=args.pcmd == "stats" or args.include_todo)
+    if args.pcmd == "stats":
+        stats = plans.gold_stats(rows)
+        print(f"{len(rows)} sheets in {path.name}")
+        for name, counter in stats.items():
+            print(f"  {name}: " + ", ".join(f"{k}={v}" for k, v in sorted(counter.items(), key=lambda kv: -kv[1])))
+        return 0
+    problems = plans.validate_gold(rows, manifest, raw_dir, offline=args.offline)
+    for p in problems:
+        print(f"FAIL {p}")
+    bad = {p.split(":")[0] + ":" + p.split(":")[1] for p in problems}
+    print(f"{len(rows) - len(bad)}/{len(rows)} sheets validated" + (" (schema only)" if args.offline else ""))
+    return 1 if problems else 0
+
+
+def _page_list(spec: str) -> list[int]:
+    pages: list[int] = []
+    for part in spec.split(","):
+        a, _, b = part.strip().partition("-")
+        pages.extend(range(int(a), int(b or a) + 1))
+    return pages
+
+
 def cmd_smoke(args: argparse.Namespace) -> int:
     from inspect_ai import eval as inspect_eval
 
@@ -250,6 +352,48 @@ def main(argv: list[str] | None = None) -> int:
     pg.add_argument("doc")
     pg.add_argument("page", type=int)
     c.set_defaults(func=cmd_corpus)
+
+    from .plans import DEFAULT_GOLD, PREDS_DIR, RENDERS_DIR
+
+    pl = sub.add_parser("plans", help="plan understanding work: sheet gold, renders, extraction, Tier 1 scoring")
+    ps = pl.add_subparsers(dest="pcmd", required=True)
+    tp = ps.add_parser("template", help="add one todo row per page of the given plan sets to a gold file")
+    tp.add_argument("--docs", required=True, help="comma-separated plan-set document ids")
+    tp.add_argument("--out", default=str(DEFAULT_GOLD))
+    rd = ps.add_parser("render", help="PNG renders of sheets for labelling")
+    rd.add_argument("doc")
+    rd.add_argument("pages", help="e.g. 2 or 1-5,9")
+    rd.add_argument("--dpi", type=int, default=80)
+    rd.add_argument("--out-dir", default=str(RENDERS_DIR))
+    for name, help_ in (("validate", "schema + text-layer check of every labelled string"), ("stats", "counts")):
+        sp = ps.add_parser(name, help=help_)
+        sp.add_argument("path", nargs="?", default=str(DEFAULT_GOLD))
+        sp.add_argument("--split", choices=["dev", "test"])
+        sp.add_argument("--offline", action="store_true")
+        sp.add_argument("--include-todo", action="store_true")
+    ex = ps.add_parser("extract", help="run a prediction system over plan sets and write prediction JSONL per document")
+    ex.add_argument("--docs", help="comma-separated document ids")
+    ex.add_argument("--group", help="manifest group, e.g. district3")
+    ex.add_argument("--pages", help="page range, e.g. 1-10 (default: every page; parser only)")
+    ex.add_argument(
+        "--system",
+        default="parser",
+        choices=["parser", "textlayer"],
+        help="parser = the product SheetFacts extractor; textlayer = regex context baseline over the page text",
+    )
+    ex.add_argument("--out-dir", help=f"default: {PREDS_DIR} for parser, plans/preds-textlayer for textlayer")
+    il = ps.add_parser("import-log", help="write the model replies of a plan_sheets Inspect log as prediction JSONL")
+    il.add_argument("log", help="path to the .eval log")
+    il.add_argument("--out-dir", required=True)
+    sc = ps.add_parser("score", help="Tier 1 scorecard of gold against predictions")
+    sc.add_argument("--gold", default=str(DEFAULT_GOLD))
+    sc.add_argument("--preds", default=str(PREDS_DIR), help="prediction JSONL file or directory")
+    sc.add_argument("--split", choices=["dev", "test"])
+    sc.add_argument("--out", help="write the scorecard JSON here")
+    sc.add_argument("--baseline", help="committed scorecard JSON to compare against; exit 1 on regression")
+    sc.add_argument("--tolerance", type=float, default=0.0)
+    sc.add_argument("--errors", type=int, default=20, help="how many error lines to print")
+    pl.set_defaults(func=cmd_plans)
 
     s = sub.add_parser("smoke", help="run the Inspect task end to end (default: mock model)")
     s.add_argument("--condition", default="closed_book", choices=["closed_book", "rag", "ekg"])

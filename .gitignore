@@ -54,3 +54,5 @@ research/corpus/raw/
 research/corpus/cache/
 research/snapshots/
 research/logs/
+research/plans/preds*/
+research/plans/renders/

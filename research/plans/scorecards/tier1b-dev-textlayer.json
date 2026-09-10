@@ -1,0 +1,3476 @@
+{
+  "meta": {
+    "generated": "2026-09-10T04:09:10+00:00",
+    "commit": "256a809",
+    "gold": "plans/gold/sheets-v0.jsonl",
+    "preds": [
+      "plans/preds-textlayer/d3-03-2H4504-plans.jsonl"
+    ],
+    "split": "dev",
+    "tier": 1
+  },
+  "sheets": {
+    "gold": 27,
+    "scored": 27,
+    "missing_prediction": 0,
+    "extracted": 27,
+    "extracted_rate": 1.0,
+    "unresolved_match_lines": 0
+  },
+  "scalars": {
+    "sheet_number": {
+      "n": 27,
+      "correct": 0,
+      "wrong": 0,
+      "missed": 16,
+      "fabricated": 0,
+      "both_null": 11,
+      "accuracy": 0.4074,
+      "precision": 0.0,
+      "recall": 0.0,
+      "null_recall": 1.0
+    },
+    "sheet_index": {
+      "n": 27,
+      "correct": 0,
+      "wrong": 0,
+      "missed": 27,
+      "fabricated": 0,
+      "both_null": 0,
+      "accuracy": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "null_recall": 0.0
+    },
+    "sheet_total": {
+      "n": 27,
+      "correct": 0,
+      "wrong": 0,
+      "missed": 27,
+      "fabricated": 0,
+      "both_null": 0,
+      "accuracy": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "null_recall": 0.0
+    },
+    "title": {
+      "n": 27,
+      "correct": 0,
+      "wrong": 0,
+      "missed": 26,
+      "fabricated": 0,
+      "both_null": 1,
+      "accuracy": 0.037,
+      "precision": 0.0,
+      "recall": 0.0,
+      "null_recall": 1.0
+    },
+    "revision": {
+      "n": 27,
+      "correct": 0,
+      "wrong": 0,
+      "missed": 11,
+      "fabricated": 0,
+      "both_null": 16,
+      "accuracy": 0.5926,
+      "precision": 0.0,
+      "recall": 0.0,
+      "null_recall": 1.0
+    }
+  },
+  "sets": {
+    "scales": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 29,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "sheets": 27,
+      "sheets_exact": 4,
+      "exact_rate": 0.1481
+    },
+    "views": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 76,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "sheets": 27,
+      "sheets_exact": 10,
+      "exact_rate": 0.3704
+    },
+    "match_lines": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "sheets": 27,
+      "sheets_exact": 27,
+      "exact_rate": 1.0
+    },
+    "references": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 23,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "sheets": 27,
+      "sheets_exact": 17,
+      "exact_rate": 0.6296
+    },
+    "schedules": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 21,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "sheets": 27,
+      "sheets_exact": 13,
+      "exact_rate": 0.4815
+    }
+  },
+  "context": {
+    "sheets": 27,
+    "scalars": {
+      "route": {
+        "n": 27,
+        "correct": 25,
+        "wrong": 1,
+        "missed": 1,
+        "fabricated": 0,
+        "both_null": 0,
+        "accuracy": 0.9259,
+        "precision": 0.9615,
+        "recall": 0.9259,
+        "null_recall": 0.0
+      },
+      "post_miles": {
+        "n": 27,
+        "correct": 27,
+        "wrong": 0,
+        "missed": 0,
+        "fabricated": 0,
+        "both_null": 0,
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "null_recall": 0.0
+      }
+    },
+    "sets": {
+      "counties": {
+        "tp": 48,
+        "fp": 8,
+        "fn": 6,
+        "precision": 0.8571,
+        "recall": 0.8889,
+        "f1": 0.8727,
+        "sheets": 27,
+        "sheets_exact": 14,
+        "exact_rate": 0.5185
+      },
+      "roads": {
+        "tp": 21,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1.0,
+        "recall": 0.9545,
+        "f1": 0.9767,
+        "sheets": 27,
+        "sheets_exact": 26,
+        "exact_rate": 0.963
+      },
+      "alignments": {
+        "tp": 12,
+        "fp": 1,
+        "fn": 0,
+        "precision": 0.9231,
+        "recall": 1.0,
+        "f1": 0.96,
+        "sheets": 27,
+        "sheets_exact": 26,
+        "exact_rate": 0.963
+      },
+      "structures": {
+        "tp": 23,
+        "fp": 4,
+        "fn": 1,
+        "precision": 0.8519,
+        "recall": 0.9583,
+        "f1": 0.902,
+        "sheets": 27,
+        "sheets_exact": 24,
+        "exact_rate": 0.8889
+      }
+    },
+    "stations": {
+      "tp": 8,
+      "fp": 5,
+      "fn": 15,
+      "precision": 0.6154,
+      "recall": 0.3478,
+      "f1": 0.4444,
+      "sheets": 27,
+      "sheets_exact": 19,
+      "exact_rate": 0.7037
+    },
+    "facts": {
+      "facts": 163,
+      "covered": 0,
+      "coverage": 0.0,
+      "sheets": 27,
+      "sheets_described": 0,
+      "described_rate": 0.0
+    }
+  },
+  "by_doc": {
+    "d3-03-2H4504-plans": {
+      "sheets": 27,
+      "scalar_accuracy": 0.2074,
+      "set_f1": 0.0
+    }
+  },
+  "errors": [
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 1,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "00-00-00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "views",
+      "kind": "fn",
+      "gold": "LOCATION MAP",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "INDEX OF PLANS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"A1\" 566+50 (location of construction)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Route 505",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Putah Creek Bridge",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Yolo",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "554+00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "578+00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p1",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "index of plans",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "L-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 2,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "title",
+      "kind": "missed",
+      "gold": "LAYOUT",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "00-00-00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 50'",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "CURVE DATA",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"P1\" 10+59.21 to 16+45.42 (curve 1, BC to EC)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "P1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Putah Creek Rd",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "10+00.00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "16+95.81",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "22-0072",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "retrofit work",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "fence",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p2",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "curve data",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "U-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 3,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "title",
+      "kind": "missed",
+      "gold": "UTILITY PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "04-06-22",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\"=50'",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "Santa Barbara"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "PG&E",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "12kV",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "AT&T",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "fiber optic",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "utility",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p3",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Putah Creek Rd",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "CS-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 4,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "title",
+      "kind": "missed",
+      "gold": "CONSTRUCTION AREA SIGNS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "00-00-00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "STATIONARY MOUNTED CONSTRUCTION AREA SIGNS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "construction area signs",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "W20-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "ROAD WORK AHEAD",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "G20-2",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p4",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "sign code",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "TH-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 5,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "title",
+      "kind": "missed",
+      "gold": "TRAFFIC HANDLING PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "00-00-00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 50'",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION A-A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.structures",
+      "kind": "fp",
+      "gold": null,
+      "pred": "BRIDGE No. 22-0072 R/L"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.structures",
+      "kind": "fp",
+      "gold": null,
+      "pred": "EXISTING BRIDGE"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"P1\" 11+85 to 15+45 (temporary barrier system, EB)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "temporary barrier",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "11+85",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "15+45",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "crash cushion",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Section A-A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p5",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Bent 2",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "THQ-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 6,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "title",
+      "kind": "missed",
+      "gold": "TRAFFIC HANDLING QUANTITIES",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "00-00-00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "references",
+      "kind": "fn",
+      "gold": "L-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "ALTERNATIVE TEMPORARY CRASH CUSHION",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "TEMPORARY BARRIER SYSTEM",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"P1\" 11+85.00 (alternative temporary crash cushion)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"P1\" 15+45.00 (alternative temporary crash cushion)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "360",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "temporary barrier",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "crash cushion",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "11+85.00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "15+45.00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p6",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "L-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "PD-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 7,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "title",
+      "kind": "missed",
+      "gold": "PAVEMENT DELINEATION PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "00-00-00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 50'",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Detail 27B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "11+15",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "16+15",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Putah Creek Rd",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p7",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "existing striping",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "PDQ-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 8,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "title",
+      "kind": "missed",
+      "gold": "PAVEMENT DELINEATION QUANTITIES",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "00-00-00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "references",
+      "kind": "fn",
+      "gold": "PD-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "TRAFFIC STRIPES",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.stations",
+      "kind": "fp",
+      "gold": null,
+      "pred": "\"P1\" 11+15"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"P1\" 11+15 to 16+15 (6-inch thermoplastic traffic stripe, Detail 27B)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "thermoplastic",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Detail 27B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "500",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "1000",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p8",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "PD-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "Q-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 9,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "title",
+      "kind": "missed",
+      "gold": "SUMMARY OF QUANTITIES",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "00-00-00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "references",
+      "kind": "fn",
+      "gold": "L-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "TEMPORARY HIGH-VISIBILITY FENCE (TYPE ESA)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "TEMPORARY WATER POLLUTION CONTROL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "918",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "fence",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "200",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "fiber roll",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "800",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "silt fence",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p9",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "construction entrance",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "ECL-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 10,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "title",
+      "kind": "missed",
+      "gold": "EROSION CONTROL LEGEND",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "5-12-22",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "EC TYPE 1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "EROSION CONTROL QUANTITIES",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "FIBER ROLLS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "SEED MIX",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.route",
+      "kind": "missed",
+      "gold": "505",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "EC Type 1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "seed mix",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "fiber roll",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "compost",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "netting",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p10",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "quantities",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "EC-1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 11,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "title",
+      "kind": "missed",
+      "gold": "EROSION CONTROL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "revision",
+      "kind": "missed",
+      "gold": "5-12-22",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 20'",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "564+00 to 569+00 (station ticks along the B and A3 lines)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "EC Type 1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "fiber roll",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Route 505",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Putah Creek",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p11",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "564+00",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "RSP A20B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 12,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "title",
+      "kind": "missed",
+      "gold": "PAVEMENT MARKERS AND TRAFFIC LINES TYPICAL DETAILS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 24",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 25",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 25A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 25B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 26",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 26A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 26B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 27",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 27B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 27C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 28",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 29",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 31",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 32",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 34",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 34A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 35",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL 35A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "TYPE H",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "views",
+      "kind": "fn",
+      "gold": "TYPE RY AND TYPE D",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "pavement markers",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "traffic lines",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "edge line",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "median island",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "two-way left turn",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p12",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Detail 27B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "RSP H51",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 13,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "title",
+      "kind": "missed",
+      "gold": "EROSION CONTROL DETAILS FIBER ROLL AND COMPOST SOCK",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "COMPOST SOCK",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "ELEVATION",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "FIBER ROLL (TYPE 1)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "FIBER ROLL (TYPE 2)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PERSPECTIVE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "views",
+      "kind": "fn",
+      "gold": "STAKE NOTCH DETAIL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "fiber roll",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "compost sock",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "stake",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "perspective",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Type 1",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p13",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Type 2",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "RSP T13",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 14,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "title",
+      "kind": "missed",
+      "gold": "TRAFFIC CONTROL SYSTEM WITH REVERSIBLE CONTROL ON TWO LANE CONVENTIONAL HIGHWAYS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PORTABLE TRANSVERSE RUMBLE STRIP ARRAY DETAIL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "references",
+      "kind": "fn",
+      "gold": "T9",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "SIGN PANEL SIZE (Min)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "traffic control",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "reversible",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "two lane",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "flagger",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "rumble strip",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p14",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "cone",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "RSP T13B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 15,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "title",
+      "kind": "missed",
+      "gold": "TRAFFIC CONTROL SYSTEM TWO LANE CONVENTIONAL HIGHWAYS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "views",
+      "kind": "fn",
+      "gold": "REVERSIBLE TRAFFIC CONTROL WITH ADDITIONAL FLAGGERS AT HIGH VOLUME INTERSECTIONS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "views",
+      "kind": "fn",
+      "gold": "REVERSIBLE TRAFFIC CONTROL WITH ADDITIONAL FLAGGERS FOR SIDE ROADS AND BUSINESS DRIVEWAYS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "views",
+      "kind": "fn",
+      "gold": "REVERSIBLE TRAFFIC CONTROL WITH SIGNS FOR RESIDENTIAL DRIVEWAYS AND LOW VOLUME SIDE ROADS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "references",
+      "kind": "fn",
+      "gold": "RSP T13",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "references",
+      "kind": "fn",
+      "gold": "T9",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "SIGN PANEL SIZE (Min)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "reversible traffic control",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "side roads",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "driveways",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "intersections",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p15",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "flagger",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "RSP T21",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 16,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "title",
+      "kind": "missed",
+      "gold": "TRAFFIC CONTROL SYSTEM CONSTRUCTION WORK ZONE SPEED LIMIT REDUCTION TWENTY-FOUR HOURS A DAY 7 DAYS A WEEK (24/7)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "references",
+      "kind": "fn",
+      "gold": "T9",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "SIGN SIZE (Min)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "speed limit reduction",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "work zone",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "PCMS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "sign size",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p16",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "24",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "sheet_number",
+      "kind": "missed",
+      "gold": "RSP T22",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 17,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "title",
+      "kind": "missed",
+      "gold": "TRAFFIC CONTROL SYSTEM FOR CONSTRUCTION WORK ZONE SPEED LIMIT REDUCTION ON TWO LANE CONVENTIONAL HIGHWAYS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "views",
+      "kind": "fn",
+      "gold": "TYPICAL SPEED LIMIT REDUCTION WITH REVERSIBLE TRAFFIC CONTROL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "views",
+      "kind": "fn",
+      "gold": "TYPICAL SPEED LIMIT REDUCTION WITH REVERSIBLE TRAFFIC CONTROL WITH ADVANCE FLAGGER",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "references",
+      "kind": "fn",
+      "gold": "RSP T13",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "references",
+      "kind": "fn",
+      "gold": "RSP T13A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "SIGN PANEL SIZE (Min)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.counties",
+      "kind": "fn",
+      "gold": "Solano",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "speed limit reduction",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "two lane",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "reversible",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "advance flagger",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p17",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "sign panel size",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 18,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "title",
+      "kind": "missed",
+      "gold": "GENERAL PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 10'-0\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 30'-0\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "views",
+      "kind": "fn",
+      "gold": "ELEVATION",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PROFILE GRADE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "views",
+      "kind": "fn",
+      "gold": "TYPICAL SECTION",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.route",
+      "kind": "wrong",
+      "gold": "505",
+      "pred": "04"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "Date"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "Sheet"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.roads",
+      "kind": "fn",
+      "gold": "Putah Creek Rd",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.structures",
+      "kind": "fn",
+      "gold": "22-0072L/R",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.stations",
+      "kind": "fp",
+      "gold": null,
+      "pred": "\"B\" 564+17.59 to 568+91.93"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.stations",
+      "kind": "fp",
+      "gold": null,
+      "pred": "564+20.30 to 568+55.12"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 564+35.87 to 568+55.12 (BB to EB, bridge limits)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 564+20.30 (profile grade, 56' Lt)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 564+56.70 (profile grade, 56' Rt)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 568+91.93 (POT Bk)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "seismic retrofit",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "column casing",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Bent 2",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "pipe seat extender",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "hinge",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "lumber blocking",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "564+35.87",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "568+55.12",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p18",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "box girder",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 19,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "title",
+      "kind": "missed",
+      "gold": "INDEX TO PLANS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "views",
+      "kind": "fn",
+      "gold": "BACKFILL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "views",
+      "kind": "fn",
+      "gold": "EXCAVATION",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "views",
+      "kind": "fn",
+      "gold": "LIMITS OF EXCAVATION AND BACKFILL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION A-A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SITE SPECIFIC ARS CURVE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10D",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10E",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A3A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A3B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A3C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "INDEX TO PLANS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "QUANTITIES",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "STANDARD PLANS DATED 2018",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "Sheet"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "index to plans",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "general notes",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "AASHTO",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "quantities",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "ARS curve",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "excavation",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p19",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "backfill",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 20,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "title",
+      "kind": "missed",
+      "gold": "ABUTMENT DETAILS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "3/4\" = 1'-0\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "3/8\" = 1'-0\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "views",
+      "kind": "fn",
+      "gold": "ABUTMENT PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION A-A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION B-B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "Sheet"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.alignments",
+      "kind": "fp",
+      "gold": null,
+      "pred": "B"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "abutment",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "lumber blocking",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "8\" x 12\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Section A-A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Section B-B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p20",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "backwall",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 21,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "title",
+      "kind": "missed",
+      "gold": "BENT 2 DETAILS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1/4\" = 1'-0\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "3/4\" = 1'-0\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "views",
+      "kind": "fn",
+      "gold": "ELEVATION",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION C-C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "APPROXIMATE STEEL COLUMN CASING HEIGHTS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "Sheet"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Bent 2",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "column casing",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Type P/F",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Section C-C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "casing heights",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p21",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "18.75",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 22,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "title",
+      "kind": "missed",
+      "gold": "COLUMN CASING - STEEL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fn",
+      "gold": "ELLIPTICAL COLUMN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fn",
+      "gold": "ROUND COLUMN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION A-A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION B-B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fn",
+      "gold": "TYPE P/F COLUMN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "views",
+      "kind": "fn",
+      "gold": "WELDED FIELD SPLICE (OPTIONAL)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "column casing",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Type P/F",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "welded field splice",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "Detail C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p22",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "elliptical",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 23,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "title",
+      "kind": "missed",
+      "gold": "HINGE RETROFIT PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 5'-0\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "views",
+      "kind": "fn",
+      "gold": "BOLSTER PLAN LEFT BRIDGE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "views",
+      "kind": "fn",
+      "gold": "BOLSTER PLAN RIGHT BRIDGE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "Sheet"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.structures",
+      "kind": "fp",
+      "gold": null,
+      "pred": "BOLSTER PLAN LEFT BRIDGE"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.structures",
+      "kind": "fp",
+      "gold": null,
+      "pred": "BOLSTER PLAN RIGHT BRIDGE"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "hinge",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "bolster",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "soffit access opening",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "pipe seat extender",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "left bridge",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p23",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "right bridge",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 24,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "title",
+      "kind": "missed",
+      "gold": "SOFFIT ACCESS OPENING DETAILS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "views",
+      "kind": "fn",
+      "gold": "HINGE ANCHORAGE DETAIL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "views",
+      "kind": "fn",
+      "gold": "HINGE DETAIL",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION B-B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SOFFIT ACCESS DOOR ASSEMBLY AT \"HINGE\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.counties",
+      "kind": "fp",
+      "gold": null,
+      "pred": "Sheet"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "soffit access",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "hinge",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "saw cut",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "expansion anchorage",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "2'-6\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p24",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "cored hole",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 25,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "title",
+      "kind": "missed",
+      "gold": "300 KIP PIPE SEAT EXTENDER (RETROFIT)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "NO SCALE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "views",
+      "kind": "fn",
+      "gold": "BRIDGES WITH SKEWS",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "views",
+      "kind": "fn",
+      "gold": "DETAIL \"A\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PIPE EXTENDER ELEVATION",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION A-A",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION B-B",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "views",
+      "kind": "fn",
+      "gold": "SECTION C-C",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "pipe seat extender",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "300 kip",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "8\"",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "cored hole",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "bolster",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p25",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "skew",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 26,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "title",
+      "kind": "missed",
+      "gold": "LOG OF TEST BORINGS 1 OF 2",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 10'",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 40'",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PLAN",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PROFILE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10F",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10G",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10H",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "schedules",
+      "kind": "fn",
+      "gold": "BOREHOLE LOCATION TABLE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fp",
+      "gold": null,
+      "pred": "\"B\" 564+00 to 568+91.93"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fp",
+      "gold": null,
+      "pred": "564+20.0 to 569+00"
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 564+20.0 (boring RC-20-001, 15.0 Lt)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 568+80.0 (boring RC-20-002, 2.0 Rt)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"B\" 568+91.93 (POT Bk)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.stations",
+      "kind": "fn",
+      "gold": "\"A3\" 568+71.89 (bench mark)",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "RC-20-001",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "RC-20-002",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "564+20.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "568+80.0",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "borehole location table",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "bench mark",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p26",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "boring",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "sheet_index",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "sheet_total",
+      "kind": "missed",
+      "gold": 27,
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "title",
+      "kind": "missed",
+      "gold": "LOG OF TEST BORINGS 2 OF 2",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "scales",
+      "kind": "fn",
+      "gold": "1\" = 10'",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "views",
+      "kind": "fn",
+      "gold": "PROFILE",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10F",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10G",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "references",
+      "kind": "fn",
+      "gold": "A10H",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "RC-20-002",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "129.7",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "16.8",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "silty sand",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "clayey silt",
+      "pred": null
+    },
+    {
+      "id": "d3-03-2H4504-plans:p27",
+      "field": "context.facts",
+      "kind": "uncovered",
+      "gold": "blow",
+      "pred": null
+    }
+  ]
+}
