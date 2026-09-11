@@ -180,15 +180,29 @@ def caltrans_bench(
     k: int = 8,
     retriever: str = "lexical",
     ekg_db: str = str(DEFAULT_SNAPSHOT),
+    ekg_tools: str = "search,fetch,traverse",
     docs: str | None = None,
     strict: bool = True,
     max_chars: int | None = None,
+    token_limit: int | None = 100_000,
+    message_limit: int | None = 24,
 ) -> Task:
+    """``ekg_tools`` names the gateway tools to expose; every schema is re-sent on every
+    request of the loop, so a tool no question can use is a tax on all of them —
+    ``find_experts`` and ``get_project_context`` are off by default for that reason.
+
+    ``token_limit`` and ``message_limit`` are backstops against a runaway tool loop
+    (observed worst case: 8 tool calls, 168k input tokens on one question), set above
+    anything a healthy sample reaches rather than tight enough to trim typical ones.
+    They apply to the ``ekg`` condition; the other two make a single request.
+    """
     questions_path = research_path(questions)
     qs = load_questions(questions_path, split=split)
     if not qs:
         raise ValueError(f"no questions in {questions_path} (split={split})")
     only = docs.split(",") if docs else None
+    tool_names = [t.strip() for t in ekg_tools.split(",") if t.strip()]
+    limits: dict[str, int | None] = {}
     if condition == "closed_book":
         chain = [system_message(SYSTEM_PROMPT), generate()]
     elif condition == "rag":
@@ -196,7 +210,9 @@ def caltrans_bench(
     elif condition == "ekg":
         from caltrans_bench.ekg_tools import ekg_tool_source
 
-        chain = [system_message(SYSTEM_PROMPT), use_tools(ekg_tool_source(research_path(ekg_db))), generate()]
+        source = ekg_tool_source(research_path(ekg_db), tools=tool_names)
+        chain = [system_message(SYSTEM_PROMPT), use_tools(source), generate()]
+        limits = {"token_limit": token_limit, "message_limit": message_limit}
     else:
         raise ValueError(f"unknown condition {condition!r}; expected closed_book, rag, or ekg")
     aliases = doc_aliases(load_manifest(MANIFEST_PATH), research_path(ekg_db))
@@ -204,8 +220,10 @@ def caltrans_bench(
         dataset=MemoryDataset([_sample(q) for q in qs], name=f"caltrans-bench:{questions_path.stem}"),
         solver=chain,
         scorer=bench_scorer(strict=strict, aliases=aliases),
+        **limits,
         metadata={
             "condition": condition, "split": split, "k": k, "retriever": retriever, "strict": strict,
             "max_chars": max_chars,
+            **({"ekg_tools": tool_names, **limits} if condition == "ekg" else {}),
         },
     )

@@ -44,6 +44,17 @@ uv run inspect eval caltrans_bench/task.py -T condition=ekg --model anthropic/cl
 (`closed_book`, `rag`, `ekg`), `questions`, `split`, `k`, `retriever`, `ekg_db`, `docs` (comma-separated document
 ids to retrieve from), `strict`, and `max_chars` (RAG passes retrieved pages whole; set this only to study a
 per-passage cap — the old default of 3,000 characters cut the answer off about half of the pages it retrieved).
+The `ekg` condition adds `ekg_tools` (which gateway tools to expose, default `search,fetch,traverse`) plus
+`token_limit` and `message_limit` backstops against a runaway tool loop. Every tool schema is re-sent on every
+request of the loop, so `find_experts` and `get_project_context` are off by default: no question in the set can
+use them, and the two cost about 540 tokens per request. Together with compact tool-result JSON and a section
+index that is no longer re-sent on a fetch that already names a section, those changes cut the first six
+questions from 79,159 input tokens to 62,251 (-21%) with the same answers and the same 12 tool calls.
+
+The gateway's `EKG_FETCH_PREVIEW_CHARS` (passed through by `gateway_env`, unset = serve the stored body) caps
+how much document body a `fetch` without a `section` returns. It is a grounding lever, not a budget one: at
+2,000 those six questions went from citation 0.00 to 0.67 — and from 62k input tokens to 123k, because the
+model made 2.3x the tool calls and every extra round re-sends the transcript. Worth settling on a full run.
 Citations are scored on manifest document ids; names the EKG gateway exposes instead (entity ids such as
 `ingest:e3673a7430de`, file stems such as `chp0200-092923-a11y`) are mapped back through `doc_aliases` so the
 citation metric is comparable across conditions. The answer protocol asks for the checked page to be cited even on

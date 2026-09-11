@@ -128,6 +128,27 @@ function chunksTextLength(chunks: Chunk[]): number {
   return chunks.reduce((n, c) => n + c.text.length, 0);
 }
 
+/**
+ * How much of a document body `fetch` returns when no section was asked for.
+ * Unset serves the stored body, which ingest has already capped.
+ *
+ * Worth a number, because the preview decides how the caller answers. A long one
+ * costs thousands of tokens and lets the caller answer from an arbitrary prefix
+ * with nothing to cite; a short one makes it pick a section from the index and
+ * answer from an anchored passage. On six benchmark questions, cutting the preview
+ * to 2,000 characters took citation accuracy from 0.00 to 0.67 — and raised total
+ * tokens 55%, because the caller then made 2.3x the tool calls and every extra
+ * round re-sends the whole transcript. It buys grounding, not budget, so it stays
+ * off by default until a full run says what it is worth.
+ */
+const PREVIEW_CHARS = (() => {
+  const raw = Number(process.env.EKG_FETCH_PREVIEW_CHARS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : Infinity;
+})();
+
+/** Section-index entries per preview; beyond this the caller narrows with `search`. */
+const SECTION_INDEX_MAX = 60;
+
 function citation(entity: Entity) {
   return {
     sourceUrl: entity.provenance.sourceUrl,
@@ -198,8 +219,13 @@ const NO_RESULTS_GUIDANCE =
   'concluding. If that also returns nothing, tell the user the firm graph has no answer — do NOT ' +
   'substitute general knowledge as if it were firm precedent (PRD P0-8).';
 
+/**
+ * Every tool result is JSON in a text block, and every byte of it is context the
+ * caller pays for on that turn and on each turn after. Serialize compactly: pretty
+ * printing a fetch payload spends about a fifth of it on indentation alone.
+ */
 function asContent(payload: unknown) {
-  return { content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] };
+  return { content: [{ type: 'text' as const, text: JSON.stringify(payload) }] };
 }
 
 /**
@@ -550,11 +576,12 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
       const picked = section !== undefined ? chunks.find((c) => c.ordinal === section) : undefined;
       const provenance = citation(entity);
       if (picked) provenance.anchor = { ...provenance.anchor, ...picked.anchor };
+      const preview = (entity.content ?? entity.summary ?? '').slice(0, PREVIEW_CHARS);
 
       return asContent({
         id: entity.id,
         title: entity.title,
-        text: picked?.text ?? entity.content ?? entity.summary ?? '',
+        text: picked?.text ?? preview,
         ...(picked ? { section: { ordinal: picked.ordinal, heading: picked.heading, anchor: picked.anchor } } : {}),
         url: appUrl(entity),
         metadata: {
@@ -562,16 +589,22 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
           properties: entity.properties,
           tags: entity.tags,
           provenance,
-          // Section index so the model can pull the exact passage it needs.
+          // Section index so the model can pull the exact passage it needs. It is
+          // the preview call's payload — what to ask for next — so a call that
+          // already names a section is not charged for it a second time.
           ...(chunks.length > 0
             ? {
                 sectionCount: chunks.length,
-                previewTruncated: (entity.content?.length ?? 0) < chunksTextLength(chunks),
-                sections: chunks.slice(0, 60).map((c) => ({
-                  ordinal: c.ordinal,
-                  heading: c.heading,
-                  anchor: c.anchor,
-                })),
+                ...(picked
+                  ? {}
+                  : {
+                      previewTruncated: preview.length < chunksTextLength(chunks),
+                      sections: chunks.slice(0, SECTION_INDEX_MAX).map((c) => ({
+                        ordinal: c.ordinal,
+                        heading: c.heading,
+                        anchor: c.anchor,
+                      })),
+                    }),
               }
             : {}),
           related: related.map((n) => ({

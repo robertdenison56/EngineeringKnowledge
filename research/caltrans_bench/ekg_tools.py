@@ -16,6 +16,13 @@ READ_TOOLS = ["search", "fetch", "traverse", "get_project_context", "find_expert
 GATEWAY_ENTRY = REPO_ROOT / "apps" / "mcp-server" / "dist" / "index.js"
 
 
+#: Gateway settings a retrieval study may vary, passed through from the parent
+#: environment when set. ``EKG_FETCH_PREVIEW_CHARS`` sets how much document body a
+#: ``fetch`` without a ``section`` returns — the lever between one expensive
+#: unanchored preview and several cheap anchored section fetches.
+PASSTHROUGH_ENV = ("EKG_FETCH_PREVIEW_CHARS",)
+
+
 def gateway_env(db_path: Path) -> dict[str, str]:
     env = {
         "EKG_DB_PATH": str(db_path),
@@ -24,6 +31,9 @@ def gateway_env(db_path: Path) -> dict[str, str]:
         "EKG_DB_MIGRATE": "0",
         "PATH": os.environ.get("PATH", ""),
     }
+    for name in PASSTHROUGH_ENV:
+        if os.environ.get(name):
+            env[name] = os.environ[name]
     return env
 
 
