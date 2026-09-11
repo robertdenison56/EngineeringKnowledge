@@ -68,12 +68,23 @@ Two gateway settings (passed through by `gateway_env`) tune the rest, both off b
   grounding lever, not a budget one: at 2,000 those six went from citation 0.00 to 0.67 and from 62k tokens to
   123k, because the model made 2.3x the tool calls and every extra round re-sends the transcript.
 
-Both want a full run before either default moves. Note the citation metric understates all of these: the model
-writes `CITE: HDM p2` — the right page — and `doc_aliases` maps entity ids and file stems but not the human
-name, so a correct citation scores zero.
-Citations are scored on manifest document ids; names the EKG gateway exposes instead (entity ids such as
-`ingest:e3673a7430de`, file stems such as `chp0200-092923-a11y`) are mapped back through `doc_aliases` so the
-citation metric is comparable across conditions. The answer protocol asks for the checked page to be cited even on
+Both want a full run before either default moves.
+Citations are scored on manifest document ids, and `doc_aliases` maps every name that identifies exactly one
+document onto its id, so the metric is comparable across conditions: the manifest id, the gateway's entity id
+(`ingest:e3673a7430de`) and file stem (`chp0200-092923-a11y`), the printed title ("2025 Standard
+Specifications"), and an HDM chapter named by a section number ("HDM Table 201.1" is chapter 200, Caltrans
+numbering). A name that fits more than one document resolves to nothing rather than to a coin flip — a bare
+`HDM` is 38 chapters, and `Standard Specifications` without an edition is two.
+
+Do not read a low citation score as an alias gap; it was measured and it is not. Across 2,842 scored answers
+the richer map (150 alias keys to 445) and the parser fix that reads the document in front of the page rather
+than the token touching it — `HDM Table 309.2A p6` used to cite a document called `A` — take item resolution
+from 33% to 60% and the citation metric from 13.2% to 13.3%. Almost everything that newly resolves cites the
+**right document and the wrong page**: 577 items against 393 right. `rag` scores 43.6% because its context is
+page-labelled; `ekg` scores 2.3% because models name the manual rather than the id they were handed
+(gemma4 answers all six of the first questions correctly and writes `CITE: HDM p2` every time).
+
+The answer protocol asks for the checked page to be cited even on
 a `NOT IN DOCUMENT` answer; every refusal question carries an anchor for exactly that page. Relative `questions` and `ekg_db` paths are taken from this directory, and logs
 land in `logs/` (`uv run inspect view` browses them). Everything else (`--limit`, `--max-connections`,
 `--no-fail-on-error`, `--log-dir`, …) is a plain Inspect option; `uv run inspect eval --help` lists them.

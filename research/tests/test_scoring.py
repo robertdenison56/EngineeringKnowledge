@@ -44,7 +44,9 @@ def test_score_number_without_protocol_uses_last_number():
 
 def test_citations_parse_and_match():
     r = "ANSWER: 3\nCITE: hdm-chp0200 p12; stdspecs-2025, page 401"
-    assert cited_pages(r) == {("hdm-chp0200", 12), ("stdspecs-2025", 401)}
+    # Document names fold to the form the alias map keys on, so a citation matches
+    # its anchor whatever separators it was written with.
+    assert cited_pages(r) == {("hdm chp0200", 12), ("stdspecs 2025", 401)}
     assert score_citation(r, [("stdspecs-2025", 401)]).correct
     assert score_citation(r, [("hdm-chp0200", 13)], page_slack=1).correct
     assert not score_citation(r, [("hdm-chp0300", 12)]).correct
@@ -116,14 +118,14 @@ def test_number_words():
 
 def test_citation_aliases_map_entity_ids_and_stems():
     aliases = {
-        "ingest:e3673a7430de": "hdm-chp0200",
+        "ingest e3673a7430de": "hdm-chp0200",
         "e3673a7430de": "hdm-chp0200",
-        "chp0200-092923-a11y": "hdm-chp0200",
+        "chp0200 092923 a11y": "hdm-chp0200",
     }
     r = "ANSWER: 360 ft\nCITE: ingest:e3673a7430de p2; chp0200-092923-a11y p5"
     assert cited_pages(r, aliases) == {("hdm-chp0200", 2), ("hdm-chp0200", 5)}
     assert score_citation(r, [("hdm-chp0200", 2)], aliases=aliases).correct
-    assert cited_pages(r) == {("ingest:e3673a7430de", 2), ("chp0200-092923-a11y", 5)}  # no aliases: raw ids
+    assert cited_pages(r) == {("ingest e3673a7430de", 2), ("chp0200 092923 a11y", 5)}  # no aliases: as written
     assert not score_citation(r, [("hdm-chp0200", 2)]).correct
 
 
@@ -142,10 +144,10 @@ def test_doc_aliases_from_manifest_and_snapshot(tmp_path):
     con.commit()
     con.close()
     aliases = doc_aliases(manifest, db)
-    assert aliases["chp0200-092923-a11y"] == "hdm-chp0200"
-    assert aliases["ingest:e3673a7430de"] == "hdm-chp0200"
+    assert aliases["chp0200 092923 a11y"] == "hdm-chp0200"
+    assert aliases["ingest e3673a7430de"] == "hdm-chp0200"
     assert aliases["e3673a7430de"] == "hdm-chp0200"
-    assert doc_aliases(manifest, tmp_path / "missing.db")["2025_stdspecs"] == "stdspecs-2025"
+    assert doc_aliases(manifest, tmp_path / "missing.db")["2025 stdspecs"] == "stdspecs-2025"
 
 
 def test_format_context_passes_whole_pages_unless_capped():
@@ -155,3 +157,49 @@ def test_format_context_passes_whole_pages_unless_capped():
     assert len(format_context([long])) > 5000
     assert format_context([long], max_chars=100).endswith(" …")
     assert format_context([long]).startswith("[hdm-chp0200 p2]\n")
+
+
+def test_citation_names_a_document_every_way_a_model_writes_it():
+    """The names models actually used across the benchmark runs, and the two they
+    must NOT resolve: an edition-less "Standard Specifications" is two documents
+    and a bare "HDM" is thirty-eight."""
+    from caltrans_bench import MANIFEST_PATH
+    from caltrans_bench.ekg_tools import doc_aliases
+    from caltrans_bench.manifest import load_manifest
+    from caltrans_bench.scoring import canonical_doc
+
+    aliases = doc_aliases(load_manifest(MANIFEST_PATH))
+    for written, expected in [
+        ("hdm-chp0200", "hdm-chp0200"),
+        ("chp0200-092923-a11y", "hdm-chp0200"),
+        ("HDM Chapter 620", "hdm-chp0620"),
+        ("HDM Table 201.1", "hdm-chp0200"),      # section 201 lives in chapter 200
+        ("HDM Table 309.2A", "hdm-chp0300"),
+        ("2025 Standard Specifications", "stdspecs-2025"),
+        ("2025-Standard-Specifications", "stdspecs-2025"),
+        ("2025-standard-plans-locked", "stdplans-2025"),
+        ("DIB 82-06", "dib-82-06"),
+    ]:
+        assert canonical_doc(written, aliases) == expected, written
+    assert canonical_doc("HDM", aliases) == "hdm"
+    assert canonical_doc("Standard Specifications", aliases) == "standard specifications"
+
+
+def test_cite_line_reads_the_document_in_front_of_the_page():
+    """The page marker ends an item; the document is the whole phrase before it."""
+    aliases = {"hdm chapter 300": "hdm-chp0300"}
+    # "A" is the tail of a table number, not a document — and the "p" of
+    # "chp0200" is mid-token, so it is not a page marker.
+    assert cited_pages("CITE: HDM Table 309.2A p6.", aliases) == {("hdm-chp0300", 6)}
+    assert cited_pages("CITE: hdm-chp0200 p2") == {("hdm chp0200", 2)}
+    assert cited_pages("CITE: 2025-std-specs-a11y p141") == {("2025 std specs a11y", 141)}
+    assert cited_pages("CITE: a p1; b page 2, c pg. 3") == {("a", 1), ("b", 2), ("c", 3)}
+    # A page with no document in front of it belongs to the last one named.
+    assert cited_pages("CITE: hdm-chp0200 p2, p5") == {("hdm chp0200", 2), ("hdm chp0200", 5)}
+    assert cited_pages("CITE: none") == set()
+
+
+def test_citation_matches_an_anchor_without_an_alias_map():
+    r = "ANSWER: 360 ft\nCITE: hdm-chp0200 p2"
+    assert score_citation(r, [("hdm-chp0200", 2)]).correct
+    assert score_citation(r, [("hdm-chp0200", 2)], aliases={}).correct

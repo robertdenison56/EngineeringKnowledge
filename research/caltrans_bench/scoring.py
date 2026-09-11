@@ -23,8 +23,14 @@ REFUSAL_TOKEN = "NOT IN DOCUMENT"
 
 _ANSWER_RE = re.compile(r"^[ \t]*\**ANSWER\**[ \t]*:[ \t]*(.+?)[ \t]*$", re.IGNORECASE | re.MULTILINE)
 _CITE_RE = re.compile(r"^[ \t]*\**CITE\**[ \t]*:[ \t]*(.+?)[ \t]*$", re.IGNORECASE | re.MULTILINE)
-# The document token may carry a namespace (EKG entity ids look like ``ingest:e3673a7430de``).
-_CITATION_ITEM_RE = re.compile(r"([A-Za-z][A-Za-z0-9._:-]*)[ \t]*,?[ \t]*(?:p\.?|pg\.?|page)[ \t]*(\d+)", re.IGNORECASE)
+# Page markers on a CITE line. Each one ends an item; the document is whatever
+# precedes it, back to the previous marker. Scanning for the marker rather than
+# for a document-shaped token is what makes "HDM Table 309.2A p6" cite the HDM
+# and not "A", and the leading \b is what keeps the "p" of "hdm-chp0200" from
+# being read as the marker (it is mid-token, so no boundary precedes it).
+_PAGE_MARKER_RE = re.compile(r"\b(?:p|pg|page)\.?[ \t]*(\d+)", re.IGNORECASE)
+#: Separators between the document and its page, and between items.
+_ITEM_TRIM = " \t,;."
 _QUANTITY_RE = re.compile(r"(-?\d[\d,]*(?:\.\d+)?)[ \t]*([A-Za-z/%°]+(?:/[A-Za-z]+)?|'|\")?")
 _REFUSAL_PHRASES = (
     "not in document",
@@ -164,27 +170,80 @@ def final_answer(response: str) -> str | None:
     return matches[-1].strip() if matches else None
 
 
-def canonical_doc(doc: str, aliases: Mapping[str, str] | None = None) -> str:
-    """Lower-cased document id, mapped through ``aliases`` (entity id / file stem → manifest id).
+def normalize_doc_token(doc: str) -> str:
+    """Fold a cited document name to the form ``doc_aliases`` keys on.
 
-    A namespaced id (``ingest:e3673a7430de``) is tried whole and then by its last segment,
-    so a model that only ever saw the gateway's ids can still be scored on the benchmark's.
+    Lower-case, everything non-alphanumeric to single spaces: ``2025-Standard-Plans``,
+    ``2025 Standard Plans`` and ``2025_standard_plans`` are one key.
     """
-    key = doc.lower()
+    return re.sub(r"[^a-z0-9]+", " ", doc.lower()).strip()
+
+
+#: An HDM section or table number: 201.1, 309.2A, 1003.1. The leading digits are
+#: the section, and its chapter is the hundred it falls in — 201.1 is chapter 200,
+#: 1003.1 is chapter 1000. Caltrans numbering, so "HDM Table 201.1" names a
+#: chapter exactly as precisely as the chapter's own id does.
+_HDM_SECTION_RE = re.compile(r"\b(\d{3,4})\.\d")
+
+
+def canonical_doc(doc: str, aliases: Mapping[str, str] | None = None) -> str:
+    """A cited document name mapped to its manifest id, or the normalized name.
+
+    Models name a document every way it appears to them: the manifest id, the
+    gateway's entity id (``ingest:e3673a7430de``) or file stem, the title
+    ("2025 Standard Specifications"), or a chapter by its table number ("HDM
+    Table 201.1"). All of those identify one document, so all of them resolve.
+
+    Tried in order: the whole phrase; its last colon segment (a namespaced entity
+    id); the longest run of words inside it that is an alias (so "see 2025
+    Standard Plans" still lands); and finally, for the HDM, the chapter implied
+    by a section number. A bare "HDM" resolves to nothing — 38 chapters carry
+    that name and the citation does not say which.
+    """
+    key = normalize_doc_token(doc)
     if not aliases:
         return key
     if key in aliases:
         return aliases[key]
-    tail = key.rsplit(":", 1)[-1]
-    return aliases.get(tail, key)
+    tail = normalize_doc_token(doc.rsplit(":", 1)[-1])
+    if tail in aliases:
+        return aliases[tail]
+    words = key.split()
+    for size in range(len(words) - 1, 0, -1):
+        for start in range(len(words) - size + 1):
+            window = " ".join(words[start : start + size])
+            if window in aliases:
+                return aliases[window]
+    if "hdm" in words or "highway design manual" in key:
+        # On the raw text: normalizing turns "201.1" into "201 1".
+        section = _HDM_SECTION_RE.search(doc)
+        if section:
+            chapter = aliases.get(f"hdm chapter {int(section.group(1)) // 100 * 100}")
+            if chapter:
+                return chapter
+    return key
 
 
 def cited_pages(response: str, aliases: Mapping[str, str] | None = None) -> set[tuple[str, int]]:
-    """All (doc-id, page) pairs on CITE: lines, with document ids canonicalised."""
+    """All (doc-id, page) pairs on CITE: lines, with document ids canonicalised.
+
+    An item runs from the end of the previous page marker to the end of this one,
+    so the document is the whole phrase in front of the page rather than the one
+    token touching it.
+    """
     pairs: set[tuple[str, int]] = set()
     for line in _CITE_RE.findall(response):
-        for doc, page in _CITATION_ITEM_RE.findall(line):
-            pairs.add((canonical_doc(doc, aliases), int(page)))
+        at = 0
+        current: str | None = None
+        for marker in _PAGE_MARKER_RE.finditer(line):
+            doc = line[at : marker.start()].strip(_ITEM_TRIM)
+            at = marker.end()
+            # "hdm-chp0200 p2, p5" cites two pages of one document: a page with no
+            # document in front of it belongs to the last one named on the line.
+            if doc:
+                current = canonical_doc(doc, aliases)
+            if current is not None:
+                pairs.add((current, int(marker.group(1))))
     return pairs
 
 
@@ -284,16 +343,22 @@ def score_citation(
     page_slack: int = 0,
     aliases: Mapping[str, str] | None = None,
 ) -> Verdict:
-    """Correct when any cited (doc, page) lands on an anchor, within `page_slack` pages."""
+    """Correct when any cited (doc, page) lands on an anchor, within `page_slack` pages.
+
+    Both sides fold through `normalize_doc_token`, so an anchor's id matches a
+    citation of that id whatever separators it was written with, and with or
+    without an alias map to resolve it.
+    """
     cited = cited_pages(response, aliases)
     if not cited:
         return Verdict(False, "no CITE line")
-    wanted = {(doc.lower(), page) for doc, page in anchors}
+    wanted = {(normalize_doc_token(doc), page) for doc, page in anchors}
     for doc, page in cited:
+        key = normalize_doc_token(doc)
         for want_doc, want_page in wanted:
-            if doc == want_doc and abs(page - want_page) <= page_slack:
+            if key == want_doc and abs(page - want_page) <= page_slack:
                 return Verdict(True, f"cited {doc} p{page}")
-    return Verdict(False, f"cited {sorted(cited)} but anchors are {sorted(wanted)}")
+    return Verdict(False, f"cited {sorted(cited)} but anchors are {sorted((d, p) for d, p in anchors)}")
 
 
 def score_refusal(response: str) -> Verdict:
