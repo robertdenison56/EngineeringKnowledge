@@ -1,7 +1,6 @@
 import type { Chunk, Entity, Relationship, RelationshipType } from './ontology.js';
 import type {
   Caller,
-  ChunkMatch,
   GraphStore,
   MergeResult,
   NeighborHit,
@@ -9,8 +8,10 @@ import type {
   SearchOptions,
 } from './graph-store.js';
 import {
+  bestCitationChunk,
   buildQueryGroups,
   canRead,
+  chunkMatch,
   groupConcept,
   matchesTagFilter,
   relaxationThreshold,
@@ -18,8 +19,8 @@ import {
   roleBoostFactor,
   scoreChunkMatch,
   scoreEntityMatch,
-  snippetForGroups,
   warningFor,
+  type ChunkCoverage,
 } from './matching.js';
 
 /**
@@ -147,17 +148,17 @@ export class InMemoryGraphStore implements GraphStore {
       // favors it. Applied after the gate, so it never admits a non-match.
       const score = baseScore * roleBoostFactor(entity, options.boostRole);
 
-      const match: ChunkMatch | undefined = bestChunk && {
-        anchor: bestChunk.chunk.anchor,
-        ordinal: bestChunk.chunk.ordinal,
-        snippet: snippetForGroups(bestChunk.chunk.text, groups),
-        ...(bestChunk.chunk.heading ? { heading: bestChunk.chunk.heading } : {}),
-      };
+      // Citation only, and strictly downstream of `baseScore` above: an
+      // all-concepts passage when one exists, else the best-coverage passage.
+      // Picking it can never admit, drop, or reorder an entity.
+      const cite: ChunkCoverage | undefined = bestChunk
+        ? { chunk: bestChunk.chunk, matched: groups.length, total: groups.length }
+        : bestCitationChunk(this.chunks.get(entity.id) ?? [], groups);
       hits.push({
         entity,
         score,
         warning: warningFor(entity.provenance.reviewStatus),
-        ...(match ? { chunk: match } : {}),
+        ...(cite ? { chunk: chunkMatch(cite, groups) } : {}),
       });
     }
     // Relaxed fallback (most concepts match, disclosed as partial): runs ONLY
@@ -166,8 +167,8 @@ export class InMemoryGraphStore implements GraphStore {
     // relaxed results never mix, relaxed hits never feed graph-expansion, and
     // every relaxed hit carries `partial` naming what matched and what is
     // missing — that explicit disclosure is what keeps the fallback inside
-    // the honest no_results contract (PRD P0-8). Entity-level only: no chunk
-    // relaxation, so no `chunk` citation is attached to a partial hit.
+    // the honest no_results contract (PRD P0-8). Admission is entity-level;
+    // the passage citation comes from the same citation-only pass as above.
     if (hits.length === 0 && options.relax !== false && relaxationThreshold(groups.length) > 0) {
       for (const entity of this.entities.values()) {
         if (!canRead(caller, entity)) continue;
@@ -177,12 +178,14 @@ export class InMemoryGraphStore implements GraphStore {
         const { score, matchedGroups } = relaxedScoreEntityMatch(entity, groups);
         if (score <= 0) continue;
         const matched = new Set(matchedGroups);
+        const cite = bestCitationChunk(this.chunks.get(entity.id) ?? [], groups);
         hits.push({
           entity,
           // Same re-rank as the strict pass: the role lens scales admitted
           // candidates only, it never admits or hides one.
           score: score * roleBoostFactor(entity, options.boostRole),
           warning: warningFor(entity.provenance.reviewStatus),
+          ...(cite ? { chunk: chunkMatch(cite, groups) } : {}),
           partial: {
             matchedConcepts: matchedGroups.map((i) => groupConcept(groups[i])),
             missingConcepts: groups.filter((_, i) => !matched.has(i)).map(groupConcept),

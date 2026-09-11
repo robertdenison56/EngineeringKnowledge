@@ -20,7 +20,9 @@ GATEWAY_ENTRY = REPO_ROOT / "apps" / "mcp-server" / "dist" / "index.js"
 #: environment when set. ``EKG_FETCH_PREVIEW_CHARS`` sets how much document body a
 #: ``fetch`` without a ``section`` returns — the lever between one expensive
 #: unanchored preview and several cheap anchored section fetches.
-PASSTHROUGH_ENV = ("EKG_FETCH_PREVIEW_CHARS",)
+#: ``EKG_SEARCH_PASSAGES`` is the other side of that lever: how many top search
+#: results carry their cited passage in full, so an answer needs no fetch at all.
+PASSTHROUGH_ENV = ("EKG_FETCH_PREVIEW_CHARS", "EKG_SEARCH_PASSAGES")
 
 
 def gateway_env(db_path: Path) -> dict[str, str]:

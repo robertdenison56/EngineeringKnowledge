@@ -51,10 +51,26 @@ use them, and the two cost about 540 tokens per request. Together with compact t
 index that is no longer re-sent on a fetch that already names a section, those changes cut the first six
 questions from 79,159 input tokens to 62,251 (-21%) with the same answers and the same 12 tool calls.
 
-The gateway's `EKG_FETCH_PREVIEW_CHARS` (passed through by `gateway_env`, unset = serve the stored body) caps
-how much document body a `fetch` without a `section` returns. It is a grounding lever, not a budget one: at
-2,000 those six questions went from citation 0.00 to 0.67 — and from 62k input tokens to 123k, because the
-model made 2.3x the tool calls and every extra round re-sends the transcript. Worth settling on a full run.
+Then `search` began citing the passage it matched. A benchmark question tokenizes into a mean 15.2 concepts and
+the chunk gate wanted all of them in one passage, which exactly one question in sixty has — so every hit cited a
+file and no page (0 of 40 top hits anchored) and the model fetched whole documents back to read what it had
+already matched. Citing the best-coverage passage above a floor takes that to 32 of 40, and the six questions
+from 62,251 input tokens to 38,606 (**-51% against the 79,159 baseline**) with answers still 1.00 — the model
+fetches a section instead of a document, so tool bytes fall 82%.
+
+Two gateway settings (passed through by `gateway_env`) tune the rest, both off by default:
+
+- `EKG_SEARCH_PASSAGES` — how many top results carry their cited passage in full. At 2 the six questions cost
+  16,238 tokens (-79%) in 6 tool calls instead of 16, but answer accuracy fell to 0.83: reading a multi-column
+  table straight from the passage, the model took the *passing* column (2,700 ft) where the question asked for
+  *stopping* (930 ft). Cheap, and a table-reading risk for a small model.
+- `EKG_FETCH_PREVIEW_CHARS` — how much body a `fetch` without a `section` returns (unset = the stored body). A
+  grounding lever, not a budget one: at 2,000 those six went from citation 0.00 to 0.67 and from 62k tokens to
+  123k, because the model made 2.3x the tool calls and every extra round re-sends the transcript.
+
+Both want a full run before either default moves. Note the citation metric understates all of these: the model
+writes `CITE: HDM p2` — the right page — and `doc_aliases` maps entity ids and file stems but not the human
+name, so a correct citation scores zero.
 Citations are scored on manifest document ids; names the EKG gateway exposes instead (entity ids such as
 `ingest:e3673a7430de`, file stems such as `chp0200-092923-a11y`) are mapped back through `doc_aliases` so the
 citation metric is comparable across conditions. The answer protocol asks for the checked page to be cited even on

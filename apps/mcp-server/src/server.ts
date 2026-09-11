@@ -149,6 +149,19 @@ const PREVIEW_CHARS = (() => {
 /** Section-index entries per preview; beyond this the caller narrows with `search`. */
 const SECTION_INDEX_MAX = 60;
 
+/**
+ * Default for `search`'s `passages` when the caller does not say: how many top
+ * results carry their cited passage in full. Zero keeps `search` a lightweight
+ * index and leaves the text to `fetch`, which is the shape OpenAI deep research
+ * and Copilot expect. `EKG_SEARCH_PASSAGES` raises it for a deployment (or a
+ * retrieval study) that would rather spend ~600 tokens a passage than a round
+ * trip; an explicit `passages` argument always wins over it.
+ */
+const DEFAULT_SEARCH_PASSAGES = (() => {
+  const raw = Number(process.env.EKG_SEARCH_PASSAGES);
+  return Number.isInteger(raw) && raw >= 0 ? Math.min(raw, 10) : 0;
+})();
+
 function citation(entity: Entity) {
   return {
     sourceUrl: entity.provenance.sourceUrl,
@@ -159,7 +172,7 @@ function citation(entity: Entity) {
   };
 }
 
-function searchResult(hit: SearchHit) {
+function searchResult(hit: SearchHit, withPassage = false) {
   // When the hit matched a document passage, cite the page/section, not just
   // the file (P0-2a, ADR 0006): snippet from the passage, anchor merged with
   // the chunk's location.
@@ -174,6 +187,18 @@ function searchResult(hit: SearchHit) {
     type: hit.entity.type,
     snippet: hit.chunk?.snippet ?? hit.entity.summary,
     ...(hit.chunk ? { matchedSection: hit.chunk.heading ?? `passage ${hit.chunk.ordinal + 1}` } : {}),
+    // The cited passage in full, so a caller can answer from it and cite it
+    // without fetching the document back (`passages` on the search tool).
+    ...(withPassage && hit.chunk
+      ? { passage: hit.chunk.text, passageSection: hit.chunk.ordinal }
+      : {}),
+    // Disclose a best-coverage citation as one: this passage carries most of
+    // the query, not all of it, and the caller should read it as such (P0-8).
+    ...(hit.chunk && hit.chunk.matchedConcepts < hit.chunk.ofConcepts
+      ? {
+          passageCoverage: `passage carries ${hit.chunk.matchedConcepts} of the query's ${hit.chunk.ofConcepts} concepts`,
+        }
+      : {}),
     tags: hit.entity.tags,
     provenance,
     ...(hit.warning ? { warning: hit.warning } : {}),
@@ -524,9 +549,20 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
               'Boosts items the firm admin configured that lens to favor; ignored if unknown.',
           ),
         limit: z.number().int().min(1).max(25).optional(),
+        passages: z
+          .number()
+          .int()
+          .min(0)
+          .max(10)
+          .optional()
+          .describe(
+            'Return the cited passage in full for this many top results (snippet only when 0). ' +
+              'Use it when you intend to answer from the text: a passage averages ~600 tokens and ' +
+              'saves fetching the whole document back.',
+          ),
       },
     },
-    async ({ query, types, tags, role, limit }, extra) => {
+    async ({ query, types, tags, role, limit, passages }, extra) => {
       const caller = resolveCaller(extra?.authInfo);
       const boostRole = await resolveRole(store, caller.tenantId, role);
       const hits = await store.search(caller, query, { types, tags, limit, boostRole });
@@ -534,7 +570,7 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         return asContent({ results: [], no_results: true, guidance: NO_RESULTS_GUIDANCE });
       }
       return asContent({
-        results: hits.map(searchResult),
+        results: hits.map((hit, i) => searchResult(hit, i < (passages ?? DEFAULT_SEARCH_PASSAGES))),
         ...(boostRole ? { focusedBy: boostRole.name } : {}),
       });
     },

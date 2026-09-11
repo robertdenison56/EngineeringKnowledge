@@ -23,6 +23,16 @@ export interface ChunkMatch {
   /** Text window around the matched concepts, for the citation snippet. */
   snippet: string;
   ordinal: number;
+  /** The passage in full, so a caller can answer from it without fetching it back. */
+  text: string;
+  /**
+   * How much of the query this passage carries. When `matchedConcepts` is below
+   * `ofConcepts` the passage was the best available coverage rather than an
+   * all-concepts match, and a gateway must disclose that (PRD P0-8) — the same
+   * discipline `SearchHit.partial` applies at entity level.
+   */
+  matchedConcepts: number;
+  ofConcepts: number;
 }
 
 export interface SearchHit {

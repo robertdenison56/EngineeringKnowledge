@@ -1,4 +1,4 @@
-import type { Caller } from './graph-store.js';
+import type { Caller, ChunkMatch } from './graph-store.js';
 import type { Chunk, Entity, ReviewStatus } from './ontology.js';
 import type { RetrievalRole } from './roles.js';
 
@@ -296,6 +296,75 @@ export function scoreChunkMatch(chunk: Chunk, groups: string[][]): number {
   if (!groups.every((g) => groupMatches(haystack, g))) return 0;
   const heading = normalizeText(chunk.heading ?? '');
   return groups.length + groups.filter((g) => groupMatches(heading, g)).length;
+}
+
+/**
+ * Share of a query's concepts one passage must carry before it may be cited,
+ * when no passage carries them all. Deliberately high, and deliberately a
+ * fraction: a two-concept query still needs both (ceil(2 x 0.6) = 2), so short
+ * precise queries keep the all-concepts contract, while a fifteen-concept
+ * question needs nine.
+ */
+export const CITATION_COVERAGE_FLOOR = 0.6;
+
+/** A passage picked to cite, with how much of the query it actually carries. */
+export interface ChunkCoverage {
+  chunk: Chunk;
+  /** Query concepts this passage contains. */
+  matched: number;
+  /** Query concepts in total; `matched < total` is a best-coverage pick. */
+  total: number;
+}
+
+/**
+ * The passage that carries most of the query, for CITATION ONLY.
+ *
+ * `scoreChunkMatch` asks every concept to co-occur in one passage, which is the
+ * right gate for admitting a chunk hit and the wrong one for choosing what to
+ * cite. A whole-sentence question tokenizes into a dozen-plus concepts —
+ * "According to HDM Table 201.1, what is the minimum stopping sight distance for
+ * a design speed of 45 mph" is fifteen — and the passage that answers it carries
+ * the substance, not the scaffolding. Measured on the Caltrans benchmark: mean
+ * 15.2 concepts per question, the best passage carries 12.6 of them, and exactly
+ * one question in sixty has a passage carrying all fifteen. Under the all-or-
+ * nothing rule those hits cited a file and no page, so a caller that wanted the
+ * text had to fetch the whole document back.
+ *
+ * Callers must keep this out of admission and scoring — it may only choose among
+ * passages of an entity already admitted — and must disclose `matched`/`total`
+ * whenever they differ, so a best-coverage citation is never presented as an
+ * all-concepts one (PRD P0-8).
+ */
+export function bestCitationChunk(chunks: Chunk[], groups: string[][]): ChunkCoverage | undefined {
+  if (groups.length === 0) return undefined;
+  const required = Math.ceil(groups.length * CITATION_COVERAGE_FLOOR);
+  let best: (ChunkCoverage & { tiebreak: number }) | undefined;
+  for (const chunk of chunks) {
+    const haystack = chunkHaystack(chunk);
+    const matched = groups.filter((g) => groupMatches(haystack, g)).length;
+    if (matched < required) continue;
+    // Ties go to the passage whose heading names the concepts — the same
+    // heading bonus `scoreChunkMatch` applies.
+    const heading = normalizeText(chunk.heading ?? '');
+    const tiebreak = groups.filter((g) => groupMatches(heading, g)).length;
+    if (!best || matched > best.matched || (matched === best.matched && tiebreak > best.tiebreak)) {
+      best = { chunk, matched, total: groups.length, tiebreak };
+    }
+  }
+  return best && { chunk: best.chunk, matched: best.matched, total: best.total };
+}
+
+/** The wire shape of a cited passage: anchor, snippet, the passage itself, its coverage. */
+export function chunkMatch({ chunk, matched, total }: ChunkCoverage, groups: string[][]): ChunkMatch {
+  return {
+    anchor: chunk.anchor,
+    ordinal: chunk.ordinal,
+    snippet: snippetForGroups(chunk.text, groups),
+    text: chunk.text,
+    matchedConcepts: matched,
+    ofConcepts: total,
+    ...(chunk.heading ? { heading: chunk.heading } : {}),
+  };
 }
 
 /**

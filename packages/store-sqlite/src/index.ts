@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
+  bestCitationChunk,
   buildQueryGroups,
   canRead,
   chunkEmbeddingText,
@@ -17,6 +18,7 @@ import {
   warningFor,
   type Caller,
   type Chunk,
+  type ChunkCoverage,
   type ChunkMatch,
   type EmbeddingProvider,
   type Entity,
@@ -716,17 +718,24 @@ export class SqliteGraphStore implements GraphStore {
     // and a snippet. Preferred source is the chunk FTS pick; when that is
     // absent we fall back to a lexical scan of the entity's own chunks (see
     // `lexicalBestChunk`).
-    return ranked.map((hit) => {
-      const chunk = this.citationChunk(hit.entity.id, bestChunkId.get(hit.entity.id), groups);
-      if (!chunk) return hit;
-      const match: ChunkMatch = {
-        anchor: chunk.anchor,
-        ordinal: chunk.ordinal,
-        snippet: snippetForGroups(chunk.text, groups),
-        ...(chunk.heading ? { heading: chunk.heading } : {}),
-      };
-      return { ...hit, chunk: match };
-    });
+    return ranked.map((hit) => this.withCitation(hit, groups, bestChunkId.get(hit.entity.id)));
+  }
+
+  /** Attach the passage to cite to an already-admitted hit (never changes admission). */
+  private withCitation<T extends SearchHit>(hit: T, groups: string[][], ftsChunkId?: string): T {
+    const found = this.citationChunk(hit.entity.id, ftsChunkId, groups);
+    if (!found) return hit;
+    const { chunk, matched, total } = found;
+    const match: ChunkMatch = {
+      anchor: chunk.anchor,
+      ordinal: chunk.ordinal,
+      snippet: snippetForGroups(chunk.text, groups),
+      text: chunk.text,
+      matchedConcepts: matched,
+      ofConcepts: total,
+      ...(chunk.heading ? { heading: chunk.heading } : {}),
+    };
+    return { ...hit, chunk: match };
   }
 
   /**
@@ -745,41 +754,55 @@ export class SqliteGraphStore implements GraphStore {
    * with no page or section even though PART 2 plainly says it. Falling back
    * to `scoreChunkMatch` — the same per-passage co-occurrence gate the
    * in-memory store already applies, so the two stores now agree — recovers
-   * the citation. When no passage clears that gate we return undefined and
-   * the hit cites the file only, rather than pointing at an arbitrary page.
+   * the citation.
+   *
+   * Last, `bestCitationChunk`: the passage carrying most of the query, for the
+   * whole-sentence questions where no single passage carries all fifteen of a
+   * question's concepts and the all-or-nothing rule cited a file and no page.
+   * Its coverage is reported so the gateway can disclose a best-coverage pick as
+   * one. When nothing clears even that floor we return undefined and the hit
+   * cites the file only, rather than pointing at an arbitrary page.
    */
   private citationChunk(
     entityId: string,
     ftsChunkId: string | undefined,
     groups: string[][],
-  ): Chunk | undefined {
+  ): ChunkCoverage | undefined {
+    const total = groups.length;
     if (ftsChunkId) {
       const row = this.db.prepare('SELECT * FROM chunks WHERE id = ?').get(ftsChunkId) as
         | ChunkRow
         | undefined;
-      if (row) return rowToChunk(row);
+      if (row) return { chunk: rowToChunk(row), matched: total, total };
     }
-    const rows = this.db
-      .prepare('SELECT * FROM chunks WHERE entity_id = ? ORDER BY ordinal')
-      .all(entityId) as unknown as ChunkRow[];
+    const chunks = (
+      this.db
+        .prepare('SELECT * FROM chunks WHERE entity_id = ? ORDER BY ordinal')
+        .all(entityId) as unknown as ChunkRow[]
+    ).map(rowToChunk);
     let best: { chunk: Chunk; score: number } | undefined;
-    for (const row of rows) {
-      const candidate = rowToChunk(row);
+    for (const candidate of chunks) {
       const score = scoreChunkMatch(candidate, groups);
       if (score > 0 && (!best || score > best.score)) best = { chunk: candidate, score };
     }
-    return best?.chunk;
+    if (best) return { chunk: best.chunk, matched: total, total };
+    return bestCitationChunk(chunks, groups);
   }
 
   /**
    * Most-concepts-match fallback (SearchOptions.relax, default on): runs ONLY
    * when the strict pipeline admitted zero entities, and only for queries of
-   * three or more concept groups. Entity-level only — no chunk pass, so
-   * relaxed hits never carry a passage citation — and it never seeds
-   * graph-expansion. Every hit is disclosed as partial via
+   * three or more concept groups. Admission is entity-level — no chunk pass —
+   * and it never seeds graph-expansion. Every hit is disclosed as partial via
    * `SearchHit.partial`, and the same review-status and role multipliers the
    * strict fusion applies scale the relaxed score, so honesty (P0-8) and the
    * focus-lens contract hold. Capped at the store's normal limit.
+   *
+   * Admitted hits then get a passage citation like any other, through the same
+   * citation-only pass. A relaxed hit used to carry no page at all, which left
+   * the caller nothing to cite and nothing to read short of fetching the whole
+   * document; the passage it points at is disclosed with its coverage, and
+   * `partial` still says what the document itself did not match.
    */
   private relaxedPass(
     visible: Entity[],
@@ -813,7 +836,8 @@ export class SqliteGraphStore implements GraphStore {
         };
       })
       .sort((a, b) => b.score - a.score)
-      .slice(0, options.limit ?? 10);
+      .slice(0, options.limit ?? 10)
+      .map((hit) => this.withCitation(hit, groups));
   }
 
   async list(caller: Caller, options: SearchOptions = {}): Promise<Entity[]> {

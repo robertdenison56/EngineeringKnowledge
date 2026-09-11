@@ -120,3 +120,121 @@ test('restricted passages inherit the parent ACL and never leak', async () => {
     'getChunks is permission-trimmed via the parent, not just search',
   );
 });
+
+/**
+ * Best-coverage citation: a whole-sentence question tokenizes into far more
+ * concepts than any one passage carries, and requiring all of them cited the
+ * file and no page — the caller then had to fetch the whole document back to
+ * read what it had already matched. `bestCitationChunk` cites the passage
+ * carrying most of the query instead, above a floor, and discloses how much.
+ */
+test('a long question cites the passage carrying most of it, and says how much', async () => {
+  const store = new SqliteGraphStore(':memory:');
+  await store.upsertEntity(
+    {
+      ...BASE,
+      id: 'doc:hdm',
+      type: 'standard',
+      title: 'Highway Design Manual chapter 200',
+      // Admission is entity-level, off the stored body — as it is for a real
+      // ingested document. No single passage carries every concept.
+      content:
+        'Chapter 200 Geometric Design. Minimum geometric design controls. ' +
+        'Table 201.1 Sight Distance Standards. Design speed 45 mph: stopping 360 ft, passing 1100 ft.',
+    },
+    [
+      {
+        id: 'doc:hdm#0',
+        entityId: 'doc:hdm',
+        tenantId: DEMO_TENANT,
+        ordinal: 0,
+        anchor: { page: 1 },
+        heading: 'Chapter 200 Geometric Design',
+        text: 'This chapter covers minimum geometric design controls and their application.',
+      },
+      {
+        id: 'doc:hdm#1',
+        entityId: 'doc:hdm',
+        tenantId: DEMO_TENANT,
+        ordinal: 1,
+        anchor: { page: 2 },
+        heading: 'Table 201.1 Sight Distance Standards',
+        text: 'Table 201.1 Sight Distance Standards. Design speed 45 mph: stopping 360 ft, passing 1100 ft.',
+      },
+    ],
+  );
+
+  const [hit] = await store.search(
+    ENGINEER,
+    'minimum stopping sight distance for a design speed of 45 mph in Table 201.1',
+    { limit: 1 },
+  );
+  assert.equal(hit.chunk.anchor.page, 2, 'cites the table page, not the chapter opener');
+  assert.ok(
+    hit.chunk.matchedConcepts < hit.chunk.ofConcepts,
+    'a best-coverage pick reports itself as one',
+  );
+  assert.ok(hit.chunk.matchedConcepts / hit.chunk.ofConcepts >= 0.6, 'and clears the floor');
+  assert.match(hit.chunk.text, /360 ft/, 'the passage comes back in full, ready to answer from');
+});
+
+test('a two-concept query still needs both — the floor does not loosen short queries', async () => {
+  const store = new SqliteGraphStore(':memory:');
+  await store.upsertEntity(
+    { ...BASE, id: 'spec:roofing2', type: 'spec-section', title: 'Roofing warranty spec' },
+    [
+      {
+        id: 'spec:roofing2#0',
+        entityId: 'spec:roofing2',
+        tenantId: DEMO_TENANT,
+        ordinal: 0,
+        anchor: { page: 1 },
+        text: 'PART 1 GENERAL. Membrane roofing over tapered insulation.',
+      },
+    ],
+  );
+  const [hit] = await store.search(ENGINEER, 'roofing warranty', { limit: 1 });
+  assert.equal(hit.entity.id, 'spec:roofing2');
+  assert.equal(hit.chunk, undefined, 'ceil(2 x 0.6) = 2, so one of two concepts still declines');
+});
+
+test('a relaxed (partial) hit now carries a passage, and still discloses what it missed', async () => {
+  const store = new SqliteGraphStore(':memory:');
+  await store.upsertEntity(
+    {
+      ...BASE,
+      id: 'doc:hdm2',
+      type: 'standard',
+      title: 'Highway Design Manual',
+      content: 'Superelevation runoff is distributed along the transition on every curve.',
+    },
+    [
+      {
+        id: 'doc:hdm2#0',
+        entityId: 'doc:hdm2',
+        tenantId: DEMO_TENANT,
+        ordinal: 0,
+        anchor: { page: 7 },
+        heading: 'Superelevation',
+        text: 'Superelevation runoff is distributed along the transition on every curve.',
+      },
+    ],
+  );
+  // "monorail" appears nowhere, so the strict pass admits nothing and the
+  // most-concepts fallback takes over.
+  const [hit] = await store.search(ENGINEER, 'superelevation runoff transition monorail', {
+    limit: 1,
+  });
+  assert.ok(hit.partial, 'still disclosed as a partial match');
+  assert.deepEqual(hit.partial.missingConcepts, ['monorail']);
+  assert.equal(hit.chunk.anchor.page, 7, 'and now points at the passage it did match');
+  assert.ok(hit.chunk.matchedConcepts < hit.chunk.ofConcepts);
+});
+
+test('best-coverage citation never widens the result set', async () => {
+  const store = await seeded();
+  // Same invariant as the strict fallback: citation runs after admission, so
+  // relaxing which passage may be cited must not admit an entity.
+  const absent = await store.search(ENGINEER, 'parapet coping termination bar', { relax: false });
+  assert.deepEqual(absent, [], 'honest no_results survives the best-coverage pick');
+});
