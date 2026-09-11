@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildQueryGroups,
+  coverageFloor,
+  partialDisclosure,
   relaxationThreshold,
   relaxedScoreEntityMatch,
   warningFor,
@@ -74,7 +76,6 @@ test('concepts split across entities return relaxed hits with partial disclosure
   const hits = await store.search(ENGINEER, 'curtain wall firestop detail Riverside');
   assert.ok(hits.length > 0, 'expected relaxed hits');
   assert.ok(hits.every((h) => h.partial), 'every relaxed hit must disclose partial');
-  assert.ok(hits.every((h) => h.chunk === undefined), 'no chunk citation on relaxed hits');
 
   const detail = hits.find((h) => h.entity.id === 'detail:cw-firestop-02');
   assert.ok(detail, 'the detail matching 4 of 5 concepts must surface');
@@ -98,11 +99,20 @@ test('relax:false suppresses the fallback and keeps hard no_results', async () =
   assert.equal(hits.length, 0, `expected no results, got [${hits.map((h) => h.entity.id).join(', ')}]`);
 });
 
-test('strict results present: no partial hits mixed in', async () => {
+test('strict results present: partial hits rank below them, never among them', async () => {
   const store = await seededStore();
   const hits = await store.search(ENGINEER, 'curtain wall firestop');
   assert.ok(hits.length > 0, 'expected strict hits');
-  assert.ok(hits.every((h) => h.partial === undefined), 'strict and relaxed must never mix');
+  // The bands are concatenated, so the first partial hit (if any) is the start
+  // of the tail: an all-concepts match can never be pushed down by one.
+  const firstPartial = hits.findIndex((h) => h.partial);
+  if (firstPartial >= 0) {
+    assert.ok(
+      hits.slice(firstPartial).every((h) => h.partial),
+      'once the partial band starts, no strict hit follows',
+    );
+  }
+  assert.equal(hits[0].partial, undefined, 'the top hit matched the whole query');
 });
 
 test('queries under three concepts never relax', async () => {
@@ -150,4 +160,45 @@ test('unverified items carry the curator-review warning (P0-8)', async () => {
   const candidate = hits.find((h) => h.entity.id === 'material:fs-195');
   assert.ok(candidate, 'unverified candidate should still be findable');
   assert.match(candidate.warning ?? '', /unverified/i);
+});
+
+test('coverageFloor keeps the all-concepts gate for short queries and loosens only for long ones', () => {
+  // One and two concepts must still all appear — a page-coverage admission at
+  // that length would be indistinguishable from "a word happened to appear".
+  assert.equal(coverageFloor(1), 1);
+  assert.equal(coverageFloor(2), 2);
+  assert.equal(coverageFloor(3), 2);
+  assert.equal(coverageFloor(10), 6);
+  assert.equal(coverageFloor(15), 9);
+});
+
+test('partialDisclosure counts the passage being cited, not the preview alone', () => {
+  const groups = buildQueryGroups('firestop deflection riverside');
+  const entity = {
+    id: 'doc:x',
+    tenantId: DEMO_TENANT,
+    type: 'document',
+    title: 'Firestop manual',
+    content: 'Front matter only.',
+    properties: {},
+    tags: [],
+    acl: { allowedPrincipals: ['*'] },
+    provenance: { createdAt: 'x', modifiedAt: 'x', reviewStatus: 'verified' },
+  };
+  const page = {
+    id: 'c1',
+    tenantId: DEMO_TENANT,
+    ordinal: 1,
+    anchor: { page: 2 },
+    text: 'Deflection joints at the head of wall.',
+  };
+  // Without the page, "deflection" reads as missing; with it, only the concept
+  // genuinely absent from everything the caller can see is reported missing.
+  assert.deepEqual(partialDisclosure(entity, undefined, groups).missingConcepts, [
+    'deflection',
+    'riverside',
+  ]);
+  assert.deepEqual(partialDisclosure(entity, page, groups).missingConcepts, ['riverside']);
+  // Nothing missing means nothing to disclose.
+  assert.equal(partialDisclosure(entity, page, buildQueryGroups('firestop')), undefined);
 });

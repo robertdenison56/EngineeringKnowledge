@@ -8,6 +8,7 @@ import type {
   SearchOptions,
 } from './graph-store.js';
 import {
+  DEFAULT_SEARCH_LIMIT,
   bestCitationChunk,
   buildQueryGroups,
   canRead,
@@ -15,6 +16,7 @@ import {
   groupConcept,
   matchesTagFilter,
   relaxationThreshold,
+  partialDisclosure,
   relaxedScoreEntityMatch,
   roleBoostFactor,
   scoreChunkMatch,
@@ -127,11 +129,18 @@ export class InMemoryGraphStore implements GraphStore {
 
   async search(caller: Caller, query: string, options: SearchOptions = {}): Promise<SearchHit[]> {
     const groups = buildQueryGroups(query);
-    const hits: SearchHit[] = [];
+    const exact: SearchHit[] = [];
+    // Candidates for the partial band: a document whose best passage carries
+    // enough of the query to be cited, or whose metadata carries most of it.
+    // Kept apart from `exact` so the two can be ranked as what they are.
+    const partial: { entity: Entity; cite?: ChunkCoverage; order: number }[] = [];
+    let order = 0;
+    const eligible: Entity[] = [];
     for (const entity of this.entities.values()) {
       if (!canRead(caller, entity)) continue;
       if (options.types && !options.types.includes(entity.type)) continue;
       if (!matchesTagFilter(entity, options.tags)) continue;
+      eligible.push(entity);
 
       // Entity-level match (metadata + content preview) OR a chunk match —
       // a concept hit in any passage admits the parent (ADR 0006). The chunk
@@ -142,59 +151,74 @@ export class InMemoryGraphStore implements GraphStore {
         const cs = scoreChunkMatch(chunk, groups);
         if (cs > 0 && (!bestChunk || cs > bestChunk.score)) bestChunk = { chunk, score: cs };
       }
-      const baseScore = Math.max(entityScore, bestChunk?.score ?? 0);
-      if (baseScore <= 0) continue;
-      // Role re-rank: scale an admitted item's score when the active lens
-      // favors it. Applied after the gate, so it never admits a non-match.
-      const score = baseScore * roleBoostFactor(entity, options.boostRole);
-
-      // Citation only, and strictly downstream of `baseScore` above: an
-      // all-concepts passage when one exists, else the best-coverage passage.
-      // Picking it can never admit, drop, or reorder an entity.
+      // Citation only, and strictly downstream of the gates: an all-concepts
+      // passage when one exists, else the best-coverage passage. Picking it can
+      // never admit, drop, or reorder an entity.
       const cite: ChunkCoverage | undefined = bestChunk
         ? { chunk: bestChunk.chunk, matched: groups.length, total: groups.length }
         : bestCitationChunk(this.chunks.get(entity.id) ?? [], groups);
-      hits.push({
-        entity,
-        score,
-        warning: warningFor(entity.provenance.reviewStatus),
-        ...(cite ? { chunk: chunkMatch(cite, groups) } : {}),
-      });
-    }
-    // Relaxed fallback (most concepts match, disclosed as partial): runs ONLY
-    // when the strict pipeline admitted nothing, the query is long enough to
-    // relax (three-plus concepts), and the caller did not opt out. Strict and
-    // relaxed results never mix, relaxed hits never feed graph-expansion, and
-    // every relaxed hit carries `partial` naming what matched and what is
-    // missing — that explicit disclosure is what keeps the fallback inside
-    // the honest no_results contract (PRD P0-8). Admission is entity-level;
-    // the passage citation comes from the same citation-only pass as above.
-    if (hits.length === 0 && options.relax !== false && relaxationThreshold(groups.length) > 0) {
-      for (const entity of this.entities.values()) {
-        if (!canRead(caller, entity)) continue;
-        if (options.types && !options.types.includes(entity.type)) continue;
-        if (!matchesTagFilter(entity, options.tags)) continue;
-
-        const { score, matchedGroups } = relaxedScoreEntityMatch(entity, groups);
-        if (score <= 0) continue;
-        const matched = new Set(matchedGroups);
-        const cite = bestCitationChunk(this.chunks.get(entity.id) ?? [], groups);
-        hits.push({
+      const baseScore = Math.max(entityScore, bestChunk?.score ?? 0);
+      if (baseScore > 0) {
+        // Role re-rank: scale an admitted item's score when the active lens
+        // favors it. Applied after the gate, so it never admits a non-match.
+        exact.push({
           entity,
-          // Same re-rank as the strict pass: the role lens scales admitted
-          // candidates only, it never admits or hides one.
-          score: score * roleBoostFactor(entity, options.boostRole),
+          score: baseScore * roleBoostFactor(entity, options.boostRole),
           warning: warningFor(entity.provenance.reviewStatus),
           ...(cite ? { chunk: chunkMatch(cite, groups) } : {}),
-          partial: {
-            matchedConcepts: matchedGroups.map((i) => groupConcept(groups[i])),
-            missingConcepts: groups.filter((_, i) => !matched.has(i)).map(groupConcept),
-          },
         });
+      } else if (cite) {
+        // Page-first admission, the same contract the SQLite store applies: a
+        // passage that carries enough of the query to be CITED may admit its
+        // parent, even though no single passage carries every concept and the
+        // bounded preview does not either. For a whole-sentence question
+        // against a long document this is the only path to the answering page.
+        partial.push({ entity, cite, order: order++ });
       }
     }
-    hits.sort((a, b) => b.score - a.score);
-    return hits.slice(0, options.limit ?? 10);
+
+    // Partial band: page-coverage hits, then the entity-level most-concepts
+    // fallback for documents with no passage to cite (short items, and corpora
+    // with no chunks at all). Both are partial matches, so both are disclosed,
+    // both need `relax`, and both rank below every exact hit.
+    if (options.relax !== false && relaxationThreshold(groups.length) > 0) {
+      const seen = new Set(partial.map((c) => c.entity.id));
+      for (const entity of eligible) {
+        if (seen.has(entity.id) || exact.some((h) => h.entity.id === entity.id)) continue;
+        if (relaxedScoreEntityMatch(entity, groups).score <= 0) continue;
+        partial.push({ entity, order: order++ });
+      }
+    }
+
+    exact.sort((a, b) => b.score - a.score);
+    const band =
+      options.relax === false
+        ? []
+        : partial
+            .map((c) => {
+              const disclosure = partialDisclosure(c.entity, c.cite?.chunk, groups);
+              // One rule for the whole band, whichever pass found it: how much
+              // of the query this result actually covers, counting the document
+              // and the passage it offers to cite.
+              const covered = groups.length - (disclosure?.missingConcepts.length ?? 0);
+              return {
+                hit: {
+                  entity: c.entity,
+                  score: covered * roleBoostFactor(c.entity, options.boostRole),
+                  warning: warningFor(c.entity.provenance.reviewStatus),
+                  ...(c.cite ? { chunk: chunkMatch(c.cite, groups) } : {}),
+                  ...(disclosure ? { partial: disclosure } : {}),
+                } as SearchHit,
+                covered,
+                order: c.order,
+              };
+            })
+            .sort((a, b) => b.hit.score - a.hit.score || a.order - b.order)
+            .map((c) => c.hit);
+    // Bands concatenated, never interleaved: an all-concepts match always
+    // outranks a page-coverage or most-concepts one (PRD P0-8 — a partial hit
+    // is disclosed as partial AND never displaces a full match).
+    return [...exact, ...band].slice(0, options.limit ?? DEFAULT_SEARCH_LIMIT);
   }
 
   async list(caller: Caller, options: SearchOptions = {}): Promise<Entity[]> {

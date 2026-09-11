@@ -63,16 +63,23 @@ test('relax: false keeps the hard no_results behavior', async () => {
   store.close();
 });
 
-test('a non-empty strict result never relaxes and never carries partial', async () => {
+test('a partial hit may join a strict result, but never above it', async () => {
   const store = await relaxFixture();
-  // Matches 2 of 3 concepts of the query below — visible only if relaxation ran.
+  // Matches 2 of 3 concepts of the query below — admitted, and disclosed.
   await store.upsertEntity({
     ...BASE, id: 'note:riverside-2', type: 'document', title: 'Riverside camber addendum',
   });
 
   const hits = await store.search(ENGINEER, 'riverside camber note');
-  assert.deepEqual(hits.map((h) => h.entity.id), ['note:riverside'], 'strict hit only');
+  assert.equal(hits[0].entity.id, 'note:riverside', 'the all-concepts hit leads');
   assert.equal(hits[0].partial, undefined, 'strict hits are never tagged partial');
+  // Every hit after the first is partial, and every partial hit says so: the
+  // bands are ordered, and nothing in the second band pretends to be in the
+  // first (P0-8).
+  assert.ok(
+    hits.slice(1).every((h) => h.partial),
+    'partial hits follow, disclosed',
+  );
   store.close();
 });
 

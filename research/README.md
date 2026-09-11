@@ -82,6 +82,23 @@ Token figures from here on are every request's full prompt, uncached, counted wi
 reads 38,606 in the paragraph above and 36,832 here: an accounting difference in how much of each tool
 definition is counted (~5%), not a change in the loop. Comparisons stay inside one convention.
 
+### Retrieval quality
+
+`scripts` in this directory do not cover it yet, but the number that matters most is measurable without a model:
+run every question through the gateway's `search` and ask whether the anchored page came back. Before page-first
+ranking (ADR 0013) the gateway returned the gold **document** for 84.8% of the 388 questions and the gold **page**
+for 60.8%, while plain BM25 over the same passages — `caltrans_bench.rag.PageIndex`, 40 lines — returned the page
+for 93.8%. The answering text is in the store for 387 of 388 questions, so that gap was ranking, not the corpus.
+
+With page-first ranking: document at rank 1 **89.7%**, document in the returned list **99.0%**, page at rank 1
+**76.0%**, page in the list **83.2%** (BM25 reference: 85.1%/96.9% document and 68.3%/90.7% page at 1 and 5).
+The gateway is ahead at rank 1 and behind across the list, because it returns one page per document where BM25
+returns five pages.
+
+End to end on 60 questions (`--limit 60`, gemma4:31b-cloud): answer 80.0% → **90.0%**, citation 46.7% → **85.0%**,
+tokens 19,419 → **15,198 per question**. Better ranking is cheaper: the model stops searching twice for what the
+first search should have returned.
+
 Two gateway settings (passed through by `gateway_env`) tune the rest, both off by default:
 
 - `EKG_SEARCH_PASSAGES` — how many top results carry their cited passage in full. At 2 the six questions cost

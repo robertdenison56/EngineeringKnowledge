@@ -3,6 +3,12 @@ import { copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname } from 'node:path';
 import {
   bestCitationChunk,
+  DEFAULT_SEARCH_LIMIT,
+  chunkCoverage,
+  chunkMatch,
+  coverageFloor,
+  partialDisclosure,
+  relaxationThreshold,
   buildQueryGroups,
   canRead,
   chunkEmbeddingText,
@@ -86,6 +92,19 @@ function ftsQuery(groups: string[][]): string {
     .join(' AND ');
 }
 
+/**
+ * The same concept groups joined by OR — a passage need not carry all of them
+ * to be scored, so FTS5's BM25 can rank pages by how much of the query they
+ * carry and how rare those terms are. The honest gate is applied afterwards,
+ * on coverage (see `pageMatches`); this expression only decides what gets
+ * scored.
+ */
+function ftsAnyQuery(groups: string[][]): string {
+  return groups
+    .map((g) => `(${g.map((v) => `"${v.replace(/"/g, '')}"`).join(' OR ')})`)
+    .join(' OR ');
+}
+
 const RRF_K = 60;
 
 /**
@@ -99,6 +118,17 @@ const RRF_WEIGHTS = { lexical: 1, fts: 1.5, chunkFts: 2, dense: 1.2, expanded: 0
 
 /** How many of the strongest base matches we expand 1-hop neighbors from. */
 const EXPAND_FROM = 6;
+
+/**
+ * How many BM25-ranked passages the page pass reads per query.
+ *
+ * The whole point is that ranking happens over PAGES rather than over document
+ * previews, so this is the only place the corpus is narrowed — wide enough that
+ * the answering page is in it (on the Caltrans set the gold page is in the top
+ * ten for 94% of questions), bounded so a query costs one indexed lookup and a
+ * couple of hundred coverage checks rather than a scan of every passage.
+ */
+const PAGE_SCAN = 200;
 
 export interface SqliteStoreOptions {
   /** Optional dense-retrieval provider; lexical-only without it. */
@@ -581,6 +611,80 @@ export class SqliteGraphStore implements GraphStore {
       .filter((e) => matchesTagFilter(e, options.tags));
   }
 
+  /**
+   * Page-first retrieval: rank PASSAGES by BM25 and roll the survivors up to
+   * their documents, keeping the passage that carries most of the query.
+   *
+   * The other admission gates read a document as a document — its metadata and
+   * the 20k preview `content` holds (ADR 0006) — and require every concept to
+   * co-occur there or in one passage. Both fail the same way on a whole-sentence
+   * question: fifteen concepts never co-occur in one passage, and the preview of
+   * a 1,400-page spec book is its first few pages, so the relaxed pass then
+   * ranked documents by how much of the question their *first few pages*
+   * mentioned. Measured on the Caltrans benchmark, that returned the page that
+   * answers the question for 60.8% of questions where BM25 over the same
+   * passages returns it for 93.8% — a document chosen by its preview is simply
+   * not the document with the best page.
+   *
+   * So: FTS5 scores passages on an OR of the query's concepts (BM25 — rare terms
+   * dominate, which is what makes "Table 201.1" beat "design"), and coverage is
+   * the honest gate on the way out. A passage admits its parent exactly when it
+   * carries enough of the query to be CITED (`coverageFloor`, the floor
+   * `bestCitationChunk` already uses), so admission and citation cannot
+   * disagree, and a short precise query still needs every concept — the floor
+   * degenerates to the all-concepts gate below three.
+   *
+   * A hit admitted here is disclosed by the coverage that travels with its
+   * citation ("passage carries 12 of the query's 15 concepts"), never served as
+   * an all-concepts match, and never used to seed graph-expansion (P0-8).
+   */
+  private pageMatches(
+    caller: Caller,
+    groups: string[][],
+    byId: Map<string, Entity>,
+  ): Map<string, ChunkCoverage> {
+    const best = new Map<string, ChunkCoverage>();
+    if (groups.length === 0) return best;
+    const required = coverageFloor(groups.length);
+    let rows: { id: string; entity_id: string }[];
+    try {
+      rows = this.db
+        .prepare(
+          'SELECT id, entity_id FROM chunks_fts WHERE chunks_fts MATCH ? AND tenant_id = ? ORDER BY rank LIMIT ?',
+        )
+        .all(ftsAnyQuery(groups), caller.tenantId, PAGE_SCAN) as unknown as {
+        id: string;
+        entity_id: string;
+      }[];
+    } catch {
+      return best; // malformed MATCH input — the other lists still stand
+    }
+    const wanted = rows.filter((r) => byId.has(r.entity_id));
+    if (wanted.length === 0) return best;
+    const chunkRows = this.db
+      .prepare(`SELECT * FROM chunks WHERE id IN (${wanted.map(() => '?').join(',')})`)
+      .all(...wanted.map((r) => r.id)) as unknown as ChunkRow[];
+    const byChunkId = new Map(chunkRows.map((row) => [row.id, rowToChunk(row)]));
+    // Walk in BM25 order, so a document enters the list at its best-ranked
+    // passage and cites that same passage.
+    for (const row of wanted) {
+      const chunk = byChunkId.get(row.id);
+      if (!chunk) continue;
+      const matched = chunkCoverage(chunk, groups);
+      if (matched < required) continue;
+      // First one wins, and the walk is in BM25 order: the passage to cite is
+      // the best-SCORED passage that clears the floor, not the one that
+      // mentions the most concepts. Measured on the Caltrans set, picking by
+      // coverage instead costs 3 points of page@1 and 4 of page recall —
+      // coverage counts "design" and "minimum" alongside "Table 201.1", and
+      // BM25 is what knows the difference.
+      if (!best.has(row.entity_id)) {
+        best.set(row.entity_id, { chunk, matched, total: groups.length });
+      }
+    }
+    return best;
+  }
+
   async search(caller: Caller, query: string, options: SearchOptions = {}): Promise<SearchHit[]> {
     const groups = buildQueryGroups(query);
     if (groups.length === 0) return [];
@@ -633,10 +737,23 @@ export class SqliteGraphStore implements GraphStore {
       // Malformed MATCH input — other lists still stand.
     }
 
+    // List 2c — page-first BM25 (see `pageMatches`): passages ranked on their
+    // own merits, rolled up to their documents. Admits on citable coverage
+    // rather than on all-concepts co-occurrence, so it reaches the answering
+    // page of a long document that no other gate can see.
+    // A page-coverage admission is a PARTIAL match, so `relax: false` — the
+    // caller asking for all-concepts hits or nothing — turns it off with the
+    // entity-level fallback.
+    const pageCites =
+      options.relax === false
+        ? new Map<string, ChunkCoverage>()
+        : this.pageMatches(caller, groups, byId);
+    const pages = [...pageCites.keys()];
+
     // Candidate set: admitted by any honest gate. Vectors re-rank; they never
     // admit items no concept matched (keeps no_results honest, P0-8).
-    const admitted = new Set([...lexical, ...fts, ...chunkFts]);
-    if (admitted.size === 0) return this.relaxedPass(visible, groups, options);
+    const strict = new Set([...lexical, ...fts, ...chunkFts]);
+    const admitted = new Set([...strict, ...pages]);
 
     // List 3 — dense similarity over admitted candidates: best of the
     // entity-level vector and the entity's chunk vectors.
@@ -671,6 +788,12 @@ export class SqliteGraphStore implements GraphStore {
     addList(lexical, RRF_WEIGHTS.lexical);
     addList(fts, RRF_WEIGHTS.fts);
     addList(chunkFts, RRF_WEIGHTS.chunkFts);
+    // The page pass deliberately does NOT fuse here. Its job is reach — putting
+    // the document whose best passage answers the query into the list at all —
+    // not re-ranking documents that already matched every concept. Fusing it
+    // promoted a spec book's dense passage over the firm's own curated detail
+    // for "curtain wall firestop", which is the wrong answer to a question the
+    // strict gates had already answered correctly.
     addList(dense, RRF_WEIGHTS.dense);
 
     // Graph-expansion (the GraphRAG payoff): surface 1-hop neighbors of the
@@ -679,8 +802,12 @@ export class SqliteGraphStore implements GraphStore {
     // admission, so no_results stays no_results (P0-8); neighbors are trimmed to
     // the caller's visible, type/tag-filtered set (`byId`) and join at a low
     // weight, so they rank below every direct concept match.
-    if (options.expand !== false && admitted.size > 0) {
+    if (options.expand !== false && strict.size > 0) {
+      // Seeded from the all-concepts admissions only: a page-coverage hit is a
+      // partial match, and partial matches do not get to pull neighbors in
+      // behind them (the same rule the relaxed pass follows).
       const topBase = [...fused.entries()]
+        .filter(([id]) => strict.has(id))
         .sort((a, b) => b[1] - a[1])
         .slice(0, EXPAND_FROM)
         .map(([id]) => id);
@@ -697,33 +824,110 @@ export class SqliteGraphStore implements GraphStore {
       addList(expanded, RRF_WEIGHTS.expanded);
     }
 
-    const ranked = [...fused.entries()]
-      .filter(([id]) => admitted.has(id))
+    const adjust = (entity: Entity, score: number) =>
+      score *
+      (entity.provenance.reviewStatus === 'superseded' ||
+      entity.provenance.reviewStatus === 'deprecated'
+        ? 0.85
+        : 1) *
+      (entity.provenance.reviewStatus === 'unverified' ? 0.95 : 1) *
+      // Role re-rank (focus lens): scales already-admitted candidates only,
+      // so it never admits a non-match or hides a match (P0-8).
+      roleBoostFactor(entity, options.boostRole);
+
+    // Two bands, and the order between them is a contract, not a tuning knob:
+    // every all-concepts hit outranks every partial one. Page coverage earns a
+    // document a place in the list — that is the recall this pass exists for —
+    // but it must never push the document that matched the whole query off the
+    // top of it. Graph-expanded neighbors ride with the band they were pulled
+    // from (strict), which is why they are seeded from strict hits only.
+    // Tier 1 is everything an all-concepts gate admitted, plus the neighbors
+    // graph-expansion pulled in behind them.
+    const tier1 = new Set([...admitted].filter((id) => !pageCites.has(id) || strict.has(id)));
+    const exact: SearchHit[] = [...fused.entries()]
+      .filter(([id]) => tier1.has(id))
       .map(([id, score]) => {
         const entity = byId.get(id)!;
-        const status = entity.provenance.reviewStatus;
-        const adjusted =
-          score *
-          (status === 'superseded' || status === 'deprecated' ? 0.85 : 1) *
-          (status === 'unverified' ? 0.95 : 1) *
-          // Role re-rank (focus lens): scales already-admitted candidates only,
-          // so it never admits a non-match or hides a match (P0-8).
-          roleBoostFactor(entity, options.boostRole);
-        return { entity, score: adjusted, warning: warningFor(status) };
+        return {
+          entity,
+          score: adjust(entity, score),
+          warning: warningFor(entity.provenance.reviewStatus),
+        };
       })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, options.limit ?? 10);
+      .sort((a, b) => b.score - a.score);
+
+    // Partial band: documents the page pass reached on coverage, then the
+    // entity-level most-concepts fallback for documents with no passage to cite
+    // at all (short items, and corpora with no chunks). Both are partial
+    // matches — both are disclosed, both need `relax`, neither seeds
+    // graph-expansion, and neither can displace an exact hit.
+    const partialCandidates: { entity: Entity; cite?: ChunkCoverage; order: number }[] = [];
+    if (options.relax !== false) {
+      let order = 0;
+      for (const [id, cite] of pageCites) {
+        if (tier1.has(id) || !byId.has(id)) continue;
+        partialCandidates.push({ entity: byId.get(id)!, cite, order: order++ });
+      }
+      if (relaxationThreshold(groups.length) > 0) {
+        const seen = new Set(partialCandidates.map((c) => c.entity.id));
+        for (const entity of visible) {
+          if (tier1.has(entity.id) || seen.has(entity.id)) continue;
+          if (relaxedScoreEntityMatch(entity, groups).score <= 0) continue;
+          partialCandidates.push({
+            entity,
+            cite: this.citationChunk(entity.id, undefined, groups),
+            order: order++,
+          });
+        }
+      }
+    }
+    const band = partialCandidates
+      .map((c) => {
+        const disclosure = partialDisclosure(c.entity, c.cite?.chunk, groups);
+        // One rule for the whole band, whichever pass found it: how much of the
+        // query this result actually covers, counting the document and the
+        // passage it offers to cite. Ties go to the earlier candidate, which is
+        // BM25 order for the page pass.
+        const covered = groups.length - (disclosure?.missingConcepts.length ?? 0);
+        // Ordered by coverage under the same review-status and role multipliers
+        // the exact band takes, so a focus lens re-ranks inside this band too
+        // (and a superseded item still sinks). Ties keep BM25 order.
+        return { candidate: c, disclosure, rank: adjust(c.entity, covered) };
+      })
+      .sort((a, b) => b.rank - a.rank || a.candidate.order - b.candidate.order);
+
+    // Scores descend from below the weakest exact hit, so a caller that
+    // re-sorts by score (find_experts aggregates on it) cannot invert the bands.
+    const floor = exact.length > 0 ? exact[exact.length - 1]!.score : 1;
+    const partialBand: SearchHit[] = band.map(({ candidate, disclosure }, i) => ({
+      entity: candidate.entity,
+      score: adjust(candidate.entity, floor / (i + 2)),
+      warning: warningFor(candidate.entity.provenance.reviewStatus),
+      // Disclosed as partial: this result did not carry the whole query, and
+      // the caller is told which concepts its evidence does not cover (P0-8).
+      ...(disclosure ? { partial: disclosure } : {}),
+      ...(candidate.cite ? { chunk: chunkMatch(candidate.cite, groups) } : {}),
+    }));
 
     // Attach the matched passage for citation (ADR 0006): page/section anchor
-    // and a snippet. Preferred source is the chunk FTS pick; when that is
-    // absent we fall back to a lexical scan of the entity's own chunks (see
-    // `lexicalBestChunk`).
-    return ranked.map((hit) => this.withCitation(hit, groups, bestChunkId.get(hit.entity.id)));
+    // and a snippet. Preferred source is the chunk FTS pick, then the passage
+    // the page pass admitted on; failing both, a lexical scan of the entity's
+    // own chunks (see `citationChunk`). Partial-band hits already carry theirs.
+    return [...exact, ...partialBand].slice(0, options.limit ?? DEFAULT_SEARCH_LIMIT).map((hit) =>
+      hit.chunk
+        ? hit
+        : this.withCitation(hit, groups, bestChunkId.get(hit.entity.id), pageCites.get(hit.entity.id)),
+    );
   }
 
   /** Attach the passage to cite to an already-admitted hit (never changes admission). */
-  private withCitation<T extends SearchHit>(hit: T, groups: string[][], ftsChunkId?: string): T {
-    const found = this.citationChunk(hit.entity.id, ftsChunkId, groups);
+  private withCitation<T extends SearchHit>(
+    hit: T,
+    groups: string[][],
+    ftsChunkId?: string,
+    pageCite?: ChunkCoverage,
+  ): T {
+    const found = this.citationChunk(hit.entity.id, ftsChunkId, groups, pageCite);
     if (!found) return hit;
     const { chunk, matched, total } = found;
     const match: ChunkMatch = {
@@ -767,6 +971,7 @@ export class SqliteGraphStore implements GraphStore {
     entityId: string,
     ftsChunkId: string | undefined,
     groups: string[][],
+    pageCite?: ChunkCoverage,
   ): ChunkCoverage | undefined {
     const total = groups.length;
     if (ftsChunkId) {
@@ -775,6 +980,9 @@ export class SqliteGraphStore implements GraphStore {
         | undefined;
       if (row) return { chunk: rowToChunk(row), matched: total, total };
     }
+    // The passage the page pass already scored and admitted on — cite that one
+    // rather than re-deriving a different passage for the same hit.
+    if (pageCite) return pageCite;
     const chunks = (
       this.db
         .prepare('SELECT * FROM chunks WHERE entity_id = ? ORDER BY ordinal')
@@ -787,57 +995,6 @@ export class SqliteGraphStore implements GraphStore {
     }
     if (best) return { chunk: best.chunk, matched: total, total };
     return bestCitationChunk(chunks, groups);
-  }
-
-  /**
-   * Most-concepts-match fallback (SearchOptions.relax, default on): runs ONLY
-   * when the strict pipeline admitted zero entities, and only for queries of
-   * three or more concept groups. Admission is entity-level — no chunk pass —
-   * and it never seeds graph-expansion. Every hit is disclosed as partial via
-   * `SearchHit.partial`, and the same review-status and role multipliers the
-   * strict fusion applies scale the relaxed score, so honesty (P0-8) and the
-   * focus-lens contract hold. Capped at the store's normal limit.
-   *
-   * Admitted hits then get a passage citation like any other, through the same
-   * citation-only pass. A relaxed hit used to carry no page at all, which left
-   * the caller nothing to cite and nothing to read short of fetching the whole
-   * document; the passage it points at is disclosed with its coverage, and
-   * `partial` still says what the document itself did not match.
-   */
-  private relaxedPass(
-    visible: Entity[],
-    groups: string[][],
-    options: SearchOptions,
-  ): SearchHit[] {
-    if (options.relax === false || groups.length < 3) return [];
-    return visible
-      .map((entity) => ({ entity, match: relaxedScoreEntityMatch(entity, groups) }))
-      .filter(({ match }) => match.score > 0)
-      .map(({ entity, match }) => {
-        const status = entity.provenance.reviewStatus;
-        // SAME multipliers as the strict fusion path above.
-        const score =
-          match.score *
-          (status === 'superseded' || status === 'deprecated' ? 0.85 : 1) *
-          (status === 'unverified' ? 0.95 : 1) *
-          roleBoostFactor(entity, options.boostRole);
-        const matched = new Set(match.matchedGroups);
-        return {
-          entity,
-          score,
-          warning: warningFor(status),
-          partial: {
-            matchedConcepts: match.matchedGroups.map((i) => groupConcept(groups[i])),
-            missingConcepts: groups
-              .map((_, i) => i)
-              .filter((i) => !matched.has(i))
-              .map((i) => groupConcept(groups[i])),
-          },
-        };
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, options.limit ?? 10)
-      .map((hit) => this.withCitation(hit, groups));
   }
 
   async list(caller: Caller, options: SearchOptions = {}): Promise<Entity[]> {

@@ -305,7 +305,40 @@ export function scoreChunkMatch(chunk: Chunk, groups: string[][]): number {
  * precise queries keep the all-concepts contract, while a fifteen-concept
  * question needs nine.
  */
+/**
+ * How many results a search returns when the caller does not say.
+ *
+ * Ten was the right number while ranking was weak: the list had to be long
+ * because the answer could be anywhere in it. With page-first ranking the
+ * Caltrans benchmark finds the right document at rank 1 for 89.7% of questions
+ * and inside the top three for 98.5% — results four through ten add 0.7 points
+ * of document recall and 0.8 of page recall for roughly half the payload of a
+ * response. Five keeps a real tail for exploratory search and stops charging
+ * every caller for the other five. Callers that want a long list still ask for
+ * one (the workspace app's search page asks for 25).
+ */
+export const DEFAULT_SEARCH_LIMIT = 5;
+
 export const CITATION_COVERAGE_FLOOR = 0.6;
+
+/**
+ * How many of a query's concepts one passage must carry to stand on its own —
+ * to be cited, and (see below) to admit its parent document.
+ *
+ * Degenerates to the strict all-concepts gate for short queries: one concept
+ * needs one, two need both, three need two. It only loosens where loosening is
+ * the honest reading — a fifteen-concept sentence whose scaffolding ("according
+ * to", "what is") no passage will ever contain.
+ */
+export function coverageFloor(groupCount: number): number {
+  return Math.ceil(groupCount * CITATION_COVERAGE_FLOOR);
+}
+
+/** How many of the query's concept groups this passage contains. */
+export function chunkCoverage(chunk: Chunk, groups: string[][]): number {
+  const haystack = chunkHaystack(chunk);
+  return groups.filter((g) => groupMatches(haystack, g)).length;
+}
 
 /** A passage picked to cite, with how much of the query it actually carries. */
 export interface ChunkCoverage {
@@ -337,11 +370,10 @@ export interface ChunkCoverage {
  */
 export function bestCitationChunk(chunks: Chunk[], groups: string[][]): ChunkCoverage | undefined {
   if (groups.length === 0) return undefined;
-  const required = Math.ceil(groups.length * CITATION_COVERAGE_FLOOR);
+  const required = coverageFloor(groups.length);
   let best: (ChunkCoverage & { tiebreak: number }) | undefined;
   for (const chunk of chunks) {
-    const haystack = chunkHaystack(chunk);
-    const matched = groups.filter((g) => groupMatches(haystack, g)).length;
+    const matched = chunkCoverage(chunk, groups);
     if (matched < required) continue;
     // Ties go to the passage whose heading names the concepts — the same
     // heading bonus `scoreChunkMatch` applies.
@@ -352,6 +384,34 @@ export function bestCitationChunk(chunks: Chunk[], groups: string[][]): ChunkCov
     }
   }
   return best && { chunk: best.chunk, matched: best.matched, total: best.total };
+}
+
+/**
+ * What a hit matched and what it did not, across everything the caller is being
+ * shown: the document's own metadata and preview, plus the passage being cited.
+ * `undefined` when the hit carries the whole query, which is the only case that
+ * may be served without a partial disclosure (PRD P0-8).
+ *
+ * The cited passage belongs in this union because it is evidence the caller can
+ * read. A long document's `content` is a bounded preview (ADR 0006), so judging
+ * coverage from the document alone would report a concept as missing while the
+ * very passage in the result spells it out.
+ */
+export function partialDisclosure(
+  entity: Entity,
+  chunk: Chunk | undefined,
+  groups: string[][],
+): { matchedConcepts: string[]; missingConcepts: string[] } | undefined {
+  if (groups.length === 0) return undefined;
+  const haystacks = [entityHaystack(entity), ...(chunk ? [chunkHaystack(chunk)] : [])];
+  const matched: string[] = [];
+  const missing: string[] = [];
+  groups.forEach((g) => {
+    (haystacks.some((h) => groupMatches(h, g)) ? matched : missing).push(groupConcept(g));
+  });
+  return missing.length === 0
+    ? undefined
+    : { matchedConcepts: matched, missingConcepts: missing };
 }
 
 /** The wire shape of a cited passage: anchor, snippet, the passage itself, its coverage. */
