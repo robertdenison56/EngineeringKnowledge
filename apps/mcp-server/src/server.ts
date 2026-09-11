@@ -150,6 +150,29 @@ const PREVIEW_CHARS = (() => {
 const SECTION_INDEX_MAX = 60;
 
 /**
+ * How much of the previous passage rides along with a section fetch.
+ *
+ * A passage cut out of a continuous document arrives without the sentence that
+ * introduces it, and on a table that is exactly the sentence that says how to
+ * read it: HDM page 2 is a sight-distance table whose extracted header reads
+ * "(1) (2) Passing Design Speed Stopping", while page 1 is what tells you the
+ * table's first column is stopping. A caller handed only the cited page
+ * answered 2,700 ft — the passing column — where the standard is 930. Before
+ * `search` named the ordinal, callers stumbled onto that context by fetching
+ * the wrong section first and paying for a whole extra round trip.
+ *
+ * It travels AHEAD of the cited text, because reading order is the whole point:
+ * the same six questions score 1.00 with the lead-in first and 0.83 with the
+ * identical bytes placed after the passage. 400 characters is not enough here —
+ * the tail of HDM page 1 is the definition of PASSING sight distance, which
+ * argues for the wrong column — so the cap is about a page, and it is a tail
+ * rather than a head because what precedes the passage is what continues into
+ * it. It stays labelled with its own ordinal and anchor, so a caller can never
+ * cite lead-in as the passage.
+ */
+const LEAD_IN_CHARS = 2000;
+
+/**
  * Default for `search`'s `passages` when the caller does not say: how many top
  * results carry their cited passage in full. Zero keeps `search` a lightweight
  * index and leaves the text to `fetch`, which is the shape OpenAI deep research
@@ -172,6 +195,51 @@ function citation(entity: Entity) {
   };
 }
 
+/**
+ * Minimum shared prefix worth naming once. Below this the `sourceRoot` line
+ * costs about what the repetition does; a scheme and host alone clear it.
+ */
+const SOURCE_ROOT_MIN_CHARS = 24;
+
+/**
+ * Say the shared source location once. A firm's documents come from one
+ * repository, so every hit's `sourceUrl` repeats the same long prefix — on the
+ * Caltrans corpus that is ~60 tokens of identical path on each of ten results,
+ * a quarter of the response spent re-stating where the library lives. Fold the
+ * common prefix into a response-level `sourceRoot` and leave each result the
+ * part that differs: the full URL is `sourceRoot + sourceUrl`, so the caller
+ * loses nothing it could cite before.
+ *
+ * Folds only when at least two results share a prefix long enough to pay for
+ * naming it, and never when a result would be left with an empty remainder —
+ * a caller must not be handed a bare root as if it were a document.
+ */
+function foldSourceUrls(results: { provenance: { sourceUrl?: string } }[]): string | undefined {
+  const urls = results
+    .map((r) => r.provenance.sourceUrl)
+    .filter((u): u is string => typeof u === 'string' && u.length > 0);
+  if (urls.length < 2) return undefined;
+
+  let prefix = urls[0]!;
+  for (const url of urls) {
+    let i = 0;
+    while (i < prefix.length && i < url.length && prefix[i] === url[i]) i++;
+    prefix = prefix.slice(0, i);
+    if (prefix.length < SOURCE_ROOT_MIN_CHARS) return undefined;
+  }
+  // Cut at a path boundary, so what each result keeps reads as a path rather
+  // than as a fragment of a file name.
+  prefix = prefix.slice(0, prefix.lastIndexOf('/') + 1);
+  if (prefix.length < SOURCE_ROOT_MIN_CHARS) return undefined;
+  if (urls.some((u) => u.length <= prefix.length)) return undefined;
+
+  for (const result of results) {
+    const url = result.provenance.sourceUrl;
+    if (url && url.startsWith(prefix)) result.provenance.sourceUrl = url.slice(prefix.length);
+  }
+  return prefix;
+}
+
 function searchResult(hit: SearchHit, withPassage = false) {
   // When the hit matched a document passage, cite the page/section, not just
   // the file (P0-2a, ADR 0006): snippet from the passage, anchor merged with
@@ -186,12 +254,22 @@ function searchResult(hit: SearchHit, withPassage = false) {
     url: appUrl(hit.entity),
     type: hit.entity.type,
     snippet: hit.chunk?.snippet ?? hit.entity.summary,
-    ...(hit.chunk ? { matchedSection: hit.chunk.heading ?? `passage ${hit.chunk.ordinal + 1}` } : {}),
+    ...(hit.chunk
+      ? {
+          matchedSection: hit.chunk.heading ?? `passage ${hit.chunk.ordinal + 1}`,
+          // The ordinal `fetch` takes, beside the heading a human reads. A
+          // caller handed only "Page 2" has to guess which section that is,
+          // and the guess costs a whole round trip: on the benchmark the model
+          // asked for section 0 first in every question that fetched at all,
+          // read the wrong page, and fetched again. Naming the ordinal here
+          // costs five tokens and saves the wasted call and the re-sent
+          // transcript behind it.
+          passageSection: hit.chunk.ordinal,
+        }
+      : {}),
     // The cited passage in full, so a caller can answer from it and cite it
     // without fetching the document back (`passages` on the search tool).
-    ...(withPassage && hit.chunk
-      ? { passage: hit.chunk.text, passageSection: hit.chunk.ordinal }
-      : {}),
+    ...(withPassage && hit.chunk ? { passage: hit.chunk.text } : {}),
     // Disclose a best-coverage citation as one: this passage carries most of
     // the query, not all of it, and the caller should read it as such (P0-8).
     ...(hit.chunk && hit.chunk.matchedConcepts < hit.chunk.ofConcepts
@@ -202,9 +280,20 @@ function searchResult(hit: SearchHit, withPassage = false) {
     tags: hit.entity.tags,
     provenance,
     ...(hit.warning ? { warning: hit.warning } : {}),
-    // Relaxed-pass disclosure (PRD P0-8): which query concepts this hit
-    // matched and which it did not. Present only on partial hits.
-    ...(hit.partial ? { partial: hit.partial } : {}),
+    // Relaxed-pass disclosure (PRD P0-8): what this hit did NOT match, and how
+    // much of the query it did. The matched list is the query minus the missing
+    // concepts and it repeats on every result — a sentence-long query put ~40
+    // tokens of echo on each of ten hits — so the count stands for it. What the
+    // caller has to be able to say ("nothing tying it to Riverside") is the
+    // missing list, and that still comes back in full.
+    ...(hit.partial
+      ? {
+          partial: {
+            matched: hit.partial.matchedConcepts.length,
+            missingConcepts: hit.partial.missingConcepts,
+          },
+        }
+      : {}),
   };
 }
 
@@ -526,9 +615,10 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         'lessons learned, experts). Results include provenance and a workspace-app URL — always cite them. ' +
         'Results carrying a "warning" field are superseded/deprecated and the warning must be relayed to the user. ' +
         'If the response has no_results=true, say the firm graph has no answer; never substitute general knowledge. ' +
-        'A result carrying a "partial" field matched only SOME of the query\'s concepts: it lists matchedConcepts ' +
-        'and missingConcepts. Present these as partial matches and name what is missing ("the firm has a curtain ' +
-        'wall firestop detail, but nothing tying it to Riverside") — never report a partial hit as a full answer. ' +
+        'A result carrying a "partial" field matched only SOME of the query\'s concepts: it says how many it ' +
+        'matched and lists missingConcepts. Present these as partial matches and name what is missing ("the firm ' +
+        'has a curtain wall firestop detail, but nothing tying it to Riverside") — never report a partial hit as ' +
+        'a full answer. Result paths are relative to `sourceRoot` when the response carries one. ' +
         'Pass `role` (a focus lens the firm admin defined, by name or id) to pivot ranking toward the knowledge ' +
         'that kind of work cares about — it only re-ranks, never hides results.',
       inputSchema: {
@@ -569,8 +659,11 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
       if (hits.length === 0) {
         return asContent({ results: [], no_results: true, guidance: NO_RESULTS_GUIDANCE });
       }
+      const results = hits.map((hit, i) => searchResult(hit, i < (passages ?? DEFAULT_SEARCH_PASSAGES)));
+      const sourceRoot = foldSourceUrls(results);
       return asContent({
-        results: hits.map((hit, i) => searchResult(hit, i < (passages ?? DEFAULT_SEARCH_PASSAGES))),
+        results,
+        ...(sourceRoot ? { sourceRoot } : {}),
         ...(boostRole ? { focusedBy: boostRole.name } : {}),
       });
     },
@@ -585,7 +678,8 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
         'Fetch the full record for a knowledge-graph entity by id (ids come from search/traverse results). ' +
         'Returns properties, provenance, related entities, and the document section index. Long documents ' +
         'are split into passages (sections) — pass `section` to retrieve one passage in full, with its ' +
-        'page/sheet/spec-section anchor for citation.',
+        'page/sheet/spec-section anchor for citation. A section also carries `precededBy`: the end of the ' +
+        'passage before it, to read the passage by. Cite `section`, never `precededBy`.',
       inputSchema: {
         id: z.string().describe('Entity id, e.g. "detail:cw-firestop-02"'),
         section: z
@@ -593,7 +687,10 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
           .int()
           .min(0)
           .optional()
-          .describe('Section ordinal (from the sections list) to return in full instead of the preview'),
+          .describe(
+            "Section ordinal to return in full instead of the preview — a search result's " +
+              '`passageSection`, or an ordinal from this document\'s sections list',
+          ),
       },
     },
     async ({ id, section }, extra) => {
@@ -610,6 +707,10 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
       // A specific section in full (cited to its page/section), or the
       // entity preview when none requested (ADR 0006).
       const picked = section !== undefined ? chunks.find((c) => c.ordinal === section) : undefined;
+      const precedes =
+        picked && picked.ordinal > 0
+          ? chunks.find((c) => c.ordinal === picked.ordinal - 1)
+          : undefined;
       const provenance = citation(entity);
       if (picked) provenance.anchor = { ...provenance.anchor, ...picked.anchor };
       const preview = (entity.content ?? entity.summary ?? '').slice(0, PREVIEW_CHARS);
@@ -617,6 +718,18 @@ export async function createServer(options: ServerOptions = {}): Promise<McpServ
       return asContent({
         id: entity.id,
         title: entity.title,
+        // What the passage was cut away from, labelled as its own section so a
+        // caller can tell lead-in from cited text (see LEAD_IN_CHARS).
+        ...(precedes
+          ? {
+              precededBy: {
+                ordinal: precedes.ordinal,
+                heading: precedes.heading,
+                anchor: precedes.anchor,
+                tail: precedes.text.slice(-LEAD_IN_CHARS),
+              },
+            }
+          : {}),
         text: picked?.text ?? preview,
         ...(picked ? { section: { ordinal: picked.ordinal, heading: picked.heading, anchor: picked.anchor } } : {}),
         url: appUrl(entity),

@@ -58,6 +58,30 @@ already matched. Citing the best-coverage passage above a floor takes that to 32
 from 62,251 input tokens to 38,606 (**-51% against the 79,159 baseline**) with answers still 1.00 — the model
 fetches a section instead of a document, so tool bytes fall 82%.
 
+Then the caller stopped guessing which section to ask for. `search` named the matched passage by heading
+("Page 2") and `fetch` takes an ordinal (1), so the model asked for section 0 in every question that fetched at
+all, read the wrong page, and fetched again — a wasted payload plus a whole round trip, which re-sends the
+schemas, the system prompt and the transcript behind it. A hit now carries `passageSection`, the ordinal `fetch`
+wants, for about five tokens. Search results also stopped repeating what the response can say once: the shared
+source prefix folds into a response-level `sourceRoot` (`sourceRoot` + a result's `sourceUrl` is the URL that
+came back before), and `partial` keeps the missing concepts — what a caller has to be able to name — while the
+matched list becomes a count. A ten-hit search goes 2,786 to 2,376 tokens (-15%); the benchmark's keyword
+searches return two hits, so that one shows up for the clients that get ten, not here.
+
+Removing the wasted fetch took the six questions from 36,832 to 23,098 tokens (-37%) and answers from 1.00 to
+0.83. The fetch it removed was load-bearing for one question: HDM page 2 is a sight-distance table whose
+extracted header reads "(1) (2) Passing Design Speed Stopping", and page 1 is what says the first column is
+stopping — so a model reading only the cited page answered 2,700 ft where the standard is 930, four runs out of
+four. A section fetch therefore carries `precededBy`, the tail of the passage before it, labelled with its own
+ordinal and anchor. Reading order is the point: the same bytes placed *after* the cited text still answer 2,700,
+and 400 characters is not enough because the tail of HDM page 1 defines *passing* sight distance. At about a
+page, ahead of the text, the six questions cost **25,297 tokens (-31% against 36,832)** with answers 1.00 on
+three consecutive runs, in 11 tool calls over 17 requests rather than 16 over 22.
+
+Token figures from here on are every request's full prompt, uncached, counted with `o200k_base`. The same build
+reads 38,606 in the paragraph above and 36,832 here: an accounting difference in how much of each tool
+definition is counted (~5%), not a change in the loop. Comparisons stay inside one convention.
+
 Two gateway settings (passed through by `gateway_env`) tune the rest, both off by default:
 
 - `EKG_SEARCH_PASSAGES` — how many top results carry their cited passage in full. At 2 the six questions cost

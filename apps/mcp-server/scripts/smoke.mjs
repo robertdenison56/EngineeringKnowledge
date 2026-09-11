@@ -87,6 +87,23 @@ try {
   const superseded = payload.results.find((r) => r.id === 'detail:cw-firestop-01');
   assert(superseded?.warning, 'superseded result carries warning (P0-8)');
 
+  // A shared source prefix is named once, not on every hit. Nothing is lost:
+  // `sourceRoot` + a result's `sourceUrl` is the URL it carried before.
+  const sourced = payload.results.filter((r) => r.provenance?.sourceUrl);
+  assert(payload.sourceRoot, 'the shared source prefix is hoisted to the response');
+  assert(
+    sourced.every((r) => r.provenance.sourceUrl.length > 0),
+    'no result is left holding a bare root instead of a document',
+  );
+  assert(
+    sourced.some(
+      (r) =>
+        `${payload.sourceRoot}${r.provenance.sourceUrl}` ===
+        'https://demo-firm.sharepoint.com/details/cw-firestop-02.pdf',
+    ),
+    'sourceRoot + sourceUrl reconstructs the full source URL',
+  );
+
   const noHits = await request(4, 'tools/call', {
     name: 'search',
     arguments: { query: 'zzz-no-such-topic-zzz' },
@@ -120,6 +137,46 @@ try {
     /25 percent compression/.test(specHit.snippet ?? ''),
     'snippet quotes the matched passage, not the file-level summary',
   );
+  // The hit names the ordinal `fetch` takes, so reading the passage it cited
+  // costs one call — not a guess, a wrong page, and a second call.
+  assert(
+    Number.isInteger(specHit.passageSection),
+    'hit carries the section ordinal, not just the heading a human reads',
+  );
+  const citedSection = await request(36, 'tools/call', {
+    name: 'fetch',
+    arguments: { id: specHit.id, section: specHit.passageSection },
+  });
+  const citedPayload = JSON.parse(citedSection.content[0].text);
+  assert(
+    citedPayload.section?.ordinal === specHit.passageSection &&
+      /25 percent compression/.test(citedPayload.text ?? ''),
+    'that ordinal fetches the passage search cited, first try',
+  );
+  // A passage arrives with what it was cut away from, labelled and ahead of the
+  // cited text — the reading order a table's legend depends on.
+  assert(
+    citedPayload.precededBy?.ordinal === specHit.passageSection - 1 &&
+      citedPayload.precededBy.tail?.length > 0,
+    'a section fetch carries the tail of the passage before it',
+  );
+  const serialized = citedSection.content[0].text;
+  assert(
+    serialized.indexOf('precededBy') < serialized.indexOf('"text"'),
+    'the lead-in is read before the passage, not after it',
+  );
+  assert(
+    citedPayload.precededBy.anchor && !citedPayload.text.includes(citedPayload.precededBy.tail),
+    'lead-in keeps its own anchor and is never folded into the cited text',
+  );
+  const firstSection = await request(37, 'tools/call', {
+    name: 'fetch',
+    arguments: { id: specHit.id, section: 0 },
+  });
+  assert(
+    JSON.parse(firstSection.content[0].text).precededBy === undefined,
+    'the first section has nothing before it to carry',
+  );
 
   // Relaxed pass (P0-8): concepts split across entities return partial hits
   // that name what matched AND what did not — never served as full answers.
@@ -131,8 +188,8 @@ try {
   const partial = splitPayload.results?.find((r) => r.partial);
   assert(partial, 'concepts split across entities yield partial hits, not a false no_results');
   assert(
-    partial.partial.matchedConcepts?.length > 0 && partial.partial.missingConcepts?.includes('camber'),
-    'partial hit discloses both matched and missing concepts (P0-8)',
+    partial.partial.matched > 0 && partial.partial.missingConcepts?.includes('camber'),
+    'partial hit discloses how much matched and names what did not (P0-8)',
   );
 
   const traverse = await request(5, 'tools/call', {
