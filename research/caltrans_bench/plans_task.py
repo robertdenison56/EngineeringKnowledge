@@ -65,12 +65,17 @@ Reply with ONE JSON object and nothing else, with exactly these keys:
     "alignments": ["alignment line names printed in quotes, e.g. P1, B, A3"],
     "stations": [{"alignment": "P1", "begin": "10+00.00", "end": "16+95.81", "what": "what the limits bound"}],
     "structures": ["bridge names and numbers as printed"],
-    "description": "two or three sentences on what the sheet shows: the work, where, identifiers, stations, quantities"
+    "description": "two or three sentences on what the sheet shows: the work, where it is, and what it is for",
+    "specifics": ["every printed station or station range with its line name", "every quantity with its unit",
+                  "every identifier or code: detail numbers, sign codes, sheet ids, bridge numbers, boring ids",
+                  "every named component or item: e.g. temporary barrier system, pipe seat extender, Bent 2"]
   }
 }
 Rules: copy strings exactly as printed; use null or [] when something is not printed rather than guessing;
 stations are <number>+<two digits>[.<decimals>] with the line name they belong to; give a single station as
-begin with end null; never invent a sheet id, revision, or station."""
+begin with end null; never invent a sheet id, revision, or station. The description names the work and the
+place in prose; the specifics list carries the numbers, codes and component names exactly as printed —
+a reader should be able to reconstruct the sheet's key facts from the two together."""
 
 
 def _prompt(row: SheetGold, condition: str, text: str | None, facts: str | None) -> list[ContentText | ContentImage]:

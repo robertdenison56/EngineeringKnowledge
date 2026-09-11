@@ -1,7 +1,7 @@
 {
   "meta": {
-    "generated": "2026-09-10T04:35:48+00:00",
-    "commit": "a63ceb2",
+    "generated": "2026-09-11T03:02:22+00:00",
+    "commit": "23a211f",
     "gold": "plans/gold/sheets-v0.jsonl",
     "preds": [
       "plans/preds-gemma4-image_facts/d3-03-2H4504-plans.jsonl"
@@ -223,8 +223,8 @@
     },
     "facts": {
       "facts": 163,
-      "covered": 72,
-      "coverage": 0.4417,
+      "covered": 93,
+      "coverage": 0.5706,
       "sheets": 27,
       "sheets_described": 27,
       "described_rate": 1.0
@@ -341,13 +341,6 @@
       "field": "context.facts",
       "kind": "uncovered",
       "gold": "16+95.81",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p2",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "22-0072",
       "pred": null
     },
     {
@@ -585,13 +578,6 @@
       "id": "d3-03-2H4504-plans:p6",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "crash cushion",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p6",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "L-1",
       "pred": null
     },
@@ -753,21 +739,7 @@
       "id": "d3-03-2H4504-plans:p9",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "fiber roll",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p9",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "800",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p9",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "construction entrance",
       "pred": null
     },
     {
@@ -782,13 +754,6 @@
       "field": "context.counties",
       "kind": "fn",
       "gold": "Yolo",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p10",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "fiber roll",
       "pred": null
     },
     {
@@ -956,20 +921,6 @@
       "id": "d3-03-2H4504-plans:p12",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "edge line",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p12",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "median island",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p12",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "Detail 27B",
       "pred": null
     },
@@ -1107,27 +1058,6 @@
       "pred": null
     },
     {
-      "id": "d3-03-2H4504-plans:p13",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "fiber roll",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p13",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "compost sock",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p13",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "stake",
-      "pred": null
-    },
-    {
       "id": "d3-03-2H4504-plans:p14",
       "field": "sheet_number",
       "kind": "wrong",
@@ -1184,13 +1114,6 @@
       "pred": null
     },
     {
-      "id": "d3-03-2H4504-plans:p14",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "cone",
-      "pred": null
-    },
-    {
       "id": "d3-03-2H4504-plans:p15",
       "field": "title",
       "kind": "wrong",
@@ -1237,13 +1160,6 @@
       "field": "context.counties",
       "kind": "fn",
       "gold": "Yolo",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p15",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "flagger",
       "pred": null
     },
     {
@@ -1363,13 +1279,6 @@
       "field": "context.counties",
       "kind": "fn",
       "gold": "Yolo",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p17",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "speed limit reduction",
       "pred": null
     },
     {
@@ -1765,27 +1674,6 @@
       "pred": null
     },
     {
-      "id": "d3-03-2H4504-plans:p20",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "Section A-A",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p20",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "Section B-B",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p20",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "backwall",
-      "pred": null
-    },
-    {
       "id": "d3-03-2H4504-plans:p21",
       "field": "sheet_number",
       "kind": "fabricated",
@@ -1971,13 +1859,6 @@
       "id": "d3-03-2H4504-plans:p22",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "column casing",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p22",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "welded field splice",
       "pred": null
     },
@@ -2036,20 +1917,6 @@
       "kind": "fp",
       "gold": null,
       "pred": "2H4504"
-    },
-    {
-      "id": "d3-03-2H4504-plans:p23",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "soffit access opening",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p23",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "pipe seat extender",
-      "pred": null
     },
     {
       "id": "d3-03-2H4504-plans:p23",
@@ -2248,13 +2115,6 @@
       "pred": null
     },
     {
-      "id": "d3-03-2H4504-plans:p25",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "skew",
-      "pred": null
-    },
-    {
       "id": "d3-03-2H4504-plans:p26",
       "field": "sheet_number",
       "kind": "fabricated",
@@ -2399,13 +2259,6 @@
       "field": "context.facts",
       "kind": "uncovered",
       "gold": "bench mark",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p26",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "boring",
       "pred": null
     },
     {

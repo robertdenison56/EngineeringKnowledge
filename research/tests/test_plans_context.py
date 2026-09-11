@@ -22,6 +22,7 @@ from caltrans_bench.plans import (
     parse_station,
     regressions,
     score,
+    text_has,
     validate_gold,
 )
 from caltrans_bench.plans_context import parse_model_json, textlayer_context
@@ -271,6 +272,29 @@ def test_lenient_readings_scale_prefix_joined_structures_endpoint_stations():
     lone = SheetPrediction.from_facts("d", 2, {"context": {"stations": [{"alignment": "A1", "begin": "554+00"}]}})
     ctx3 = score([gold], {gold.id: lone}).to_dict()["context"]
     assert (ctx3["stations"]["tp"], ctx3["stations"]["fp"], ctx3["stations"]["fn"]) == (0, 1, 1)
+
+
+def test_fact_matching_folds_plurals_and_reads_specifics():
+    assert text_has("temporary barriers and crash cushions", "crash cushion", fold_plurals=True)
+    assert text_has("soffit access door assemblies", "assembly", fold_plurals=True)
+    assert not text_has("temporary barriers and crash cushions", "crash cushion")  # validator stays strict
+    assert text_has("the class", "class", fold_plurals=True)  # "ss" is not a plural
+    gold = SheetGold.model_validate(
+        {**GOLD, "context": {"description": "x", "facts": ["crash cushion", "11+85", "Detail 27B", "Bent 2"]}}
+    )
+    pred = SheetPrediction.from_facts(
+        "d",
+        2,
+        {
+            "context": {
+                "description": "Traffic handling with temporary barriers and crash cushions.",
+                "specifics": ['"P1" 11+85 to 15+45', "Detail 27B"],
+            }
+        },
+    )
+    facts = score([gold], {gold.id: pred}).to_dict()["context"]["facts"]
+    assert (facts["covered"], facts["facts"]) == (3, 4)
+    assert pred.context is not None and pred.context.specifics == ['"P1" 11+85 to 15+45', "Detail 27B"]
 
 
 def test_context_regressions_gate():

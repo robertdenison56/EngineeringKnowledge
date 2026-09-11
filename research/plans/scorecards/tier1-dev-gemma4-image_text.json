@@ -1,7 +1,7 @@
 {
   "meta": {
-    "generated": "2026-09-10T04:35:48+00:00",
-    "commit": "a63ceb2",
+    "generated": "2026-09-11T03:02:22+00:00",
+    "commit": "23a211f",
     "gold": "plans/gold/sheets-v0.jsonl",
     "preds": [
       "plans/preds-gemma4-image_text/d3-03-2H4504-plans.jsonl"
@@ -223,8 +223,8 @@
     },
     "facts": {
       "facts": 163,
-      "covered": 80,
-      "coverage": 0.4908,
+      "covered": 100,
+      "coverage": 0.6135,
       "sheets": 27,
       "sheets_described": 27,
       "described_rate": 1.0
@@ -313,13 +313,6 @@
       "field": "context.facts",
       "kind": "uncovered",
       "gold": "Putah Creek Rd",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p2",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "22-0072",
       "pred": null
     },
     {
@@ -421,24 +414,10 @@
       "pred": null
     },
     {
-      "id": "d3-03-2H4504-plans:p4",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "sign code",
-      "pred": null
-    },
-    {
       "id": "d3-03-2H4504-plans:p5",
       "field": "context.roads",
       "kind": "fn",
       "gold": "ROUTE 505",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p5",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "temporary barrier",
       "pred": null
     },
     {
@@ -459,13 +438,6 @@
       "id": "d3-03-2H4504-plans:p5",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "crash cushion",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p5",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "Bent 2",
       "pred": null
     },
@@ -474,13 +446,6 @@
       "field": "references",
       "kind": "fn",
       "gold": "L-1",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p6",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "crash cushion",
       "pred": null
     },
     {
@@ -578,21 +543,7 @@
       "id": "d3-03-2H4504-plans:p9",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "fiber roll",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p9",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "800",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p9",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "construction entrance",
       "pred": null
     },
     {
@@ -607,13 +558,6 @@
       "field": "context.counties",
       "kind": "fn",
       "gold": "Yolo",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p10",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "fiber roll",
       "pred": null
     },
     {
@@ -753,20 +697,6 @@
       "id": "d3-03-2H4504-plans:p12",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "edge line",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p12",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "median island",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p12",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "Detail 27B",
       "pred": null
     },
@@ -893,20 +823,6 @@
       "id": "d3-03-2H4504-plans:p13",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "fiber roll",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p13",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "compost sock",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p13",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "stake",
       "pred": null
     },
@@ -1002,13 +918,6 @@
       "pred": null
     },
     {
-      "id": "d3-03-2H4504-plans:p15",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "flagger",
-      "pred": null
-    },
-    {
       "id": "d3-03-2H4504-plans:p16",
       "field": "title",
       "kind": "wrong",
@@ -1096,13 +1005,6 @@
       "id": "d3-03-2H4504-plans:p17",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "speed limit reduction",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p17",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "sign panel size",
       "pred": null
     },
@@ -1167,13 +1069,6 @@
       "field": "context.facts",
       "kind": "uncovered",
       "gold": "Bent 2",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p18",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "pipe seat extender",
       "pred": null
     },
     {
@@ -1425,13 +1320,6 @@
       "id": "d3-03-2H4504-plans:p21",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "column casing",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p21",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "Type P/F",
       "pred": null
     },
@@ -1600,13 +1488,6 @@
       "id": "d3-03-2H4504-plans:p22",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "column casing",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p22",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "Detail C",
       "pred": null
     },
@@ -1642,28 +1523,7 @@
       "id": "d3-03-2H4504-plans:p23",
       "field": "context.facts",
       "kind": "uncovered",
-      "gold": "soffit access opening",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p23",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "pipe seat extender",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p23",
-      "field": "context.facts",
-      "kind": "uncovered",
       "gold": "left bridge",
-      "pred": null
-    },
-    {
-      "id": "d3-03-2H4504-plans:p23",
-      "field": "context.facts",
-      "kind": "uncovered",
-      "gold": "right bridge",
       "pred": null
     },
     {

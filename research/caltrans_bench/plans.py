@@ -144,6 +144,11 @@ class SheetContext(BaseModel):
     stations: list[StationLimit] = Field(default_factory=list)
     structures: list[str] = Field(default_factory=list, description="bridge names/numbers: Br No. 22-0072L")
     description: str | None = Field(default=None, description="one or two sentences: what the sheet shows")
+    specifics: list[str] = Field(
+        default_factory=list,
+        description="model output only: printed stations, quantities with units, identifiers/codes, component "
+        "names; the fact matcher reads description + specifics together",
+    )
     facts: list[str] = Field(default_factory=list, description="short phrases a correct description must contain")
 
     def labelled_strings(self) -> list[tuple[str, str]]:
@@ -369,6 +374,10 @@ def _coerce_context(raw: Mapping[str, Any]) -> dict[str, Any]:
             stations.append({"begin": s.strip()})
     out["stations"] = stations
     out["description"] = _opt_str(raw.get("description"))
+    specifics = raw.get("specifics") or []
+    out["specifics"] = (
+        [str(x).strip() for x in specifics if x is not None and str(x).strip()] if isinstance(specifics, list) else []
+    )
     facts = raw.get("facts") or []
     out["facts"] = [str(f) for f in facts if isinstance(f, str) and f.strip()] if isinstance(facts, list) else []
     return out
@@ -582,11 +591,23 @@ def norm_field(name: str, value: str) -> str:
 # --- Text-layer check (port of the grounding gate's matching rules) ----------
 
 
-def normalize_for_grounding(text: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", _ascii(text).casefold()).strip()
+def normalize_for_grounding(text: str, fold_plurals: bool = False) -> str:
+    words = re.sub(r"[^a-z0-9]+", " ", _ascii(text).casefold()).strip()
+    if not fold_plurals:
+        return words
+    return " ".join(_singular(w) for w in words.split())
 
 
-def text_has(page_text: str, needle: str) -> bool:
+def _singular(token: str) -> str:
+    """``cushions`` → ``cushion``, ``assemblies`` → ``assembly``; short tokens and ``ss`` endings untouched."""
+    if len(token) >= 5 and token.endswith("ies"):
+        return token[:-3] + "y"
+    if len(token) >= 4 and token.endswith("s") and not token.endswith("ss") and not token[-2].isdigit():
+        return token[:-1]
+    return token
+
+
+def text_has(page_text: str, needle: str, fold_plurals: bool = False) -> bool:
     """Whether ``needle`` occurs in ``page_text`` as whole tokens.
 
     Tolerant of formatting noise (quotes, hyphens, stacked fractions), strict about
@@ -594,10 +615,11 @@ def text_has(page_text: str, needle: str) -> bool:
     letter-space words (``ROUTE 505`` extracts as ``R OU TE 505``), so a token-exact
     miss gets a second, space-blind check that still respects token boundaries at
     the edges, and only for needles of six or more characters — a shorter needle
-    would match inside almost any run of digits.
+    would match inside almost any run of digits. ``fold_plurals`` (fact matching only)
+    lets "crash cushions" satisfy the fact "crash cushion"; the label validator stays strict.
     """
-    hay = normalize_for_grounding(page_text)
-    want = normalize_for_grounding(needle)
+    hay = normalize_for_grounding(page_text, fold_plurals)
+    want = normalize_for_grounding(needle, fold_plurals)
     if not hay or not want:
         return False
     if f" {want} " in f" {hay} ":
@@ -1075,14 +1097,16 @@ def _score_context(card: Scorecard, row: SheetGold, pred: SheetPrediction) -> No
         card.errors.append(SheetError(row.id, "context.stations", "fp", None, _station_text(s)))
     for s in fns_st:
         card.errors.append(SheetError(row.id, "context.stations", "fn", _station_text(s), None))
-    # Facts: containment of each gold phrase in the predicted description.
+    # Facts: containment of each gold phrase in the predicted description plus its
+    # specifics list, plural-folded ("crash cushions" satisfies "crash cushion").
     if gold.facts:
         card.facts.sheets += 1
         card.facts.facts += len(gold.facts)
         if got.description:
             card.facts.sheets_described += 1
+            haystack = " \n ".join([got.description, *got.specifics])
             for fact in gold.facts:
-                if text_has(got.description, fact):
+                if text_has(haystack, fact, fold_plurals=True):
                     card.facts.covered += 1
                 else:
                     card.errors.append(SheetError(row.id, "context.facts", "uncovered", fact, None))
