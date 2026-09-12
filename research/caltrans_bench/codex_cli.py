@@ -276,7 +276,8 @@ class CodexAPI(ModelAPI):
             input_tokens_cache_write=usage.get("cache_write_input_tokens"),
             reasoning_tokens=usage.get("reasoning_output_tokens"),
         )
-        allowed = {("mcp_tool_call", "list_mcp_resources")}  # Codex's built-in, inert without servers
+        # Codex's built-in resource listings are inert (they only enumerate configured servers).
+        allowed = {("mcp_tool_call", "list_mcp_resources"), ("mcp_tool_call", "list_mcp_resource_templates")}
         if with_ekg:
             allowed |= {("mcp_tool_call", n) for n in READ_TOOLS}
         foreign = [t for t in parsed["tool_calls"] if (t["tool"], t.get("name")) not in allowed]
