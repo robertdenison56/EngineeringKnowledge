@@ -20,7 +20,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from .manifest import Manifest
-from .schema import Question, dump_questions
+from .schema import SHARDS, Question, dump_questions
 
 FONT = "Arial"
 ALIAS_SEP = " | "
@@ -29,6 +29,7 @@ MAX_ROWS = 5000  # rows covered by the dropdown validations
 BUCKETS = ["lookup", "multihop", "trap", "refusal"]
 ANSWER_TYPES = ["number", "citation", "text", "refusal"]
 SPLITS = ["smoke", "dev", "test", "train"]
+SHARD_LETTERS = list(SHARDS)
 TARGETS = {"lookup": 60, "multihop": 40, "trap": 30, "refusal": 30}
 BENCH_GROUPS = {"hdm", "std-2025", "dib"}
 
@@ -50,7 +51,7 @@ for n in range(1, MAX_ANCHORS + 1):
         (f"anchor{n}_table", 14, False),
         (f"anchor{n}_quote", 48, True),
     ]
-COLUMNS += [("edition", 26, False), ("split", 7, False), ("notes", 44, True)]
+COLUMNS += [("edition", 26, False), ("split", 7, False), ("shard", 7, False), ("notes", 44, True)]
 HEADERS = [c[0] for c in COLUMNS]
 COL = {name: i + 1 for i, name in enumerate(HEADERS)}
 
@@ -88,7 +89,7 @@ def question_to_row(q: Question) -> list:
             row += [a.doc, a.page, a.table, a.quote]
         else:
             row += [None, None, None, None]
-    row += [q.edition, q.split, q.notes]
+    row += [q.edition, q.split, q.shard, q.notes]
     return row
 
 
@@ -121,6 +122,7 @@ def row_to_question(values: dict[str, object]) -> Question:
         "anchors": anchors,
         "edition": _cell_text(values.get("edition")),
         "split": _cell_text(values.get("split")) or "dev",
+        "shard": _cell_text(values.get("shard")),
         "notes": _cell_text(values.get("notes")),
     }
     return Question.model_validate(payload)
@@ -193,7 +195,12 @@ def export_xlsx(questions: list[Question], manifest: Manifest, out: Path, source
 
     # Dropdowns on the Questions sheet.
     last = MAX_ROWS
-    for name, options in (("bucket", BUCKETS), ("answer_type", ANSWER_TYPES), ("split", SPLITS)):
+    for name, options in (
+        ("bucket", BUCKETS),
+        ("answer_type", ANSWER_TYPES),
+        ("split", SPLITS),
+        ("shard", SHARD_LETTERS),
+    ):
         dv = DataValidation(type="list", formula1='"' + ",".join(options) + '"', allow_blank=True)
         dv.error = f"Pick one of: {', '.join(options)}"
         dv.errorTitle = name
@@ -264,7 +271,33 @@ def export_xlsx(questions: list[Question], manifest: Manifest, out: Path, source
         st.cell(
             row=r, column=2, value=f'=COUNTIF(Questions!${split_col}$2:${split_col}${last},"{s_}")'
         ).font = body_font
-    for col, width in ((1, 14), (2, 9), (3, 9), (4, 11)):
+    r += 2
+    shard_col = get_column_letter(COL["shard"])
+    for col, name in enumerate(("Shard", "Count", *BUCKETS), start=1):
+        c = st.cell(row=r, column=col, value=name)
+        c.font = header_font
+        c.fill = HEADER_FILL
+    st.cell(row=r, column=1).comment = Comment(
+        "Run shards: a run is one shard unless it asks for another. Every shard carries the same mix, so these "
+        "rows should stay level. Assigned by: caltrans-bench questions shard — not by hand.",
+        "caltrans-bench",
+    )
+    for sh in SHARD_LETTERS:
+        r += 1
+        st.cell(row=r, column=1, value=sh).font = body_font
+        st.cell(
+            row=r, column=2, value=f'=COUNTIF(Questions!${shard_col}$2:${shard_col}${last},"{sh}")'
+        ).font = body_font
+        for col, b in enumerate(BUCKETS, start=3):
+            st.cell(
+                row=r,
+                column=col,
+                value=(
+                    f'=COUNTIFS(Questions!${shard_col}$2:${shard_col}${last},"{sh}",'
+                    f'Questions!${bucket_col}$2:${bucket_col}${last},"{b}")'
+                ),
+            ).font = body_font
+    for col, width in ((1, 14), (2, 9), (3, 10), (4, 11), (5, 9), (6, 9)):
         st.column_dimensions[get_column_letter(col)].width = width
 
     # Guide sheet.
@@ -314,6 +347,12 @@ def export_xlsx(questions: list[Question], manifest: Manifest, out: Path, source
         (
             "7. split: dev while authoring. edition: HDM 7th edition / 2025 / Standard Plans 2025. notes: anything a reviewer should "
             "know (why a value is a trap, what the table's range is).",
+            False,
+        ),
+        (
+            "8. shard: leave blank on a new row. Shards are the run-sized pieces of the set and are dealt by "
+            "caltrans-bench questions shard, which balances the mix across them; a hand-picked letter unbalances it. "
+            "Re-run that command after importing new rows.",
             False,
         ),
         ("", False),

@@ -46,12 +46,35 @@ https://github.com/robertdenison56/EngineeringKnowledge/tree/main/research.
 The lookup surplus will be trimmed to the target when the dev/test split is
 frozen; the other buckets are still being filled.
 
+## Run shards
+
+The set is dealt into shards of at most 100 questions — four of 97 today — and a
+run is one shard unless it asks for `shard=all`. A shard is not a split and holds
+nothing out: it is the same population in run-sized pieces, dealt so each one
+carries the whole mix, so one shard is a usable estimate of the set and two are
+comparable to each other.
+
+| Shard | Questions | lookup | multihop | trap | refusal | Anchored documents |
+|---|---|---|---|---|---|---|
+| `a` | 97 | 71 | 10 | 7 | 9 | 16 |
+| `b` | 97 | 70 | 11 | 7 | 9 | 16 |
+| `c` | 97 | 70 | 11 | 7 | 9 | 16 |
+| `d` | 97 | 70 | 11 | 7 | 9 | 15 |
+
+The stratum is (bucket, the document the first anchor names), dealt round-robin in
+file order so a run of near-duplicate questions off one table — four stopping sight
+distances at four design speeds — lands one per shard instead of four in one.
+`caltrans-bench questions shard` computes it; the count follows the 100 cap, so a
+set past 400 questions is re-dealt into five and every letter moves. A past run is
+identified by the question ids it covered, not by a letter.
+
 ## Record format
 
 One JSON object per line. Fields: `id`, `bucket`, `question`, `answer`,
 `answer_type` (`number` · `citation` · `text` · `refusal`), `unit`,
 `tolerance`, `aliases`, `anchors` (list of `{doc, page, table, quote}`),
-`edition`, `split` (`smoke` · `dev` · `test` · `train`), `notes`.
+`edition`, `split` (`smoke` · `dev` · `test` · `train`), `shard` (the run shard,
+assigned by `caltrans-bench questions shard`), `notes`.
 `page` is the 1-based PDF page index of the file named in the manifest.
 
 ## Source documents and licensing

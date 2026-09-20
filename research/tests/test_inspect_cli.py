@@ -63,3 +63,30 @@ def test_research_path_resolves_readme_relative_paths(tmp_path: Path, monkeypatc
     local.write_text("")
     assert research_path("local.jsonl") == Path("local.jsonl")  # exists from the cwd: used as given
     assert research_path(str(local)) == local  # absolute: used as given
+
+
+def test_a_run_is_one_shard_unless_it_asks_for_all() -> None:
+    """The cost guard: the default must not quietly become the whole set again."""
+    import pytest
+
+    from caltrans_bench import QUESTIONS_DIR
+    from caltrans_bench.schema import load_questions
+    from caltrans_bench.task import caltrans_bench
+
+    questions = "questions/caltrans-v0.jsonl"
+    total = len(load_questions(QUESTIONS_DIR / "caltrans-v0.jsonl"))
+    default = caltrans_bench(questions=questions)
+    assert len(default.dataset) < total
+    assert default.dataset.name.endswith(":a") and default.metadata["shard"] == "a"
+    assert {s.metadata["shard"] for s in default.dataset} == {"a"}
+
+    everything = caltrans_bench(questions=questions, shard="all")
+    assert len(everything.dataset) == total
+    assert everything.dataset.name == "caltrans-bench:caltrans-v0"
+
+    # An unsharded set (CI's smoke file) still runs whole, and reports that it did.
+    smoke = caltrans_bench(questions="questions/smoke.jsonl")
+    assert smoke.dataset.name == "caltrans-bench:smoke" and smoke.metadata["shard"] == "all"
+
+    with pytest.raises(ValueError, match="unknown shard"):
+        caltrans_bench(questions=questions, shard="z")

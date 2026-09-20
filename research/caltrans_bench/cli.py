@@ -8,6 +8,7 @@ from pathlib import Path
 
 from . import MANIFEST_PATH, QUESTIONS_DIR, RAW_DIR
 from .manifest import build, fetch, load_manifest, save_manifest, verify
+from .schema import DEFAULT_SHARD, MAX_SHARD, SHARDS
 
 
 def _ids(value: str | None) -> list[str] | None:
@@ -74,13 +75,48 @@ def cmd_questions_xlsx(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_questions_shard(args: argparse.Namespace) -> int:
+    """Deal a set into run shards and write the assignment back into the JSONL."""
+    from collections import Counter
+
+    from .schema import MAX_SHARD, load_questions, stratify, write_shards
+
+    path = Path(args.path)
+    qs = load_questions(path)
+    assigned = stratify(qs, shards=args.shards)
+    counts = Counter(assigned.values())
+    over = [f"{k}={v}" for k, v in sorted(counts.items()) if v > MAX_SHARD]
+    if over:
+        print(f"FAIL shard(s) over the {MAX_SHARD}-question cap: {', '.join(over)}")
+        return 1
+    by_shard: dict[str, Counter] = {sh: Counter() for sh in counts}
+    docs: dict[str, set[str]] = {sh: set() for sh in counts}
+    moved = 0
+    for q in qs:
+        sh = assigned[q.id]
+        by_shard[sh][q.bucket] += 1
+        docs[sh].update(a.doc for a in q.anchors)
+        moved += q.shard != sh
+    for sh in sorted(counts):
+        mix = " ".join(f"{b}={by_shard[sh][b]}" for b in ("lookup", "multihop", "trap", "refusal"))
+        print(f"  {sh}: {counts[sh]:3d} questions  {mix}  ({len(docs[sh])} documents)")
+    if args.dry_run:
+        print(f"{len(qs)} questions in {len(counts)} shards; {moved} would move (dry run, nothing written)")
+        return 0
+    changed = write_shards(path, assigned)
+    print(f"{len(qs)} questions in {len(counts)} shards; {changed} line(s) updated in {path.name}")
+    return 0
+
+
 def cmd_questions(args: argparse.Namespace) -> int:
     from .schema import load_questions
 
     if args.qcmd in ("export-xlsx", "import-xlsx"):
         return cmd_questions_xlsx(args)
+    if args.qcmd == "shard":
+        return cmd_questions_shard(args)
     path = Path(args.path)
-    qs = load_questions(path, split=args.split)
+    qs = load_questions(path, split=args.split, shard=args.shard)
     if args.qcmd == "docs":
         print(",".join(sorted({a.doc for q in qs for a in q.anchors})))
         return 0
@@ -88,19 +124,38 @@ def cmd_questions(args: argparse.Namespace) -> int:
         from collections import Counter
 
         buckets, types, splits, docs = Counter(), Counter(), Counter(), Counter()
+        shards: dict[str, Counter] = {}
+        shard_docs: dict[str, set[str]] = {}
         for q in qs:
             buckets[q.bucket] += 1
             types[q.answer_type] += 1
             splits[q.split] += 1
             for a in q.anchors:
                 docs[a.doc] += 1
+            if q.shard:
+                shards.setdefault(q.shard, Counter())[q.bucket] += 1
+                shard_docs.setdefault(q.shard, set()).update(a.doc for a in q.anchors)
         print(f"{len(qs)} questions in {path.name}")
         for name, c in (("bucket", buckets), ("answer_type", types), ("split", splits), ("anchored doc", docs)):
             print(f"  {name}: " + ", ".join(f"{k}={v}" for k, v in sorted(c.items(), key=lambda kv: -kv[1])))
+        if shards:
+            print("  shards (one shard is a runnable estimate of the whole set):")
+            for sh in sorted(shards):
+                mix = " ".join(f"{b}={shards[sh][b]}" for b in ("lookup", "multihop", "trap", "refusal"))
+                print(f"    {sh}: {sum(shards[sh].values()):3d}  {mix}  ({len(shard_docs[sh])} documents)")
         return 0
     # validate
     manifest = load_manifest(args.manifest).by_id()
     failures: list[str] = []
+    # A part-sharded set is the quiet failure: `shard=a` filters on the field, so questions
+    # added since the last deal would sit out every run instead of erroring.
+    if args.shard is None:
+        missing = [q.id for q in qs if not q.shard]
+        if missing and len(missing) != len(qs):
+            failures.append(
+                f"{len(missing)} question(s) carry no shard while the rest do ({', '.join(missing[:5])}"
+                f"{', …' if len(missing) > 5 else ''}); run: caltrans-bench questions shard {path}"
+            )
     for q in qs:
         for a in q.anchors:
             doc = manifest.get(a.doc)
@@ -275,7 +330,7 @@ def cmd_smoke(args: argparse.Namespace) -> int:
     from .task import caltrans_bench
 
     logs = inspect_eval(
-        caltrans_bench(condition=args.condition, questions=args.questions, split=args.split),
+        caltrans_bench(condition=args.condition, questions=args.questions, split=args.split, shard=args.shard),
         model=args.model,
         limit=args.limit,
         log_dir=args.log_dir,
@@ -286,7 +341,7 @@ def cmd_smoke(args: argparse.Namespace) -> int:
         print(f"smoke FAILED: {log.status} {log.error.message if log.error else ''}")
         return 1
     n = log.results.completed_samples if log.results else 0
-    print(f"smoke ok: {n} samples, condition={args.condition}, model={args.model}")
+    print(f"smoke ok: {n} samples, condition={args.condition}, model={args.model}, shard={args.shard}")
     if log.results:
         for s in log.results.scores:
             for name, m in s.metrics.items():
@@ -328,7 +383,12 @@ def main(argv: list[str] | None = None) -> int:
         sp = qs.add_parser(name, help=help_)
         sp.add_argument("path", nargs="?", default=str(QUESTIONS_DIR / "smoke.jsonl"))
         sp.add_argument("--split")
+        sp.add_argument("--shard", choices=list(SHARDS), help="one run shard; ignored on an unsharded set")
         sp.add_argument("--offline", action="store_true")
+    sh = qs.add_parser("shard", help=f"deal a set into run shards of at most {MAX_SHARD}, each with the whole mix")
+    sh.add_argument("path", nargs="?", default=str(QUESTIONS_DIR / "caltrans-v0.jsonl"))
+    sh.add_argument("--shards", type=int, help=f"how many (default: the fewest that keep each at {MAX_SHARD})")
+    sh.add_argument("--dry-run", action="store_true", help="print the deal, write nothing")
     ex = qs.add_parser(
         "export-xlsx", help="write an editable workbook (Questions, Docs, Stats, Guide sheets) from a JSONL set"
     )
@@ -400,6 +460,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--model", default="mockllm/model")
     s.add_argument("--questions", default=str(QUESTIONS_DIR / "smoke.jsonl"))
     s.add_argument("--split")
+    s.add_argument("--shard", default=DEFAULT_SHARD, help=f"run shard, or 'all' (default: {DEFAULT_SHARD})")
     s.add_argument("--limit", type=int, default=10)
     s.add_argument("--log-dir", default="logs")
     s.set_defaults(func=cmd_smoke)

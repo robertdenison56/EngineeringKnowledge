@@ -10,6 +10,9 @@ Run, for example::
 
     inspect eval caltrans_bench/task.py -T condition=closed_book --model openai/gpt-5.5
     inspect eval caltrans_bench/task.py -T condition=rag -T split=smoke --model mockllm/model
+
+A run is one shard of the question set (``-T shard=a``, the default) unless it asks
+for ``-T shard=all``; see ``shard`` below.
 """
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ from caltrans_bench import claude_code as _claude_code  # noqa: F401  (registers
 from caltrans_bench import codex_cli as _codex_cli  # noqa: F401  (registers the codex/ provider)
 from caltrans_bench.ekg_tools import doc_aliases
 from caltrans_bench.manifest import load_manifest
-from caltrans_bench.schema import Question, load_questions
+from caltrans_bench.schema import ALL_SHARDS, DEFAULT_SHARD, SHARDS, Question, load_questions
 from caltrans_bench.scoring import (
     REFUSAL_TOKEN,
     cited_pages,
@@ -177,6 +180,7 @@ def caltrans_bench(
     condition: str = "closed_book",
     questions: str = str(DEFAULT_QUESTIONS),
     split: str | None = None,
+    shard: str = DEFAULT_SHARD,
     k: int = 8,
     retriever: str = "lexical",
     ekg_db: str = str(DEFAULT_SNAPSHOT),
@@ -195,11 +199,21 @@ def caltrans_bench(
     (observed worst case: 8 tool calls, 168k input tokens on one question), set above
     anything a healthy sample reaches rather than tight enough to trim typical ones.
     They apply to the ``ekg`` condition; the other two make a single request.
+
+    ``shard`` is one run-sized piece of the set, dealt so it carries the whole mix —
+    the default, because a run of the full set is four times the cost and is what the
+    provider caps cut off half way through (a Codex run died at 252 of 388). ``all``
+    runs every question; the shard is in the dataset name and the task metadata, so a
+    97-question result cannot be mistaken for a 388-question one in the log.
     """
     questions_path = research_path(questions)
-    qs = load_questions(questions_path, split=split)
+    if shard not in (*SHARDS, ALL_SHARDS):
+        raise ValueError(f"unknown shard {shard!r}; expected one of {', '.join(SHARDS)} or {ALL_SHARDS!r}")
+    wanted = None if shard == ALL_SHARDS else shard
+    qs = load_questions(questions_path, split=split, shard=wanted)
     if not qs:
-        raise ValueError(f"no questions in {questions_path} (split={split})")
+        raise ValueError(f"no questions in {questions_path} (split={split}, shard={shard})")
+    sharded = wanted is not None and any(q.shard for q in qs)
     only = docs.split(",") if docs else None
     tool_names = [t.strip() for t in ekg_tools.split(",") if t.strip()]
     limits: dict[str, int | None] = {}
@@ -217,12 +231,16 @@ def caltrans_bench(
         raise ValueError(f"unknown condition {condition!r}; expected closed_book, rag, or ekg")
     aliases = doc_aliases(load_manifest(MANIFEST_PATH), research_path(ekg_db))
     return Task(
-        dataset=MemoryDataset([_sample(q) for q in qs], name=f"caltrans-bench:{questions_path.stem}"),
+        dataset=MemoryDataset(
+            [_sample(q) for q in qs],
+            name=f"caltrans-bench:{questions_path.stem}" + (f":{shard}" if sharded else ""),
+        ),
         solver=chain,
         scorer=bench_scorer(strict=strict, aliases=aliases),
         **limits,
         metadata={
-            "condition": condition, "split": split, "k": k, "retriever": retriever, "strict": strict,
+            "condition": condition, "split": split, "shard": shard if sharded else ALL_SHARDS,
+            "k": k, "retriever": retriever, "strict": strict,
             "max_chars": max_chars,
             **({"ekg_tools": tool_names, **limits} if condition == "ekg" else {}),
         },

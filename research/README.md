@@ -40,10 +40,15 @@ scripts/build-ekg-snapshot.sh          # once; builds snapshots/ekg-caltrans.db
 uv run inspect eval caltrans_bench/task.py -T condition=ekg --model anthropic/claude-fable-5-1
 ```
 
+**A run is one shard of the question set.** `caltrans-v0.jsonl` is dealt into four shards of 97 that each carry
+the whole mix, and `-T shard=` picks one (default `a`); `-T shard=all` runs every question. The shard is in the
+dataset name (`caltrans-bench:caltrans-v0:a`) and the task metadata, so a 97-question result cannot be read as a
+388-question one. See [Run shards](#run-shards).
+
 `-T name=value` sets any argument of the `caltrans_bench` task in `caltrans_bench/task.py`: `condition`
-(`closed_book`, `rag`, `ekg`), `questions`, `split`, `k`, `retriever`, `ekg_db`, `docs` (comma-separated document
-ids to retrieve from), `strict`, and `max_chars` (RAG passes retrieved pages whole; set this only to study a
-per-passage cap — the old default of 3,000 characters cut the answer off about half of the pages it retrieved).
+(`closed_book`, `rag`, `ekg`), `questions`, `split`, `shard`, `k`, `retriever`, `ekg_db`, `docs` (comma-separated
+document ids to retrieve from), `strict`, and `max_chars` (RAG passes retrieved pages whole; set this only to study
+a per-passage cap — the old default of 3,000 characters cut the answer off about half of the pages it retrieved).
 The `ekg` condition adds `ekg_tools` (which gateway tools to expose, default `search,fetch,traverse`) plus
 `token_limit` and `message_limit` backstops against a runaway tool loop. Every tool schema is re-sent on every
 request of the loop, so `find_experts` and `get_project_context` are off by default: no question in the set can
@@ -130,17 +135,52 @@ a `NOT IN DOCUMENT` answer; every refusal question carries an anchor for exactly
 land in `logs/` (`uv run inspect view` browses them). Everything else (`--limit`, `--max-connections`,
 `--no-fail-on-error`, `--log-dir`, …) is a plain Inspect option; `uv run inspect eval --help` lists them.
 `caltrans-bench smoke` wraps the same task for CI and only exposes `--condition`, `--model`, `--questions`,
-`--split`, `--limit`, and `--log-dir`.
+`--split`, `--shard`, `--limit`, and `--log-dir`.
 
 ## Question sets
 
 | File | What |
 |---|---|
 | `questions/smoke.jsonl` | 10 questions CI runs on the mock model; anchors only two documents so CI downloads a few MB. |
-| `questions/caltrans-v0.jsonl` | The working benchmark set (split `dev` until the dev/test split is frozen). Scope: current HDM chapter files + 2025 Standard Plans and Specifications + DIB 82-06 (designer-framed accessibility questions, ids `dib-*`), plus 100 HDM questions derived from the DIB 78-04 Design Checklist (ids `dib78-*`, anchored to the HDM chapters the checklist cites). |
+| `questions/caltrans-v0.jsonl` | The working benchmark set, 388 questions in 4 run shards of 97 (split `dev` until the dev/test split is frozen). Scope: current HDM chapter files + 2025 Standard Plans and Specifications + DIB 82-06 (designer-framed accessibility questions, ids `dib-*`), plus 100 HDM questions derived from the DIB 78-04 Design Checklist (ids `dib78-*`, anchored to the HDM chapters the checklist cites). |
 | `questions/dib78-unused.jsonl` | 143 validated spare questions from the DIB 78-04 checklist pass that duplicate a value or item already in the set; move a line into `caltrans-v0.jsonl` to promote it. |
 
-`caltrans-bench questions stats questions/caltrans-v0.jsonl` prints bucket, answer-type, and document counts.
+`caltrans-bench questions stats questions/caltrans-v0.jsonl` prints bucket, answer-type, document, and shard
+counts; `--shard a` restricts every `questions` subcommand to one shard.
+
+### Run shards
+
+A shard is a run-sized piece of the set, not a split. Every shard is dealt from the same population so that it
+carries the whole mix — the four hold 70/71 lookup, 10/11 multihop, 7 trap and 9 refusal each, across 15–16 of the
+20 anchored documents — which is what makes one shard a usable estimate of the set and two shards comparable to
+each other. Nothing is held out: all 388 questions are still `split=dev`.
+
+The reason to run one is cost and survival. A full sweep is four times the price of a shard, and the runs that
+have actually been cut short were cut by a provider cap part way down a 388-question list — a Codex run died at
+252, a free-plan Gemma run at 45 — leaving a prefix that over-weights whatever the file happened to list first.
+A shard that finishes is worth more than a full run that does not, so the default is one shard and the whole set
+is the thing you ask for:
+
+```bash
+uv run inspect eval caltrans_bench/task.py -T condition=rag --model anthropic/claude-sonnet-5                  # shard a, 97 questions
+uv run inspect eval caltrans_bench/task.py -T condition=rag -T shard=c --model anthropic/claude-sonnet-5       # another shard
+uv run inspect eval caltrans_bench/task.py -T condition=rag -T shard=all --model anthropic/claude-sonnet-5     # all 388
+```
+
+The deal is deterministic and lives in the JSONL as a `shard` field, so a run is reproducible from the committed
+file. `questions shard` recomputes it and rewrites those fields in place (section comments and field order
+untouched); re-run it after adding questions. Do not set a letter by hand: the balance is a property of the whole
+deal, and one question moved by hand is one bucket the shards no longer agree on.
+
+```bash
+uv run caltrans-bench questions shard questions/caltrans-v0.jsonl --dry-run   # print the deal, write nothing
+uv run caltrans-bench questions shard questions/caltrans-v0.jsonl
+```
+
+The shard count follows the 100-question cap rather than being fixed at four, so a set that grows past 400 is
+dealt into five. That re-deals every letter: a shard identifies a way to run the set, not a stable cohort, and an
+old run is identified by the question ids it covered. `test_stratify_is_deterministic_and_matches_the_committed_file`
+fails if the file and the deal drift apart.
 
 ### Authoring workflow
 

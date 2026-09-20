@@ -31,3 +31,14 @@ def test_import_reports_bad_rows(tmp_path: Path):
     qs, errors = import_xlsx(xlsx)
     assert len(errors) == 2 and errors[0].startswith("row 2") and errors[1].startswith("row 3")
     assert len(qs) == 8
+
+
+def test_round_trip_keeps_shard_assignments(tmp_path: Path):
+    """A workbook without the column would silently un-shard the set on import."""
+    src = QUESTIONS_DIR / "caltrans-v0.jsonl"
+    original = load_questions(src)
+    assert {q.shard for q in original} != {None}, f"{src.name} is not sharded"
+    xlsx = export_xlsx(original, load_manifest(MANIFEST_PATH), tmp_path / "q.xlsx", src.name)
+    back, errors = import_xlsx(xlsx)
+    assert errors == []
+    assert {q.id: q.shard for q in back} == {q.id: q.shard for q in original}
